@@ -5,19 +5,20 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { REVIEW_ROUTE } from '@/lib/reminders';
+import { REMINDER_ROUTES } from '@/lib/reminders';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 
 SplashScreen.preventAutoHideAsync();
 
-// Tapping the nightly reminder opens the review, including when it launched the app.
+// Tapping a review reminder opens that review, including when it launched the app.
 function useReminderNavigation(enabled: boolean) {
   const response = Notifications.useLastNotificationResponse();
   useEffect(() => {
     if (!enabled || !response) return;
     if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-    if (response.notification.request.content.data?.url !== REVIEW_ROUTE) return;
-    router.push(REVIEW_ROUTE);
+    const url = REMINDER_ROUTES.find((route) => route === response.notification.request.content.data?.url);
+    if (!url) return;
+    router.push(url);
     Notifications.clearLastNotificationResponse();
   }, [enabled, response]);
 }
@@ -37,6 +38,7 @@ function RootNavigator() {
           <Stack.Screen name="(app)" />
           <Stack.Screen name="quick-log" options={{ presentation: 'modal' }} />
           <Stack.Screen name="review" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="weekly-review" options={{ presentation: 'modal' }} />
           <Stack.Screen name="intent-new" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>

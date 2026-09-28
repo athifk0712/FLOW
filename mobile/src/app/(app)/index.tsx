@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BudgetCard } from '@/components/dashboard/budget-card';
+import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,10 +14,12 @@ import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
+import { weeklyReviewWindow } from '@/lib/weekly-review';
 
 type Balance = Tables<'v_account_balances'>;
 type Budget = Tables<'v_budget_remaining'>;
 type MixRow = Tables<'v_spending_mix_monthly'>;
+type RegretRow = Tables<'v_regret_by_necessity'>;
 type Unreviewed = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at'> & {
   categories: { name: string } | null;
 };
@@ -30,12 +33,15 @@ export default function HomeScreen() {
   const [mix, setMix] = useState<MixRow[]>([]);
   const [heldBack, setHeldBack] = useState(0);
   const [unreviewed, setUnreviewed] = useState<Unreviewed[]>([]);
+  const [weeklyDue, setWeeklyDue] = useState(0);
+  const [regret, setRegret] = useState<RegretRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
   useFocusEffect(
     useCallback(() => {
       const month = currentMonthKey();
+      const week = weeklyReviewWindow();
       Promise.all([
         supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
         supabase.from('v_budget_remaining').select('*'),
@@ -46,8 +52,17 @@ export default function HomeScreen() {
           .select('id, amount, occurred_at, categories(name)')
           .eq('needs_review', true)
           .order('occurred_at', { ascending: false }),
-      ]).then(([bal, bud, mixRes, held, rev]) => {
-        const failed = bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error;
+        supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('type', 'EXPENSE')
+          .not('necessity', 'is', null)
+          .is('regret', null)
+          .gte('occurred_at', week.from)
+          .lte('occurred_at', week.to),
+        supabase.from('v_regret_by_necessity').select('*'),
+      ]).then(([bal, bud, mixRes, held, rev, due, reg]) => {
+        const failed = bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error;
         if (failed) return setError(failed.message);
         setError(null);
         setBalances(bal.data ?? []);
@@ -55,6 +70,8 @@ export default function HomeScreen() {
         setMix(mixRes.data ?? []);
         setHeldBack(held.data?.total_held_back ?? 0);
         setUnreviewed(rev.data ?? []);
+        setWeeklyDue(due.count ?? 0);
+        setRegret(reg.data ?? []);
       });
     }, []),
   );
@@ -111,6 +128,20 @@ export default function HomeScreen() {
             </Pressable>
           )}
 
+          {weeklyDue > 0 && (
+            <Pressable onPress={() => router.push('/weekly-review')}>
+              <ThemedView type="backgroundElement" style={[styles.card, styles.reviewCard]}>
+                <View style={styles.flex}>
+                  <ThemedText type="smallBold">Refleksi mingguan</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {weeklyDue} pengeluaran: masih puas, atau menyesal?
+                  </ThemedText>
+                </View>
+                <ThemedText type="smallBold">Mulai →</ThemedText>
+              </ThemedView>
+            </Pressable>
+          )}
+
           <Section title="BUDGET MINGGU INI">
             <BudgetCard budgets={budgets} />
           </Section>
@@ -118,6 +149,12 @@ export default function HomeScreen() {
           <Section title="PENGELUARAN BULAN INI">
             <SpendingMix rows={mix} />
           </Section>
+
+          {regret.some((r) => (r.reviewed ?? 0) > 0) && (
+            <Section title="REFLEKSI">
+              <RegretInsight rows={regret} />
+            </Section>
+          )}
 
           <Section title="AKUN">
             <ThemedView type="backgroundElement" style={styles.card}>

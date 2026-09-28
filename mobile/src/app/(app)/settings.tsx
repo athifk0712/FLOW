@@ -20,7 +20,13 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
 import { formatDigits, toDigits } from '@/lib/money';
-import { applyReminderSettings, getReminderSettings, REMINDER_HOURS, type ReminderSettings } from '@/lib/reminders';
+import {
+  applyReminderSettings,
+  getReminderSettings,
+  REMINDER_HOURS,
+  type ReminderSettings,
+  WEEKLY_LABEL,
+} from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
@@ -110,11 +116,15 @@ export default function SettingsScreen() {
     setReminderMessage(null);
     const ok = await applyReminderSettings(next);
     if (!ok) {
-      setReminder({ ...next, enabled: false });
+      setReminder({ ...next, enabled: false, weeklyEnabled: false });
       setReminderMessage('Izin notifikasi ditolak. Aktifkan dari pengaturan HP.');
-    } else if (next.enabled) {
-      setReminderMessage(`Pengingat aktif setiap hari jam ${String(next.hour).padStart(2, '0')}.00`);
+      return;
     }
+    const active = [
+      next.enabled && `review malam setiap hari jam ${String(next.hour).padStart(2, '0')}.00`,
+      next.weeklyEnabled && `refleksi mingguan setiap ${WEEKLY_LABEL}`,
+    ].filter(Boolean);
+    setReminderMessage(active.length > 0 ? `Pengingat aktif: ${active.join(' dan ')}.` : null);
   }
 
   const inputRow = [styles.priceRow, { backgroundColor: theme.backgroundSelected }];
@@ -182,14 +192,14 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
               <ThemedText type="smallBold" themeColor="textSecondary">
-                PENGINGAT REVIEW MALAM
+                PENGINGAT
               </ThemedText>
               <ThemedView type="backgroundElement" style={styles.card}>
                 <View style={styles.row}>
                   <View style={styles.flex}>
-                    <ThemedText type="smallBold">Ingatkan setiap malam</ThemedText>
+                    <ThemedText type="smallBold">Review malam</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
-                      Notifikasi untuk menilai pengeluaran hari itu.
+                      Setiap hari, untuk menilai pengeluaran hari itu.
                     </ThemedText>
                   </View>
                   <Switch value={reminder.enabled} onValueChange={(enabled) => updateReminder({ ...reminder, enabled })} />
@@ -214,6 +224,18 @@ export default function SettingsScreen() {
                     })}
                   </View>
                 )}
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <ThemedText type="smallBold">Refleksi mingguan</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {WEEKLY_LABEL}: masih puas dengan belanja minggu lalu, atau menyesal?
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    value={reminder.weeklyEnabled}
+                    onValueChange={(weeklyEnabled) => updateReminder({ ...reminder, weeklyEnabled })}
+                  />
+                </View>
                 {reminderMessage && (
                   <ThemedText type="small" themeColor="textSecondary">
                     {reminderMessage}
