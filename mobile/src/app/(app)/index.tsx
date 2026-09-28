@@ -1,51 +1,66 @@
-import { router, useFocusEffect } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BudgetCard } from '@/components/dashboard/budget-card';
+import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
 type Balance = Tables<'v_account_balances'>;
+type Budget = Tables<'v_budget_remaining'>;
+type MixRow = Tables<'v_spending_mix_monthly'>;
 type Unreviewed = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at'> & {
   categories: { name: string } | null;
 };
 
 const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-// v0.1 dashboard: real cash, balances per account, and what still needs the nightly review.
 export default function HomeScreen() {
   const theme = useTheme();
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [mix, setMix] = useState<MixRow[]>([]);
+  const [heldBack, setHeldBack] = useState(0);
   const [unreviewed, setUnreviewed] = useState<Unreviewed[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Refetch every time the screen regains focus, e.g. after closing Quick Log.
+  // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
   useFocusEffect(
     useCallback(() => {
+      const month = currentMonthKey();
       Promise.all([
         supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
+        supabase.from('v_budget_remaining').select('*'),
+        supabase.from('v_spending_mix_monthly').select('*').eq('month', month),
+        supabase.from('v_saved_money_monthly').select('total_held_back').eq('month', month).maybeSingle(),
         supabase
           .from('transactions')
           .select('id, amount, occurred_at, categories(name)')
           .eq('needs_review', true)
           .order('occurred_at', { ascending: false }),
-      ]).then(([bal, rev]) => {
-        const failed = bal.error ?? rev.error;
+      ]).then(([bal, bud, mixRes, held, rev]) => {
+        const failed = bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error;
         if (failed) return setError(failed.message);
         setError(null);
         setBalances(bal.data ?? []);
+        setBudgets(bud.data ?? []);
+        setMix(mixRes.data ?? []);
+        setHeldBack(held.data?.total_held_back ?? 0);
         setUnreviewed(rev.data ?? []);
       });
     }, []),
   );
 
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
+  const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <ThemedView style={styles.container}>
@@ -64,41 +79,56 @@ export default function HomeScreen() {
 
           {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
-          <ThemedView type="backgroundElement" style={styles.card}>
-            {balances.map((b) => (
-              <View key={b.account_id} style={styles.row}>
-                <ThemedText>{b.name}</ThemedText>
-                <ThemedText>{formatRupiah(b.current_balance ?? 0)}</ThemedText>
-              </View>
-            ))}
-          </ThemedView>
-
-          <View style={styles.row}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              BELUM DIREVIEW ({unreviewed.length})
-            </ThemedText>
-            {unreviewed.length > 0 && (
-              <Pressable onPress={() => router.push('/review')} hitSlop={8}>
-                <ThemedText type="smallBold">Mulai review →</ThemedText>
-              </Pressable>
-            )}
-          </View>
-          <ThemedView type="backgroundElement" style={styles.card}>
-            {unreviewed.length === 0 ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Semua transaksi sudah dinilai.
-              </ThemedText>
-            ) : (
-              unreviewed.map((t) => (
-                <View key={t.id} style={styles.row}>
-                  <ThemedText>
-                    {timeFormat.format(new Date(t.occurred_at))} · {t.categories?.name ?? 'Tanpa kategori'}
+          {heldBack > 0 && (
+            <Link href="/intents" asChild>
+              <Pressable>
+                <ThemedView style={[styles.card, styles.celebration]}>
+                  <ThemedText type="small" style={styles.celebrationText}>
+                    Bulan ini kamu berhasil menahan
                   </ThemedText>
-                  <ThemedText>{formatRupiah(t.amount)}</ThemedText>
+                  <ThemedText type="subtitle" style={[styles.celebrationText, styles.celebrationAmount]}>
+                    {formatRupiah(heldBack)}
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
+            </Link>
+          )}
+
+          {unreviewed.length > 0 && (
+            <Pressable onPress={() => router.push('/review')}>
+              <ThemedView type="backgroundElement" style={[styles.card, styles.reviewCard]}>
+                <View style={styles.flex}>
+                  <ThemedText type="smallBold">
+                    {unreviewed.length} transaksi belum dinilai
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {formatRupiah(unreviewedTotal)} · terakhir {timeFormat.format(new Date(unreviewed[0].occurred_at))}{' '}
+                    {unreviewed[0].categories?.name ?? ''}
+                  </ThemedText>
                 </View>
-              ))
-            )}
-          </ThemedView>
+                <ThemedText type="smallBold">Review →</ThemedText>
+              </ThemedView>
+            </Pressable>
+          )}
+
+          <Section title="BUDGET MINGGU INI">
+            <BudgetCard budgets={budgets} />
+          </Section>
+
+          <Section title="PENGELUARAN BULAN INI">
+            <SpendingMix rows={mix} />
+          </Section>
+
+          <Section title="AKUN">
+            <ThemedView type="backgroundElement" style={styles.card}>
+              {balances.map((b) => (
+                <View key={b.account_id} style={styles.row}>
+                  <ThemedText>{b.name}</ThemedText>
+                  <ThemedText>{formatRupiah(b.current_balance ?? 0)}</ThemedText>
+                </View>
+              ))}
+            </ThemedView>
+          </Section>
         </ScrollView>
 
         <Pressable
@@ -110,6 +140,17 @@ export default function HomeScreen() {
         </Pressable>
       </SafeAreaView>
     </ThemedView>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <ThemedText type="smallBold" themeColor="textSecondary">
+        {title}
+      </ThemedText>
+      {children}
+    </View>
   );
 }
 
@@ -127,17 +168,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.six + Spacing.four,
-    gap: Spacing.three,
+    gap: Spacing.four,
   },
   total: {
     fontSize: 36,
     lineHeight: 44,
     fontWeight: 700,
   },
+  section: {
+    gap: Spacing.two,
+  },
   card: {
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  celebration: {
+    backgroundColor: NECESSITY.NEED.color,
+  },
+  celebrationText: {
+    color: '#ffffff',
+  },
+  celebrationAmount: {
+    fontSize: 28,
+    lineHeight: 34,
+  },
+  reviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flex: {
+    flex: 1,
   },
   row: {
     flexDirection: 'row',

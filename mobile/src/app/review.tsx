@@ -5,24 +5,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { Enums, Tables } from '@/lib/database.types';
+import type { Tables } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
-type Necessity = Enums<'necessity_level'>;
 type Item = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at' | 'merchant' | 'description'> & {
   categories: { name: string } | null;
   accounts: { name: string } | null;
 };
 
-const OPTIONS: { value: Necessity; label: string; hint: string; color: string }[] = [
-  { value: 'NEED', label: 'Butuh', hint: 'Tidak bisa dihindari', color: '#30a46c' },
-  { value: 'IMPORTANT', label: 'Penting', hint: 'Perlu, tapi bisa ditunda', color: '#f5a524' },
-  { value: 'WANT', label: 'Ingin', hint: 'Direncanakan, tapi tidak perlu', color: '#3e8ef7' },
-  { value: 'IMPULSE', label: 'Impulsif', hint: 'Tidak direncanakan', color: '#e5484d' },
-];
+const OPTIONS = NECESSITY_ORDER.map((value) => ({ value, ...NECESSITY[value] }));
 
 const dateTimeFormat = new Intl.DateTimeFormat('id-ID', {
   weekday: 'short',

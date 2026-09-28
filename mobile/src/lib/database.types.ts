@@ -450,6 +450,10 @@ export type Database = {
         Args: { p_cost: number; p_user_id: string }
         Returns: string
       }
+      purchase_intent: {
+        Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
+        Returns: string
+      }
     }
     Enums: {
       account_type: "BANK" | "EWALLET" | "CASH"
