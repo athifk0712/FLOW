@@ -20,6 +20,7 @@ function RootNavigator() {
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(app)" />
           <Stack.Screen name="quick-log" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="review" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />

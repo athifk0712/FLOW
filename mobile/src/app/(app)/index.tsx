@@ -73,9 +73,16 @@ export default function HomeScreen() {
             ))}
           </ThemedView>
 
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            BELUM DIREVIEW ({unreviewed.length})
-          </ThemedText>
+          <View style={styles.row}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              BELUM DIREVIEW ({unreviewed.length})
+            </ThemedText>
+            {unreviewed.length > 0 && (
+              <Pressable onPress={() => router.push('/review')} hitSlop={8}>
+                <ThemedText type="smallBold">Mulai review →</ThemedText>
+              </Pressable>
+            )}
+          </View>
           <ThemedView type="backgroundElement" style={styles.card}>
             {unreviewed.length === 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
