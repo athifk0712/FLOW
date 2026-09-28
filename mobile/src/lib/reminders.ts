@@ -22,14 +22,19 @@ export type ReminderSettings = { enabled: boolean; hour: number; weeklyEnabled: 
 
 const DEFAULT_SETTINGS: ReminderSettings = { enabled: false, hour: 21, weeklyEnabled: false };
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/** Scheduled local notifications are not supported in the browser. */
+export const REMINDERS_SUPPORTED = Platform.OS !== 'web';
+
+if (REMINDERS_SUPPORTED) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export function getReminderSettings(): ReminderSettings {
   try {

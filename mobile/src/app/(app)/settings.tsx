@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccountSection } from '@/components/settings/account-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
@@ -24,11 +25,11 @@ import {
   applyReminderSettings,
   getReminderSettings,
   REMINDER_HOURS,
+  REMINDERS_SUPPORTED,
   type ReminderSettings,
   WEEKLY_LABEL,
 } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
-import { useSession } from '@/providers/session-provider';
 
 type Scope = Extract<Enums<'budget_scope'>, 'DISCRETIONARY' | 'ESSENTIAL'>;
 
@@ -49,7 +50,6 @@ const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = 
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { session } = useSession();
   const [budgetIds, setBudgetIds] = useState<Partial<Record<Scope, string>>>({});
   const [limits, setLimits] = useState<Record<Scope, string>>({ DISCRETIONARY: '', ESSENTIAL: '' });
   const [savingBudget, setSavingBudget] = useState(false);
@@ -140,6 +140,13 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
               <ThemedText type="smallBold" themeColor="textSecondary">
+                AKUN
+              </ThemedText>
+              <AccountSection />
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
                 BUDGET MINGGUAN
               </ThemedText>
               <ThemedView type="backgroundElement" style={styles.card}>
@@ -194,6 +201,13 @@ export default function SettingsScreen() {
               <ThemedText type="smallBold" themeColor="textSecondary">
                 PENGINGAT
               </ThemedText>
+              {!REMINDERS_SUPPORTED ? (
+                <ThemedView type="backgroundElement" style={styles.card}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Pengingat hanya tersedia di aplikasi HP. Aktifkan dari sana; review-nya tetap bisa dibuka di sini.
+                  </ThemedText>
+                </ThemedView>
+              ) : (
               <ThemedView type="backgroundElement" style={styles.card}>
                 <View style={styles.row}>
                   <View style={styles.flex}>
@@ -242,23 +256,7 @@ export default function SettingsScreen() {
                   </ThemedText>
                 )}
               </ThemedView>
-            </View>
-
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                AKUN
-              </ThemedText>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <ThemedText type="smallBold">
-                  {session?.user.is_anonymous ? 'Akun tamu' : session?.user.email}
-                </ThemedText>
-                {session?.user.is_anonymous && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Datamu tersimpan aman, tapi terikat ke HP ini. Kalau aplikasi dihapus sebelum email ditautkan, datanya
-                    tidak bisa dipulihkan. Menautkan email akan tersedia di versi berikutnya.
-                  </ThemedText>
-                )}
-              </ThemedView>
+              )}
             </View>
           </ScrollView>
         </SafeAreaView>
