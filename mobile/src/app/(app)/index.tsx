@@ -14,6 +14,7 @@ import { DANGER_COLOR } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
+import { type Debt, dueStatus } from '@/lib/debts';
 import type { Goal } from '@/lib/goals';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const [regret, setRegret] = useState<RegretRow[]>([]);
   const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [openDebts, setOpenDebts] = useState<Debt[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -69,13 +71,14 @@ export default function HomeScreen() {
           supabase.from('v_regret_by_necessity').select('*'),
           supabase.from('categories').select('id, name'),
           supabase.from('v_goal_progress').select('*').order('created_at'),
+          supabase.from('v_debts').select('*').eq('settled', false),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
       supabase
         .rpc('post_due_recurring')
         .then(load)
-        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows]) => {
+        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -85,7 +88,8 @@ export default function HomeScreen() {
             due.error ??
             reg.error ??
             cats.error ??
-            goalRows.error;
+            goalRows.error ??
+            debtRows.error;
           if (failed) return setError(failed.message);
           setError(null);
           setBalances(bal.data ?? []);
@@ -97,6 +101,7 @@ export default function HomeScreen() {
           setRegret(reg.data ?? []);
           setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
           setGoals(goalRows.data ?? []);
+          setOpenDebts(debtRows.data ?? []);
         });
     }, []),
   );
@@ -199,6 +204,12 @@ export default function HomeScreen() {
             </Pressable>
           </Section>
 
+          {openDebts.length > 0 && (
+            <Section title="UTANG & PIUTANG">
+              <DebtsCard debts={openDebts} />
+            </Section>
+          )}
+
           <Section title="AKUN">
             <Pressable onPress={() => router.push('/accounts')}>
               <ThemedView type="backgroundElement" style={styles.card}>
@@ -225,6 +236,36 @@ export default function HomeScreen() {
         </Pressable>
       </SafeAreaView>
     </ThemedView>
+  );
+}
+
+/** Open receivables and debts at a glance; red when something is overdue. */
+function DebtsCard({ debts }: { debts: Debt[] }) {
+  const sum = (direction: Debt['direction']) =>
+    debts.filter((d) => d.direction === direction).reduce((s, d) => s + (d.remaining ?? 0), 0);
+  const overdue = debts.filter((d) => dueStatus(d)?.overdue).length;
+  const owedToMe = sum('OWED_TO_ME');
+  const iOwe = sum('I_OWE');
+  return (
+    <Pressable onPress={() => router.push('/debts')}>
+      <ThemedView type="backgroundElement" style={styles.card}>
+        {owedToMe > 0 && (
+          <View style={styles.row}>
+            <ThemedText>Piutang (orang pinjam ke kamu)</ThemedText>
+            <ThemedText type="smallBold">{formatRupiah(owedToMe)}</ThemedText>
+          </View>
+        )}
+        {iOwe > 0 && (
+          <View style={styles.row}>
+            <ThemedText>Utang (kamu pinjam)</ThemedText>
+            <ThemedText type="smallBold">{formatRupiah(iOwe)}</ThemedText>
+          </View>
+        )}
+        <ThemedText type="small" themeColor={overdue ? undefined : 'textSecondary'} style={overdue > 0 && styles.error}>
+          {overdue > 0 ? `${overdue} lewat jatuh tempo · lihat →` : 'Kelola →'}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
   );
 }
 

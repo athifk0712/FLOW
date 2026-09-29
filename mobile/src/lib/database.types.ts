@@ -173,6 +173,78 @@ export type Database = {
         }
         Relationships: []
       }
+      debt_payments: {
+        Row: {
+          amount: number
+          debt_id: string
+          id: string
+          paid_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          debt_id: string
+          id?: string
+          paid_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          debt_id?: string
+          id?: string
+          paid_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_payments_debt_id_user_id_fkey"
+            columns: ["debt_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "debt_payments_debt_id_user_id_fkey"
+            columns: ["debt_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "v_debts"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      debts: {
+        Row: {
+          amount: number
+          created_at: string
+          direction: Database["public"]["Enums"]["debt_direction"]
+          due_date: string | null
+          id: string
+          note: string | null
+          person: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          direction: Database["public"]["Enums"]["debt_direction"]
+          due_date?: string | null
+          id?: string
+          note?: string | null
+          person: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          direction?: Database["public"]["Enums"]["debt_direction"]
+          due_date?: string | null
+          id?: string
+          note?: string | null
+          person?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       goal_contributions: {
         Row: {
           amount: number
@@ -558,6 +630,23 @@ export type Database = {
           },
         ]
       }
+      v_debts: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          direction: Database["public"]["Enums"]["debt_direction"] | null
+          due_date: string | null
+          id: string | null
+          last_paid_at: string | null
+          note: string | null
+          paid: number | null
+          person: string | null
+          remaining: number | null
+          settled: boolean | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_goal_progress: {
         Row: {
           created_at: string | null
@@ -621,6 +710,7 @@ export type Database = {
       budget_period: "WEEKLY" | "MONTHLY"
       budget_scope: "CATEGORY" | "ESSENTIAL" | "DISCRETIONARY"
       category_kind: "EXPENSE" | "INCOME"
+      debt_direction: "OWED_TO_ME" | "I_OWE"
       intent_status: "PENDING" | "PURCHASED" | "CANCELLED"
       necessity_level: "NEED" | "IMPORTANT" | "WANT" | "IMPULSE"
       transaction_type: "INCOME" | "EXPENSE" | "TRANSFER"
@@ -738,6 +828,7 @@ export const Constants = {
       budget_period: ["WEEKLY", "MONTHLY"],
       budget_scope: ["CATEGORY", "ESSENTIAL", "DISCRETIONARY"],
       category_kind: ["EXPENSE", "INCOME"],
+      debt_direction: ["OWED_TO_ME", "I_OWE"],
       intent_status: ["PENDING", "PURCHASED", "CANCELLED"],
       necessity_level: ["NEED", "IMPORTANT", "WANT", "IMPULSE"],
       transaction_type: ["INCOME", "EXPENSE", "TRANSFER"],

@@ -156,6 +156,7 @@ export default function SettingsScreen() {
                 <LinkRow title="Budget per kategori" hint="Batas mingguan atau bulanan per kategori" href="/budgets" />
                 <LinkRow title="Transaksi rutin" hint="Kos, langganan, gaji: dicatat otomatis tiap bulan" href="/recurring" />
                 <LinkRow title="Target tabungan" hint="Sisihkan uang untuk sesuatu yang kamu mau" href="/goals" />
+                <LinkRow title="Utang & piutang" hint="Siapa pinjam ke siapa, dan sudah dibayar berapa" href="/debts" />
               </ThemedView>
             </View>
 
