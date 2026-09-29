@@ -8,6 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { DANGER_COLOR } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatRupiah } from '@/lib/money';
+import { isScanResult, type ScanResult, scanReceipt } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
@@ -18,14 +20,21 @@ type Props = {
   transactionId: string;
   receiptId: string | null;
   onChange: (receiptId: string | null) => void;
+  /** Called when the user taps "Terapkan" on a scan result. */
+  onApplyScan: (result: ScanResult) => void;
 };
 
-/** Attach, view, or remove the receipt photo of one transaction. Changes are saved immediately. */
-export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
+const scanDateFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+/** Attach, view, or remove the receipt photo of one transaction. Changes are saved immediately.
+ * New photos are read by OCR; the result is only applied to the form when the user taps "Terapkan". */
+export function ReceiptPhoto({ transactionId, receiptId, onChange, onApplyScan }: Props) {
   const theme = useTheme();
   const { session } = useSession();
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [scan, setScan] = useState<ScanResult | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +43,13 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
     let active = true;
     supabase
       .from('receipts')
-      .select('storage_path')
+      .select('storage_path, ocr_json')
       .eq('id', receiptId)
       .single()
       .then(async ({ data, error }) => {
         if (!active) return;
         if (error) return setError(error.message);
+        if (isScanResult(data.ocr_json)) setScan(data.ocr_json);
         const signed = await supabase.storage.from(BUCKET).createSignedUrl(data.storage_path, SIGNED_URL_SECONDS);
         if (!active) return;
         if (signed.error) return setError(signed.error.message);
@@ -91,11 +101,25 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
       if (receiptId) await deleteReceipt(receiptId);
 
       setUrl(asset.uri);
+      setScan(null);
       onChange(inserted.data.id);
+      setBusy(false);
+      await runScan(inserted.data.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal mengunggah foto.');
-    } finally {
       setBusy(false);
+    }
+  }
+
+  async function runScan(id: string) {
+    setScanning(true);
+    setError(null);
+    try {
+      setScan(await scanReceipt(id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal membaca struk.');
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -113,6 +137,7 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
     setBusy(false);
     setConfirmRemove(false);
     setUrl(null);
+    setScan(null);
     onChange(null);
   }
 
@@ -141,6 +166,23 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
 
       {busy && <ActivityIndicator />}
 
+      {scanning && (
+        <View style={styles.scanning}>
+          <ActivityIndicator />
+          <ThemedText type="small" themeColor="textSecondary">
+            Membaca struk…
+          </ThemedText>
+        </View>
+      )}
+
+      {scan && !scanning && <ScanCard scan={scan} onApply={() => onApplyScan(scan)} />}
+
+      {receiptId && !scan && !scanning && !busy && (
+        <Pressable onPress={() => runScan(receiptId)} style={({ pressed }) => [button, pressed && styles.pressed]}>
+          <ThemedText type="smallBold">Baca struk otomatis</ThemedText>
+        </Pressable>
+      )}
+
       {receiptId && !busy && (
         <Pressable onPress={remove} style={styles.remove} hitSlop={8}>
           <ThemedText type="small" style={{ color: DANGER_COLOR }}>
@@ -151,6 +193,42 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange }: Props) {
 
       {error && <ThemedText style={styles.error}>{error}</ThemedText>}
     </View>
+  );
+}
+
+function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) {
+  const theme = useTheme();
+  if (!scan.is_receipt) {
+    return (
+      <ThemedText type="small" themeColor="textSecondary">
+        Foto ini tidak terbaca sebagai struk.
+      </ThemedText>
+    );
+  }
+  const date = /^(d{4})-(d{2})-(d{2})$/.exec(scan.date);
+  const parts = [
+    scan.merchant,
+    scan.total > 0 && formatRupiah(scan.total),
+    date && scanDateFormat.format(new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]))),
+    scan.time,
+    scan.category,
+  ].filter(Boolean);
+  return (
+    <ThemedView type="backgroundElement" style={styles.scanCard}>
+      <View style={styles.flex}>
+        <ThemedText type="small" themeColor="textSecondary">
+          Terbaca dari struk
+        </ThemedText>
+        <ThemedText type="smallBold">{parts.length > 0 ? parts.join(' · ') : 'Tidak ada yang terbaca'}</ThemedText>
+      </View>
+      {parts.length > 0 && (
+        <Pressable onPress={onApply} style={({ pressed }) => [styles.apply, { backgroundColor: theme.text }, pressed && styles.pressed]}>
+          <ThemedText type="smallBold" style={{ color: theme.background }}>
+            Terapkan
+          </ThemedText>
+        </Pressable>
+      )}
+    </ThemedView>
   );
 }
 
@@ -183,6 +261,27 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  scanning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+  },
+  scanCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  flex: {
+    flex: 1,
+  },
+  apply: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
     borderRadius: Spacing.three,
   },
   remove: {

@@ -21,6 +21,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
 import { formatDigits, toDigits } from '@/lib/money';
+import { type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
@@ -114,6 +115,16 @@ export default function TransactionScreen() {
     router.back();
   }
 
+  // Fills the form from a receipt scan; nothing is saved until "Simpan perubahan".
+  function applyScan(scan: ScanResult) {
+    if (scan.total > 0) setDigits(String(scan.total));
+    if (scan.merchant) setMerchant(scan.merchant.slice(0, 100));
+    const date = scannedDate(scan);
+    if (date) setOccurredAt(date);
+    const category = categories.find((c) => c.kind === tx?.type && c.name === scan.category);
+    if (category && tx?.type !== 'TRANSFER') setCategoryId(category.id);
+  }
+
   async function remove() {
     if (!tx || saving) return;
     // Two taps instead of a dialog, so it works the same on web.
@@ -175,7 +186,8 @@ export default function TransactionScreen() {
           ) : (
             <>
               <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-                <DateTimeField value={occurredAt} onChange={setOccurredAt} />
+                {/* Keyed so the time text resets when the date is set from outside (e.g. a receipt scan). */}
+                <DateTimeField key={occurredAt.getTime()} value={occurredAt} onChange={setOccurredAt} />
 
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.prefix}>Rp</ThemedText>
@@ -262,7 +274,12 @@ export default function TransactionScreen() {
                 <ThemedText type="small" themeColor="textSecondary">
                   Struk (langsung tersimpan)
                 </ThemedText>
-                <ReceiptPhoto transactionId={tx.id} receiptId={receiptId} onChange={setReceiptId} />
+                <ReceiptPhoto
+                  transactionId={tx.id}
+                  receiptId={receiptId}
+                  onChange={setReceiptId}
+                  onApplyScan={applyScan}
+                />
 
                 <ThemedText type="small" themeColor="textSecondary">
                   Nama / toko (opsional)
