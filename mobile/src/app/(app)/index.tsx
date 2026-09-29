@@ -17,6 +17,7 @@ import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
 import type { Goal } from '@/lib/goals';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
+import { isOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
 
@@ -92,6 +93,8 @@ export default function HomeScreen() {
             debtRows.error;
           if (failed) return setError(failed.message);
           setError(null);
+          // A brand-new guest (no accounts, never onboarded) gets the first-run setup.
+          if ((bal.data ?? []).length === 0 && !isOnboarded()) router.push('/onboarding');
           setBalances(bal.data ?? []);
           setBudgets(bud.data ?? []);
           setMix(mixRes.data ?? []);
