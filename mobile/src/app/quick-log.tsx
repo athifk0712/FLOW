@@ -7,31 +7,53 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { Tables } from '@/lib/database.types';
+import type { Tables, TablesInsert } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
-type Category = Pick<Tables<'categories'>, 'id' | 'name'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
+type Mode = 'EXPENSE' | 'INCOME' | 'TRANSFER';
+
+const MODES: { value: Mode; label: string }[] = [
+  { value: 'EXPENSE', label: 'Keluar' },
+  { value: 'INCOME', label: 'Masuk' },
+  { value: 'TRANSFER', label: 'Transfer' },
+];
+
+const SAVE_LABEL: Record<Mode, string> = {
+  EXPENSE: 'SIMPAN (review nanti malam)',
+  INCOME: 'SIMPAN PEMASUKAN',
+  TRANSFER: 'SIMPAN TRANSFER',
+};
+
+const FROM_LABEL: Record<Mode, string> = {
+  EXPENSE: 'Akun bayar',
+  INCOME: 'Masuk ke akun',
+  TRANSFER: 'Dari akun',
+};
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'del'] as const;
 const MAX_DIGITS = 12;
 
 // Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly review.
+// Income and transfers use the same screen; only expenses go to the nightly review.
 export default function QuickLogScreen() {
   const theme = useTheme();
+  const [mode, setMode] = useState<Mode>('EXPENSE');
   const [digits, setDigits] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [guessed, setGuessed] = useState(false);
+  const [toAccountId, setToAccountId] = useState<string | null>(null);
+  const [guess, setGuess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      supabase.from('categories').select('id, name').eq('kind', 'EXPENSE').order('created_at'),
+      supabase.from('categories').select('id, name, kind').order('created_at'),
       supabase.from('accounts').select('id, name').is('archived_at', null).order('created_at'),
       supabase
         .from('transactions')
@@ -49,7 +71,9 @@ export default function QuickLogScreen() {
       setAccounts(accountRows);
 
       // Default account: the one used last, else the first one.
-      setAccountId(recentRows[0]?.from_account_id ?? accountRows[0]?.id ?? null);
+      const defaultAccount = recentRows[0]?.from_account_id ?? accountRows[0]?.id ?? null;
+      setAccountId(defaultAccount);
+      setToAccountId(accountRows.find((a) => a.id !== defaultAccount)?.id ?? null);
 
       // Smart guess: the category logged most often around this hour.
       const hour = new Date().getHours();
@@ -61,14 +85,31 @@ export default function QuickLogScreen() {
       }
       const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
       if (best) {
+        setGuess(best[0]);
         setCategoryId(best[0]);
-        setGuessed(true);
       }
     });
   }, []);
 
   const amount = Number(digits || '0');
-  const canSave = amount > 0 && !!accountId && !saving;
+  const isTransfer = mode === 'TRANSFER';
+  const accountsValid = isTransfer ? !!accountId && !!toAccountId && accountId !== toAccountId : !!accountId;
+  const canSave = amount > 0 && accountsValid && !saving;
+  const visibleCategories = categories.filter((c) => c.kind === (mode === 'INCOME' ? 'INCOME' : 'EXPENSE'));
+  const guessed = mode === 'EXPENSE' && !!guess && categoryId === guess;
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    // The time-of-day guess only applies to expenses.
+    setCategoryId(next === 'EXPENSE' ? guess : null);
+  }
+
+  function pickFrom(id: string) {
+    setAccountId(id);
+    // Keep a transfer valid: move the destination off the account just picked as source.
+    if (id === toAccountId) setToAccountId(accounts.find((a) => a.id !== id)?.id ?? null);
+  }
 
   function press(key: (typeof KEYS)[number]) {
     if (key === 'del') return setDigits((d) => d.slice(0, -1));
@@ -82,12 +123,13 @@ export default function QuickLogScreen() {
     if (!canSave) return;
     setSaving(true);
     setError(null);
-    const { error } = await supabase.from('transactions').insert({
-      type: 'EXPENSE',
-      amount,
-      from_account_id: accountId,
-      category_id: categoryId,
-    });
+    const row: TablesInsert<'transactions'> =
+      mode === 'EXPENSE'
+        ? { type: mode, amount, from_account_id: accountId, category_id: categoryId }
+        : mode === 'INCOME'
+          ? { type: mode, amount, to_account_id: accountId, category_id: categoryId }
+          : { type: mode, amount, from_account_id: accountId, to_account_id: toAccountId };
+    const { error } = await supabase.from('transactions').insert(row);
     setSaving(false);
     if (error) return setError(error.message);
     router.back();
@@ -113,16 +155,30 @@ export default function QuickLogScreen() {
           </Pressable>
         </View>
 
+        <View style={[styles.modes, { backgroundColor: theme.backgroundElement }]}>
+          {MODES.map((m) => (
+            <Pressable
+              key={m.value}
+              onPress={() => switchMode(m.value)}
+              style={[styles.mode, m.value === mode && { backgroundColor: theme.text }]}>
+              <ThemedText type="smallBold" style={chipText(m.value === mode)}>
+                {m.label}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
         <ThemedText style={styles.amount} numberOfLines={1} adjustsFontSizeToFit>
           {formatRupiah(amount)}
         </ThemedText>
 
         <ThemedText type="small" themeColor="textSecondary">
-          Akun bayar{accounts.length > 1 ? ' (otomatis: terakhir dipakai)' : ''}
+          {FROM_LABEL[mode]}
+          {mode === 'EXPENSE' && accounts.length > 1 ? ' (otomatis: terakhir dipakai)' : ''}
         </ThemedText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {accounts.map((a) => (
-            <Pressable key={a.id} onPress={() => setAccountId(a.id)} style={chip(a.id === accountId)}>
+            <Pressable key={a.id} onPress={() => pickFrom(a.id)} style={chip(a.id === accountId)}>
               <ThemedText type="small" style={chipText(a.id === accountId)}>
                 {a.name}
               </ThemedText>
@@ -130,24 +186,48 @@ export default function QuickLogScreen() {
           ))}
         </ScrollView>
 
-        <ThemedText type="small" themeColor="textSecondary">
-          Kategori{guessed ? ' (tebakan dari jam ini)' : ''}
-        </ThemedText>
-        <View style={styles.chipsWrap}>
-          {categories.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => {
-                setCategoryId(c.id === categoryId ? null : c.id);
-                setGuessed(false);
-              }}
-              style={chip(c.id === categoryId)}>
-              <ThemedText type="small" style={chipText(c.id === categoryId)}>
-                {c.name}
+        {isTransfer ? (
+          <>
+            <ThemedText type="small" themeColor="textSecondary">
+              Ke akun
+            </ThemedText>
+            {accounts.length < 2 ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Butuh minimal dua akun untuk transfer.
               </ThemedText>
-            </Pressable>
-          ))}
-        </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {accounts
+                  .filter((a) => a.id !== accountId)
+                  .map((a) => (
+                    <Pressable key={a.id} onPress={() => setToAccountId(a.id)} style={chip(a.id === toAccountId)}>
+                      <ThemedText type="small" style={chipText(a.id === toAccountId)}>
+                        {a.name}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+              </ScrollView>
+            )}
+          </>
+        ) : (
+          <>
+            <ThemedText type="small" themeColor="textSecondary">
+              Kategori{guessed ? ' (tebakan dari jam ini)' : ''}
+            </ThemedText>
+            <View style={styles.chipsWrap}>
+              {visibleCategories.map((c) => (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setCategoryId(c.id === categoryId ? null : c.id)}
+                  style={chip(c.id === categoryId)}>
+                  <ThemedText type="small" style={chipText(c.id === categoryId)}>
+                    {c.name}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
@@ -180,7 +260,7 @@ export default function QuickLogScreen() {
             <ActivityIndicator color={theme.background} />
           ) : (
             <ThemedText type="smallBold" style={{ color: theme.background }}>
-              SIMPAN (review nanti malam)
+              {SAVE_LABEL[mode]}
             </ThemedText>
           )}
         </Pressable>
@@ -205,6 +285,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  modes: {
+    flexDirection: 'row',
+    padding: Spacing.one,
+    borderRadius: Spacing.three,
+  },
+  mode: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
   },
   amount: {
     fontSize: 44,
