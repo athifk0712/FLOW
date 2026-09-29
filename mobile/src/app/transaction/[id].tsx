@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateTimeField } from '@/components/date-time-field';
 import { deleteReceipt, ReceiptPhoto } from '@/components/receipt-photo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,15 +33,6 @@ const TYPE_LABEL: Record<TransactionRow['type'], string> = {
   TRANSFER: 'TRANSFER',
 };
 
-const dateTimeFormat = new Intl.DateTimeFormat('id-ID', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
 // Edit or delete one transaction. The type is fixed; to change it, delete and log it again.
 export default function TransactionScreen() {
   const theme = useTheme();
@@ -57,6 +49,7 @@ export default function TransactionScreen() {
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [occurredAt, setOccurredAt] = useState(() => new Date());
 
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -88,6 +81,7 @@ export default function TransactionScreen() {
       setMerchant(row.merchant ?? '');
       setDescription(row.description ?? '');
       setReceiptId(row.receipt_id);
+      setOccurredAt(new Date(row.occurred_at));
     });
   }, [id]);
 
@@ -107,6 +101,7 @@ export default function TransactionScreen() {
     setError(null);
     const changes: TablesUpdate<'transactions'> = {
       amount,
+      occurred_at: occurredAt.toISOString(),
       merchant: merchant.trim() || null,
       description: description.trim() || null,
     };
@@ -180,9 +175,7 @@ export default function TransactionScreen() {
           ) : (
             <>
               <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-                <ThemedText type="small" themeColor="textSecondary">
-                  {dateTimeFormat.format(new Date(tx.occurred_at))}
-                </ThemedText>
+                <DateTimeField value={occurredAt} onChange={setOccurredAt} />
 
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.prefix}>Rp</ThemedText>
