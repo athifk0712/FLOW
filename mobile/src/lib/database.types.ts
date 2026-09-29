@@ -173,6 +173,45 @@ export type Database = {
         }
         Relationships: []
       }
+      goal_contributions: {
+        Row: {
+          amount: number
+          created_at: string
+          goal_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_contributions_goal_id_user_id_fkey"
+            columns: ["goal_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_goal_id_user_id_fkey"
+            columns: ["goal_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "v_goal_progress"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -281,6 +320,33 @@ export type Database = {
             referencedColumns: ["id", "user_id"]
           },
         ]
+      }
+      savings_goals: {
+        Row: {
+          created_at: string
+          deadline: string | null
+          id: string
+          name: string
+          target_amount: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          name: string
+          target_amount: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          name?: string
+          target_amount?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       transactions: {
         Row: {
@@ -491,6 +557,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_goal_progress: {
+        Row: {
+          created_at: string | null
+          deadline: string | null
+          id: string | null
+          name: string | null
+          saved: number | null
+          target_amount: number | null
+          user_id: string | null
+        }
+        Relationships: []
       }
       v_regret_by_necessity: {
         Row: {

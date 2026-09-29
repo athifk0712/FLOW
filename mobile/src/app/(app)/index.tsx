@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
+import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
+import type { Goal } from '@/lib/goals';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
@@ -36,6 +38,7 @@ export default function HomeScreen() {
   const [weeklyDue, setWeeklyDue] = useState(0);
   const [regret, setRegret] = useState<RegretRow[]>([]);
   const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -64,15 +67,24 @@ export default function HomeScreen() {
             .lte('occurred_at', week.to),
           supabase.from('v_regret_by_necessity').select('*'),
           supabase.from('categories').select('id, name'),
+          supabase.from('v_goal_progress').select('*').order('created_at'),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
       supabase
         .rpc('post_due_recurring')
         .then(load)
-        .then(([bal, bud, mixRes, held, rev, due, reg, cats]) => {
+        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows]) => {
           const failed =
-            bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error ?? cats.error;
+            bal.error ??
+            bud.error ??
+            mixRes.error ??
+            held.error ??
+            rev.error ??
+            due.error ??
+            reg.error ??
+            cats.error ??
+            goalRows.error;
           if (failed) return setError(failed.message);
           setError(null);
           setBalances(bal.data ?? []);
@@ -83,6 +95,7 @@ export default function HomeScreen() {
           setWeeklyDue(due.count ?? 0);
           setRegret(reg.data ?? []);
           setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
+          setGoals(goalRows.data ?? []);
         });
     }, []),
   );
@@ -170,6 +183,23 @@ export default function HomeScreen() {
             </Section>
           )}
 
+          <Section title="TARGET TABUNGAN">
+            <Pressable onPress={() => router.push('/goals')}>
+              <ThemedView type="backgroundElement" style={[styles.card, styles.goals]}>
+                {goals.slice(0, 3).map((g) => (
+                  <GoalProgress key={g.id} goal={g} />
+                ))}
+                <ThemedText type="small" themeColor="textSecondary">
+                  {goals.length === 0
+                    ? 'Mau menabung untuk sesuatu? Buat target tabungan →'
+                    : goals.length > 3
+                      ? `Lihat semua ${goals.length} target →`
+                      : 'Kelola target →'}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Section>
+
           <Section title="AKUN">
             <Pressable onPress={() => router.push('/accounts')}>
               <ThemedView type="backgroundElement" style={styles.card}>
@@ -238,6 +268,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  goals: {
+    gap: Spacing.three,
   },
   celebration: {
     backgroundColor: NECESSITY.NEED.color,
