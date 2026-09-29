@@ -251,6 +251,7 @@ export type Database = {
           created_at: string
           goal_id: string
           id: string
+          intent_id: string | null
           user_id: string
         }
         Insert: {
@@ -258,6 +259,7 @@ export type Database = {
           created_at?: string
           goal_id: string
           id?: string
+          intent_id?: string | null
           user_id?: string
         }
         Update: {
@@ -265,6 +267,7 @@ export type Database = {
           created_at?: string
           goal_id?: string
           id?: string
+          intent_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -280,6 +283,20 @@ export type Database = {
             columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "v_goal_progress"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_intent_id_user_id_fkey"
+            columns: ["intent_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "buy_intents"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_intent_id_user_id_fkey"
+            columns: ["intent_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "v_buy_intents"
             referencedColumns: ["id", "user_id"]
           },
         ]

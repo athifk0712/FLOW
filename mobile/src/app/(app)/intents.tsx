@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProgressBar } from '@/components/progress-bar';
+import { SaveToGoal } from '@/components/save-to-goal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
@@ -44,6 +45,9 @@ export default function IntentsScreen() {
   const [heldBack, setHeldBack] = useState({ total: 0, count: 0 });
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
+  // Cancelled intents whose money is already set aside for a goal, and the one being offered now.
+  const [savedIntentIds, setSavedIntentIds] = useState(new Set<string>());
+  const [offer, setOffer] = useState<Intent | null>(null);
 
   const load = useCallback(() => {
     Promise.all([
@@ -54,13 +58,15 @@ export default function IntentsScreen() {
         .select('total_held_back, items_held_back')
         .eq('month', currentMonthKey())
         .maybeSingle(),
-    ]).then(([int, acc, held]) => {
-      const failed = int.error ?? acc.error ?? held.error;
+      supabase.from('goal_contributions').select('intent_id').not('intent_id', 'is', null),
+    ]).then(([int, acc, held, saved]) => {
+      const failed = int.error ?? acc.error ?? held.error ?? saved.error;
       if (failed) return setError(failed.message);
       setError(null);
       setIntents(int.data ?? []);
       setAccounts(acc.data ?? []);
       setHeldBack({ total: held.data?.total_held_back ?? 0, count: held.data?.items_held_back ?? 0 });
+      setSavedIntentIds(new Set((saved.data ?? []).map((c) => c.intent_id!)));
       setNow(Date.now());
     });
   }, []);
@@ -109,11 +115,31 @@ export default function IntentsScreen() {
             </ThemedText>
           </Pressable>
 
+          {offer && (
+            <SaveToGoal
+              key={offer.id}
+              intentId={offer.id}
+              itemName={offer.item_name}
+              amount={offer.estimated_cost}
+              onClose={() => {
+                setOffer(null);
+                load();
+              }}
+            />
+          )}
+
           {error && <ThemedText style={styles.error}>{error}</ThemedText>}
           {intents === null && !error && <ActivityIndicator />}
 
           {pending.map((intent) => (
-            <IntentCard key={intent.id} intent={intent} accounts={accounts} now={now} onChanged={load} />
+            <IntentCard
+              key={intent.id}
+              intent={intent}
+              accounts={accounts}
+              now={now}
+              onChanged={load}
+              onCancelled={() => setOffer(intent)}
+            />
           ))}
 
           {decided.length > 0 && (
@@ -130,9 +156,18 @@ export default function IntentsScreen() {
                         {i.status === 'CANCELLED' ? 'Ditahan' : 'Dibeli'} · {dateFormat.format(new Date(i.decided_at ?? i.created_at))}
                       </ThemedText>
                     </View>
-                    <ThemedText type="small" style={i.status === 'CANCELLED' ? styles.saved : undefined}>
-                      {formatRupiah(i.estimated_cost)}
-                    </ThemedText>
+                    <View style={styles.amountColumn}>
+                      <ThemedText type="small" style={i.status === 'CANCELLED' ? styles.saved : undefined}>
+                        {formatRupiah(i.estimated_cost)}
+                      </ThemedText>
+                      {i.status === 'CANCELLED' && !savedIntentIds.has(i.id) && offer?.id !== i.id && (
+                        <Pressable onPress={() => setOffer(i)} hitSlop={8}>
+                          <ThemedText type="small" style={{ color: theme.primary }}>
+                            Sisihkan ke tabungan →
+                          </ThemedText>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                 ))}
               </ThemedView>
@@ -149,11 +184,13 @@ function IntentCard({
   accounts,
   now,
   onChanged,
+  onCancelled,
 }: {
   intent: Intent;
   accounts: Account[];
   now: number;
   onChanged: () => void;
+  onCancelled: () => void;
 }) {
   const theme = useTheme();
   const [buying, setBuying] = useState(false);
@@ -172,6 +209,7 @@ function IntentCard({
     const { error } = await supabase.from('buy_intents').update({ status: 'CANCELLED' }).eq('id', intent.id);
     setBusy(false);
     if (error) return setError(error.message);
+    onCancelled();
     onChanged();
   }
 
@@ -242,10 +280,10 @@ function IntentCard({
           onPress={buying ? () => setBuying(false) : cancel}
           style={({ pressed }) => [
             styles.action,
-            { backgroundColor: buying ? theme.backgroundSelected : NECESSITY.NEED.color },
+            { backgroundColor: buying ? theme.backgroundSelected : theme.primary },
             (pressed || busy) && styles.pressed,
           ]}>
-          <ThemedText type="smallBold" style={buying ? undefined : styles.white}>
+          <ThemedText type="smallBold" style={buying ? undefined : { color: theme.onPrimary }}>
             {buying ? 'Kembali' : 'Tahan uangnya'}
           </ThemedText>
         </Pressable>
@@ -271,6 +309,9 @@ function IntentCard({
 }
 
 const styles = StyleSheet.create({
+  amountColumn: {
+    alignItems: 'flex-end',
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
