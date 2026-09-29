@@ -23,7 +23,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="intents">
-        <NativeTabs.Trigger.Label>Sebelum Beli</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Tunda Beli</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="hourglass" md="hourglass_empty" />
       </NativeTabs.Trigger>
 

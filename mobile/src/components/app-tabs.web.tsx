@@ -20,7 +20,7 @@ export default function AppTabs() {
             <TabButton>Riwayat</TabButton>
           </TabTrigger>
           <TabTrigger name="intents" href="/intents" asChild>
-            <TabButton>Sebelum Beli</TabButton>
+            <TabButton>Tunda Beli</TabButton>
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TabButton>Pengaturan</TabButton>
