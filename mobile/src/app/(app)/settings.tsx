@@ -154,6 +154,7 @@ export default function SettingsScreen() {
                 <LinkRow title="Akun & dompet" hint="Bank, e-wallet, tunai, dan saldo awalnya" href="/accounts" />
                 <LinkRow title="Kategori" hint="Tambah, ganti nama, atau hapus kategori" href="/categories" />
                 <LinkRow title="Budget per kategori" hint="Batas mingguan atau bulanan per kategori" href="/budgets" />
+                <LinkRow title="Transaksi rutin" hint="Kos, langganan, gaji: dicatat otomatis tiap bulan" href="/recurring" />
               </ThemedView>
             </View>
 

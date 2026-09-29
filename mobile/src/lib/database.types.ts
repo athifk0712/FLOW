@@ -215,6 +215,73 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_transactions: {
+        Row: {
+          account_id: string
+          active: boolean
+          amount: number
+          category_id: string | null
+          created_at: string
+          day_of_month: number
+          id: string
+          name: string
+          necessity: Database["public"]["Enums"]["necessity_level"] | null
+          next_due: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          active?: boolean
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month: number
+          id?: string
+          name: string
+          necessity?: Database["public"]["Enums"]["necessity_level"] | null
+          next_due?: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Update: {
+          account_id?: string
+          active?: boolean
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          id?: string
+          name?: string
+          necessity?: Database["public"]["Enums"]["necessity_level"] | null
+          next_due?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_transactions_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_balances"
+            referencedColumns: ["account_id", "user_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_category_id_user_id_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -228,6 +295,7 @@ export type Database = {
           needs_review: boolean | null
           occurred_at: string
           receipt_id: string | null
+          recurring_id: string | null
           regret: boolean | null
           regret_reviewed_at: string | null
           to_account_id: string | null
@@ -247,6 +315,7 @@ export type Database = {
           needs_review?: boolean | null
           occurred_at?: string
           receipt_id?: string | null
+          recurring_id?: string | null
           regret?: boolean | null
           regret_reviewed_at?: string | null
           to_account_id?: string | null
@@ -266,6 +335,7 @@ export type Database = {
           needs_review?: boolean | null
           occurred_at?: string
           receipt_id?: string | null
+          recurring_id?: string | null
           regret?: boolean | null
           regret_reviewed_at?: string | null
           to_account_id?: string | null
@@ -301,6 +371,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "receipts"
             referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "transactions_to_account_id_user_id_fkey"
@@ -450,10 +527,16 @@ export type Database = {
         Args: { p_cost: number; p_user_id: string }
         Returns: string
       }
+      post_due_recurring: { Args: never; Returns: number }
       purchase_intent: {
         Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
         Returns: string
       }
+      recurring_due_date: {
+        Args: { p_day: number; p_month: number; p_year: number }
+        Returns: string
+      }
+      user_today: { Args: { p_user_id: string }; Returns: string }
     }
     Enums: {
       account_type: "BANK" | "EWALLET" | "CASH"

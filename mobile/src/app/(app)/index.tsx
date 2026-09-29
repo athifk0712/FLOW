@@ -43,40 +43,47 @@ export default function HomeScreen() {
     useCallback(() => {
       const month = currentMonthKey();
       const week = weeklyReviewWindow();
-      Promise.all([
-        supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
-        supabase.from('v_budget_remaining').select('*'),
-        supabase.from('v_spending_mix_monthly').select('*').eq('month', month),
-        supabase.from('v_saved_money_monthly').select('total_held_back').eq('month', month).maybeSingle(),
-        supabase
-          .from('transactions')
-          .select('id, amount, occurred_at, categories(name)')
-          .eq('needs_review', true)
-          .order('occurred_at', { ascending: false }),
-        supabase
-          .from('transactions')
-          .select('id', { count: 'exact', head: true })
-          .eq('type', 'EXPENSE')
-          .not('necessity', 'is', null)
-          .is('regret', null)
-          .gte('occurred_at', week.from)
-          .lte('occurred_at', week.to),
-        supabase.from('v_regret_by_necessity').select('*'),
-        supabase.from('categories').select('id, name'),
-      ]).then(([bal, bud, mixRes, held, rev, due, reg, cats]) => {
-        const failed =
-          bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error ?? cats.error;
-        if (failed) return setError(failed.message);
-        setError(null);
-        setBalances(bal.data ?? []);
-        setBudgets(bud.data ?? []);
-        setMix(mixRes.data ?? []);
-        setHeldBack(held.data?.total_held_back ?? 0);
-        setUnreviewed(rev.data ?? []);
-        setWeeklyDue(due.count ?? 0);
-        setRegret(reg.data ?? []);
-        setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
-      });
+      const load = () =>
+        Promise.all([
+          supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
+          supabase.from('v_budget_remaining').select('*'),
+          supabase.from('v_spending_mix_monthly').select('*').eq('month', month),
+          supabase.from('v_saved_money_monthly').select('total_held_back').eq('month', month).maybeSingle(),
+          supabase
+            .from('transactions')
+            .select('id, amount, occurred_at, categories(name)')
+            .eq('needs_review', true)
+            .order('occurred_at', { ascending: false }),
+          supabase
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('type', 'EXPENSE')
+            .not('necessity', 'is', null)
+            .is('regret', null)
+            .gte('occurred_at', week.from)
+            .lte('occurred_at', week.to),
+          supabase.from('v_regret_by_necessity').select('*'),
+          supabase.from('categories').select('id, name'),
+        ]);
+      // Post due recurring transactions first so balances and budgets include them.
+      // A failure there should not block the dashboard; the next focus retries.
+      supabase
+        .rpc('post_due_recurring')
+        .then(load)
+        .then(([bal, bud, mixRes, held, rev, due, reg, cats]) => {
+          const failed =
+            bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error ?? cats.error;
+          if (failed) return setError(failed.message);
+          setError(null);
+          setBalances(bal.data ?? []);
+          setBudgets(bud.data ?? []);
+          setMix(mixRes.data ?? []);
+          setHeldBack(held.data?.total_held_back ?? 0);
+          setUnreviewed(rev.data ?? []);
+          setWeeklyDue(due.count ?? 0);
+          setRegret(reg.data ?? []);
+          setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
+        });
     }, []),
   );
 
