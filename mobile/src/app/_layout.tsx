@@ -46,6 +46,7 @@ function RootNavigator() {
           <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
           <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
           <Stack.Screen name="budgets" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="report" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />

@@ -152,6 +152,9 @@ export default function HomeScreen() {
 
           <Section title="PENGELUARAN BULAN INI">
             <SpendingMix rows={mix} />
+            <Pressable onPress={() => router.push('/report')} hitSlop={8}>
+              <ThemedText type="smallBold">Lihat laporan bulanan →</ThemedText>
+            </Pressable>
           </Section>
 
           {regret.some((r) => (r.reviewed ?? 0) > 0) && (

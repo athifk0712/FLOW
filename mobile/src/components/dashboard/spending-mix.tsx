@@ -8,11 +8,11 @@ import { Spacing } from '@/constants/theme';
 import type { Tables } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
 
-type MixRow = Tables<'v_spending_mix_monthly'>;
+type MixRow = Pick<Tables<'v_spending_mix_monthly'>, 'necessity' | 'total'>;
 
 const percent = (value: number, total: number) => (total > 0 ? Math.round((value / total) * 100) : 0);
 
-/** This month's expenses split by necessity. Unreviewed spending is its own slice so the parts add up to 100%. */
+/** A month's expenses split by necessity. Unreviewed spending is its own slice so the parts add up to 100%. */
 export function SpendingMix({ rows }: { rows: MixRow[] }) {
   const byKey = new Map(rows.map((r) => [r.necessity ?? 'UNREVIEWED', r.total ?? 0]));
   const slices = [
