@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { deleteReceipt, ReceiptPhoto } from '@/components/receipt-photo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { DANGER_COLOR, NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
@@ -55,6 +56,7 @@ export default function TransactionScreen() {
   const [necessity, setNecessity] = useState<Necessity | null>(null);
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
+  const [receiptId, setReceiptId] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -85,6 +87,7 @@ export default function TransactionScreen() {
       setNecessity(row.necessity);
       setMerchant(row.merchant ?? '');
       setDescription(row.description ?? '');
+      setReceiptId(row.receipt_id);
     });
   }, [id]);
 
@@ -123,6 +126,7 @@ export default function TransactionScreen() {
     setSaving(true);
     setError(null);
     const { error } = await supabase.from('transactions').delete().eq('id', tx.id);
+    if (!error && receiptId) await deleteReceipt(receiptId);
     setSaving(false);
     if (error) return setError(error.message);
     router.back();
@@ -261,6 +265,11 @@ export default function TransactionScreen() {
                     </View>
                   </>
                 )}
+
+                <ThemedText type="small" themeColor="textSecondary">
+                  Struk (langsung tersimpan)
+                </ThemedText>
+                <ReceiptPhoto transactionId={tx.id} receiptId={receiptId} onChange={setReceiptId} />
 
                 <ThemedText type="small" themeColor="textSecondary">
                   Nama / toko (opsional)

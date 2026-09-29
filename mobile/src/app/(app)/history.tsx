@@ -188,6 +188,7 @@ function HistoryItem({ item }: { item: TransactionRow }) {
           <ThemedText numberOfLines={1}>{transactionTitle(item)}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
             {timeFormat.format(new Date(item.occurred_at))} · {account}
+            {item.receipt_id ? ' · ada struk' : ''}
           </ThemedText>
         </View>
         <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: INCOME_COLOR }}>

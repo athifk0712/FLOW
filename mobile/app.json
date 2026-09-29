@@ -34,7 +34,15 @@
         }
       ],
       "expo-sqlite",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FLOW memakai galeri untuk melampirkan foto struk ke transaksi.",
+          "cameraPermission": "FLOW memakai kamera untuk memotret struk belanja.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
