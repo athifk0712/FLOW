@@ -183,7 +183,11 @@ export default function QuickLogScreen() {
             <ThemedText type="small">Belum ada akun. Tambahkan dulu →</ThemedText>
           </Pressable>
         )}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRow}
+          contentContainerStyle={styles.chips}>
           {accounts.map((a) => (
             <Pressable key={a.id} onPress={() => pickFrom(a.id)} style={chip(a.id === accountId)}>
               <ThemedText type="small" style={chipText(a.id === accountId)}>
@@ -203,7 +207,11 @@ export default function QuickLogScreen() {
                 Butuh minimal dua akun untuk transfer.
               </ThemedText>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipRow}
+                contentContainerStyle={styles.chips}>
                 {accounts
                   .filter((a) => a.id !== accountId)
                   .map((a) => (
@@ -310,8 +318,13 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     paddingVertical: Spacing.two,
   },
+  // Without this, a horizontal ScrollView on web grows to fill free height and stretches the chips.
+  chipRow: {
+    flexGrow: 0,
+  },
   chips: {
     gap: Spacing.two,
+    alignItems: 'flex-start',
   },
   chipsWrap: {
     flexDirection: 'row',
