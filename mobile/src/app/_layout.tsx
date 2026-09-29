@@ -67,6 +67,7 @@ function RootNavigator() {
           <Stack.Screen name="goals" options={{ presentation: 'modal' }} />
           <Stack.Screen name="debts" options={{ presentation: 'modal' }} />
           <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="habits" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />

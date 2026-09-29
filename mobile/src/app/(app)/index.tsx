@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BudgetCard } from '@/components/dashboard/budget-card';
+import { HabitCard } from '@/components/dashboard/habit-card';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
@@ -16,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
 import type { Goal } from '@/lib/goals';
+import { fetchHabits, type Habits } from '@/lib/habits';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +45,7 @@ export default function HomeScreen() {
   const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
   const [goals, setGoals] = useState<Goal[]>([]);
   const [openDebts, setOpenDebts] = useState<Debt[]>([]);
+  const [habits, setHabits] = useState<Habits | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -76,9 +79,14 @@ export default function HomeScreen() {
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
+      // Habits are a nice-to-have: failures just leave the card hidden.
+      const loadHabits = () => fetchHabits().then(setHabits, () => {});
       supabase
         .rpc('post_due_recurring')
-        .then(load)
+        .then(() => {
+          loadHabits();
+          return load();
+        })
         .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows]) => {
           const failed =
             bal.error ??
@@ -171,6 +179,12 @@ export default function HomeScreen() {
                 <ThemedText type="smallBold">Mulai →</ThemedText>
               </ThemedView>
             </Pressable>
+          )}
+
+          {habits && habits.milestones[0].done && (
+            <Section title="KEBIASAAN">
+              <HabitCard habits={habits} />
+            </Section>
           )}
 
           <Section title="BUDGET">
