@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +19,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
 import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type AccountType = Enums<'account_type'>;
@@ -240,7 +241,7 @@ export default function AccountsScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary">
               AKUN & DOMPET
             </ThemedText>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
                 Tutup
               </ThemedText>

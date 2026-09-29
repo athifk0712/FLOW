@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +18,7 @@ import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Kind = Enums<'category_kind'>;
@@ -153,7 +154,7 @@ export default function CategoriesScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary">
               KATEGORI
             </ThemedText>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
                 Tutup
               </ThemedText>

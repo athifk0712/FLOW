@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { type Href, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -153,6 +153,7 @@ export default function SettingsScreen() {
               <ThemedView type="backgroundElement" style={styles.card}>
                 <LinkRow title="Akun & dompet" hint="Bank, e-wallet, tunai, dan saldo awalnya" href="/accounts" />
                 <LinkRow title="Kategori" hint="Tambah, ganti nama, atau hapus kategori" href="/categories" />
+                <LinkRow title="Budget per kategori" hint="Batas mingguan atau bulanan per kategori" href="/budgets" />
               </ThemedView>
             </View>
 
@@ -276,7 +277,7 @@ export default function SettingsScreen() {
   );
 }
 
-function LinkRow({ title, hint, href }: { title: string; hint: string; href: '/accounts' | '/categories' }) {
+function LinkRow({ title, hint, href }: { title: string; hint: string; href: Href }) {
   return (
     <Pressable onPress={() => router.push(href)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.flex}>

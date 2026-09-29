@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +9,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name'>;
@@ -75,7 +75,7 @@ export default function NewIntentScreen() {
             {result}
           </ThemedText>
           <Pressable
-            onPress={() => router.back()}
+            onPress={closeModal}
             style={({ pressed }) => [styles.save, { backgroundColor: theme.text }, pressed && styles.pressed]}>
             <ThemedText type="smallBold" style={{ color: theme.background }}>
               Oke
@@ -94,7 +94,7 @@ export default function NewIntentScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary">
               NIAT BELI
             </ThemedText>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
                 Batal
               </ThemedText>

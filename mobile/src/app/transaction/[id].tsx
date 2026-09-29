@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
 import { formatDigits, toDigits } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
@@ -112,7 +113,7 @@ export default function TransactionScreen() {
     const { error } = await supabase.from('transactions').update(changes).eq('id', tx.id);
     setSaving(false);
     if (error) return setError(error.message);
-    router.back();
+    closeModal();
   }
 
   // Fills the form from a receipt scan; nothing is saved until "Simpan perubahan".
@@ -135,7 +136,7 @@ export default function TransactionScreen() {
     if (!error && receiptId) await deleteReceipt(receiptId);
     setSaving(false);
     if (error) return setError(error.message);
-    router.back();
+    closeModal();
   }
 
   const chip = (selected: boolean) => [
@@ -170,7 +171,7 @@ export default function TransactionScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary">
               {type ? `EDIT ${TYPE_LABEL[type]}` : 'TRANSAKSI'}
             </ThemedText>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
                 Batal
               </ThemedText>

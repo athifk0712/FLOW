@@ -9,6 +9,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
@@ -134,7 +135,7 @@ export default function QuickLogScreen() {
     const { error } = await supabase.from('transactions').insert(row);
     setSaving(false);
     if (error) return setError(error.message);
-    router.back();
+    closeModal();
   }
 
   const chip = (selected: boolean) => [
@@ -150,7 +151,7 @@ export default function QuickLogScreen() {
           <ThemedText type="smallBold" themeColor="textSecondary">
             QUICK LOG
           </ThemedText>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={closeModal} hitSlop={12}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               Batal
             </ThemedText>

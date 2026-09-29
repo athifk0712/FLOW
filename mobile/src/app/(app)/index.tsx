@@ -35,6 +35,7 @@ export default function HomeScreen() {
   const [unreviewed, setUnreviewed] = useState<Unreviewed[]>([]);
   const [weeklyDue, setWeeklyDue] = useState(0);
   const [regret, setRegret] = useState<RegretRow[]>([]);
+  const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -61,8 +62,10 @@ export default function HomeScreen() {
           .gte('occurred_at', week.from)
           .lte('occurred_at', week.to),
         supabase.from('v_regret_by_necessity').select('*'),
-      ]).then(([bal, bud, mixRes, held, rev, due, reg]) => {
-        const failed = bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error;
+        supabase.from('categories').select('id, name'),
+      ]).then(([bal, bud, mixRes, held, rev, due, reg, cats]) => {
+        const failed =
+          bal.error ?? bud.error ?? mixRes.error ?? held.error ?? rev.error ?? due.error ?? reg.error ?? cats.error;
         if (failed) return setError(failed.message);
         setError(null);
         setBalances(bal.data ?? []);
@@ -72,6 +75,7 @@ export default function HomeScreen() {
         setUnreviewed(rev.data ?? []);
         setWeeklyDue(due.count ?? 0);
         setRegret(reg.data ?? []);
+        setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
       });
     }, []),
   );
@@ -142,8 +146,8 @@ export default function HomeScreen() {
             </Pressable>
           )}
 
-          <Section title="BUDGET MINGGU INI">
-            <BudgetCard budgets={budgets} />
+          <Section title="BUDGET">
+            <BudgetCard budgets={budgets} categoryNames={categoryNames} />
           </Section>
 
           <Section title="PENGELUARAN BULAN INI">

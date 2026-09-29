@@ -23,13 +23,18 @@ const SCOPE_COLOR = {
   CATEGORY: NECESSITY.IMPORTANT.color,
 } as const;
 
-/** This week's budgets. Discretionary first: it is the one the app is really about. */
-export function BudgetCard({ budgets }: { budgets: Budget[] }) {
+const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
+
+/** Current budgets. Discretionary first: it is the one the app is really about.
+ * Category budgets follow, the closest to their limit first. */
+export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; categoryNames: Map<string, string> }) {
   const weekly = budgets
     .filter((b) => b.period === 'WEEKLY' && b.scope !== 'CATEGORY')
     .sort((a, b) => Number(a.scope !== 'DISCRETIONARY') - Number(b.scope !== 'DISCRETIONARY'));
+  const usedShare = (b: Budget) => (b.spent ?? 0) / (b.limit_amount || 1);
+  const perCategory = budgets.filter((b) => b.scope === 'CATEGORY').sort((a, b) => usedShare(b) - usedShare(a));
 
-  if (weekly.length === 0) {
+  if (weekly.length === 0 && perCategory.length === 0) {
     return (
       <Link href="/settings" asChild>
         <Pressable>
@@ -46,23 +51,26 @@ export function BudgetCard({ budgets }: { budgets: Budget[] }) {
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      {weekly.map((b) => {
+      {[...weekly, ...perCategory].map((b) => {
         const limit = b.limit_amount ?? 0;
         const spent = b.spent ?? 0;
         const remaining = b.remaining ?? 0;
         const over = remaining < 0;
         const scope = b.scope ?? 'DISCRETIONARY';
+        const label =
+          scope === 'CATEGORY' ? (categoryNames.get(b.category_id ?? '') ?? SCOPE_LABEL.CATEGORY) : SCOPE_LABEL[scope];
+        const period = PERIOD_LABEL[b.period ?? 'WEEKLY'];
         return (
           <View key={b.budget_id} style={styles.budget}>
             <View style={styles.row}>
-              <ThemedText type="smallBold">{SCOPE_LABEL[scope]}</ThemedText>
+              <ThemedText type="smallBold">{label}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {formatRupiah(spent)} / {formatRupiah(limit)}
               </ThemedText>
             </View>
             <ProgressBar total={limit} segments={[{ value: spent, color: over ? DANGER_COLOR : SCOPE_COLOR[scope] }]} />
             <ThemedText type="small" style={over ? styles.danger : undefined} themeColor="textSecondary">
-              {over ? `Lewat ${formatRupiah(-remaining)} minggu ini` : `Sisa ${formatRupiah(remaining)} minggu ini`}
+              {over ? `Lewat ${formatRupiah(-remaining)} ${period}` : `Sisa ${formatRupiah(remaining)} ${period}`}
             </ThemedText>
             {(b.unreviewed_amount ?? 0) > 0 && (
               <ThemedText type="small" themeColor="textSecondary">

@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +10,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
 
@@ -85,7 +85,7 @@ export default function WeeklyReviewScreen() {
           <ThemedText type="smallBold" themeColor="textSecondary">
             REFLEKSI MINGGUAN{items && !done ? ` · ${index + 1} DARI ${items.length}` : ''}
           </ThemedText>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={closeModal} hitSlop={12}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               {done ? 'Tutup' : 'Nanti'}
             </ThemedText>
@@ -176,7 +176,7 @@ export default function WeeklyReviewScreen() {
               </>
             )}
             <Pressable
-              onPress={() => router.back()}
+              onPress={closeModal}
               style={({ pressed }) => [styles.close, { backgroundColor: theme.text }, pressed && styles.pressed]}>
               <ThemedText type="smallBold" style={{ color: theme.background }}>
                 Selesai

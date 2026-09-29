@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +9,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Item = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at' | 'merchant' | 'description'> & {
@@ -73,7 +73,7 @@ export default function ReviewScreen() {
           <ThemedText type="smallBold" themeColor="textSecondary">
             REVIEW MALAM{items && !done ? ` · ${index + 1} DARI ${items.length}` : ''}
           </ThemedText>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={closeModal} hitSlop={12}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               {done ? 'Tutup' : 'Nanti'}
             </ThemedText>
