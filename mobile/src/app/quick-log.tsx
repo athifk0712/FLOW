@@ -44,6 +44,7 @@ export default function QuickLogScreen() {
   const [digits, setDigits] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export default function QuickLogScreen() {
       const recentRows = recent.data ?? [];
       setCategories(cats.data ?? []);
       setAccounts(accountRows);
+      setLoaded(true);
 
       // Default account: the one used last, else the first one.
       const defaultAccount = recentRows[0]?.from_account_id ?? accountRows[0]?.id ?? null;
@@ -176,6 +178,11 @@ export default function QuickLogScreen() {
           {FROM_LABEL[mode]}
           {mode === 'EXPENSE' && accounts.length > 1 ? ' (otomatis: terakhir dipakai)' : ''}
         </ThemedText>
+        {loaded && accounts.length === 0 && (
+          <Pressable onPress={() => router.replace('/accounts')} style={chip(false)}>
+            <ThemedText type="small">Belum ada akun. Tambahkan dulu →</ThemedText>
+          </Pressable>
+        )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {accounts.map((a) => (
             <Pressable key={a.id} onPress={() => pickFrom(a.id)} style={chip(a.id === accountId)}>

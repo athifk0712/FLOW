@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -148,6 +148,16 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
               <ThemedText type="smallBold" themeColor="textSecondary">
+                DATA
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <LinkRow title="Akun & dompet" hint="Bank, e-wallet, tunai, dan saldo awalnya" href="/accounts" />
+                <LinkRow title="Kategori" hint="Tambah, ganti nama, atau hapus kategori" href="/categories" />
+              </ThemedView>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
                 BUDGET MINGGUAN
               </ThemedText>
               <ThemedView type="backgroundElement" style={styles.card}>
@@ -263,6 +273,20 @@ export default function SettingsScreen() {
         </SafeAreaView>
       </KeyboardAvoidingView>
     </ThemedView>
+  );
+}
+
+function LinkRow({ title, hint, href }: { title: string; hint: string; href: '/accounts' | '/categories' }) {
+  return (
+    <Pressable onPress={() => router.push(href)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <View style={styles.flex}>
+        <ThemedText type="smallBold">{title}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {hint}
+        </ThemedText>
+      </View>
+      <ThemedText type="smallBold">→</ThemedText>
+    </Pressable>
   );
 }
 

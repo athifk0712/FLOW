@@ -157,14 +157,19 @@ export default function HomeScreen() {
           )}
 
           <Section title="AKUN">
-            <ThemedView type="backgroundElement" style={styles.card}>
-              {balances.map((b) => (
-                <View key={b.account_id} style={styles.row}>
-                  <ThemedText>{b.name}</ThemedText>
-                  <ThemedText>{formatRupiah(b.current_balance ?? 0)}</ThemedText>
-                </View>
-              ))}
-            </ThemedView>
+            <Pressable onPress={() => router.push('/accounts')}>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                {balances.map((b) => (
+                  <View key={b.account_id} style={styles.row}>
+                    <ThemedText>{b.name}</ThemedText>
+                    <ThemedText>{formatRupiah(b.current_balance ?? 0)}</ThemedText>
+                  </View>
+                ))}
+                <ThemedText type="small" themeColor="textSecondary">
+                  {balances.length === 0 ? 'Belum ada akun. Ketuk untuk menambahkan →' : 'Kelola akun →'}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
           </Section>
         </ScrollView>
 
