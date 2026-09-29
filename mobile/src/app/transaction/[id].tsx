@@ -141,9 +141,9 @@ export default function TransactionScreen() {
 
   const chip = (selected: boolean) => [
     styles.chip,
-    { backgroundColor: selected ? theme.text : theme.backgroundElement },
+    { backgroundColor: selected ? theme.primary : theme.backgroundElement },
   ];
-  const chipText = (selected: boolean) => ({ color: selected ? theme.background : theme.text });
+  const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
   const inputStyle = [styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }];
 
   function accountChips(selectedId: string | null, onPick: (id: string) => void, exclude?: string | null) {
@@ -319,14 +319,14 @@ export default function TransactionScreen() {
                 onPress={save}
                 style={({ pressed }) => [
                   styles.save,
-                  { backgroundColor: theme.text },
+                  { backgroundColor: theme.primary },
                   !canSave && !saving && styles.disabled,
                   (pressed || saving) && styles.pressed,
                 ]}>
                 {saving ? (
-                  <ActivityIndicator color={theme.background} />
+                  <ActivityIndicator color={theme.onPrimary} />
                 ) : (
-                  <ThemedText type="smallBold" style={{ color: theme.background }}>
+                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                     Simpan perubahan
                   </ThemedText>
                 )}

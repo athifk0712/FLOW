@@ -142,8 +142,8 @@ export default function AccountsScreen() {
             <Pressable
               key={t.value}
               onPress={() => setType(t.value)}
-              style={[styles.chip, { backgroundColor: selected ? theme.text : theme.backgroundSelected }]}>
-              <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+              style={[styles.chip, { backgroundColor: selected ? theme.primary : theme.backgroundSelected }]}>
+              <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
                 {t.label}
               </ThemedText>
             </Pressable>
@@ -152,7 +152,7 @@ export default function AccountsScreen() {
       </View>
       <View>
         <ThemedText type="small" themeColor="textSecondary">
-          Saldo awal (saat mulai pakai FLOW)
+          Saldo awal (saat mulai pakai Flowku)
         </ThemedText>
         <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
           <ThemedText type="smallBold">Rp</ThemedText>
@@ -182,14 +182,14 @@ export default function AccountsScreen() {
           onPress={save}
           style={({ pressed }) => [
             styles.button,
-            { backgroundColor: theme.text },
+            { backgroundColor: theme.primary },
             !canSave && !saving && styles.disabled,
             (pressed || saving) && styles.pressed,
           ]}>
           {saving ? (
-            <ActivityIndicator color={theme.background} />
+            <ActivityIndicator color={theme.onPrimary} />
           ) : (
-            <ThemedText type="smallBold" style={{ color: theme.background }}>
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
               Simpan
             </ThemedText>
           )}

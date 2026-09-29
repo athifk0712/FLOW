@@ -128,14 +128,14 @@ export default function CategoriesScreen() {
               onPress={save}
               style={({ pressed }) => [
                 styles.button,
-                { backgroundColor: theme.text },
+                { backgroundColor: theme.primary },
                 !canSave && !saving && styles.disabled,
                 (pressed || saving) && styles.pressed,
               ]}>
               {saving ? (
-                <ActivityIndicator color={theme.background} />
+                <ActivityIndicator color={theme.onPrimary} />
               ) : (
-                <ThemedText type="smallBold" style={{ color: theme.background }}>
+                <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                   Simpan
                 </ThemedText>
               )}

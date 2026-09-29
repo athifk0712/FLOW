@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
+import { DANGER_COLOR, NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -76,8 +76,8 @@ export default function NewIntentScreen() {
           </ThemedText>
           <Pressable
             onPress={closeModal}
-            style={({ pressed }) => [styles.save, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-            <ThemedText type="smallBold" style={{ color: theme.background }}>
+            style={({ pressed }) => [styles.save, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
               Oke
             </ThemedText>
           </Pressable>
@@ -163,8 +163,8 @@ export default function NewIntentScreen() {
                   <Pressable
                     key={c.id}
                     onPress={() => setCategoryId(selected ? null : c.id)}
-                    style={[styles.chip, { backgroundColor: selected ? theme.text : theme.backgroundElement }]}>
-                    <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+                    style={[styles.chip, { backgroundColor: selected ? theme.primary : theme.backgroundElement }]}>
+                    <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
                       {c.name}
                     </ThemedText>
                   </Pressable>
@@ -180,14 +180,14 @@ export default function NewIntentScreen() {
             onPress={save}
             style={({ pressed }) => [
               styles.save,
-              { backgroundColor: theme.text },
+              { backgroundColor: theme.primary },
               !canSave && !saving && styles.disabled,
               (pressed || saving) && styles.pressed,
             ]}>
             {saving ? (
-              <ActivityIndicator color={theme.background} />
+              <ActivityIndicator color={theme.onPrimary} />
             ) : (
-              <ThemedText type="smallBold" style={{ color: theme.background }}>
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                 Simpan & mulai jeda
               </ThemedText>
             )}
@@ -293,6 +293,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });

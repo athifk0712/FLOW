@@ -150,9 +150,9 @@ export default function BudgetsScreen() {
                               onPress={() => update(r.categoryId, { period: p.value })}
                               style={[
                                 styles.period,
-                                { backgroundColor: selected ? theme.text : theme.backgroundSelected },
+                                { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
                               ]}>
-                              <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+                              <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
                                 {p.label}
                               </ThemedText>
                             </Pressable>
@@ -186,13 +186,13 @@ export default function BudgetsScreen() {
                 onPress={save}
                 style={({ pressed }) => [
                   styles.save,
-                  { backgroundColor: theme.text },
+                  { backgroundColor: theme.primary },
                   (pressed || saving) && styles.pressed,
                 ]}>
                 {saving ? (
-                  <ActivityIndicator color={theme.background} />
+                  <ActivityIndicator color={theme.onPrimary} />
                 ) : (
-                  <ThemedText type="smallBold" style={{ color: theme.background }}>
+                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                     Simpan budget
                   </ThemedText>
                 )}

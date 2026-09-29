@@ -163,10 +163,10 @@ export default function RecurringScreen() {
 
   const chip = (selected: boolean) => [
     styles.chip,
-    { backgroundColor: selected ? theme.text : theme.backgroundSelected },
+    { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
   ];
   const chipText = (selected: boolean) => ({
-    color: selected ? theme.background : theme.text,
+    color: selected ? theme.onPrimary : theme.text,
   });
   const inputStyle = [
     styles.input,
@@ -182,7 +182,7 @@ export default function RecurringScreen() {
           <Pressable
             key={k}
             onPress={() => switchKind(k)}
-            style={[styles.mode, k === kind && { backgroundColor: theme.text }]}
+            style={[styles.mode, k === kind && { backgroundColor: theme.primary }]}
           >
             <ThemedText type="smallBold" style={chipText(k === kind)}>
               {k === "EXPENSE" ? "Pengeluaran" : "Pemasukan"}
@@ -352,15 +352,15 @@ export default function RecurringScreen() {
             onPress={save}
             style={({ pressed }) => [
               styles.button,
-              { backgroundColor: theme.text },
+              { backgroundColor: theme.primary },
               !canSave && !saving && styles.disabled,
               (pressed || saving) && styles.pressed,
             ]}
           >
             {saving ? (
-              <ActivityIndicator color={theme.background} />
+              <ActivityIndicator color={theme.onPrimary} />
             ) : (
-              <ThemedText type="smallBold" style={{ color: theme.background }}>
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                 Simpan
               </ThemedText>
             )}

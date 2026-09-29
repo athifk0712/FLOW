@@ -141,7 +141,7 @@ export default function ReportScreen() {
                           <View
                             style={[
                               styles.bar,
-                              { width: `${(c.total / maxCategory) * 100}%`, backgroundColor: theme.text },
+                              { width: `${(c.total / maxCategory) * 100}%`, backgroundColor: theme.primary },
                             ]}
                           />
                         </View>

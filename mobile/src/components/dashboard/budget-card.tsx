@@ -41,7 +41,7 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold">Belum ada budget mingguan</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Atur budget untuk pengeluaran keinginan supaya FLOW bisa memberi jeda sebelum kamu belanja besar. Atur →
+              Atur budget untuk pengeluaran keinginan supaya Flowku bisa memberi jeda sebelum kamu belanja besar. Atur →
             </ThemedText>
           </ThemedView>
         </Pressable>

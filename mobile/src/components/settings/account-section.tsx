@@ -36,7 +36,7 @@ export function AccountSection() {
           </ThemedText>
         )}
         <ThemedText type="small" themeColor="textSecondary">
-          Buka FLOW di perangkat lain, lalu pilih &quot;Masuk dengan email&quot; di Pengaturan.
+          Buka Flowku di perangkat lain, lalu pilih &quot;Masuk dengan email&quot; di Pengaturan.
         </ThemedText>
         {confirmSignOut ? (
           <View style={styles.row}>
@@ -82,8 +82,8 @@ export function AccountSection() {
       ) : (
         <Pressable
           onPress={() => setPanel('link')}
-          style={({ pressed }) => [styles.button, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-          <ThemedText type="smallBold" style={{ color: theme.background }}>
+          style={({ pressed }) => [styles.button, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+          <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
             Simpan akun dengan email
           </ThemedText>
         </Pressable>

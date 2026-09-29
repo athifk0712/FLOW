@@ -7,20 +7,30 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+// Flowku "Tenang & sadar": deep teal, warm sand, a touch of honey. Dark mode is its own night-teal set,
+// not an inversion. primary/onPrimary are for buttons and selected chips; accent is for highlights only.
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#1C2B2A',
+    background: '#F6F1E7',
+    backgroundElement: '#FFFCF6',
+    backgroundSelected: '#ECE5D7',
+    textSecondary: '#5E6B69',
+    primary: '#0F5C55',
+    onPrimary: '#FFFFFF',
+    accent: '#E9A23B',
+    onAccent: '#1C2B2A',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#F2EDE3',
+    background: '#0E1716',
+    backgroundElement: '#182624',
+    backgroundSelected: '#243532',
+    textSecondary: '#A3B3AF',
+    primary: '#4FB3A5',
+    onPrimary: '#0E1716',
+    accent: '#F0B454',
+    onAccent: '#0E1716',
   },
 } as const;
 

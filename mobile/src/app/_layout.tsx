@@ -4,10 +4,26 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { Colors } from '@/constants/theme';
 import { Notifications, REMINDER_ROUTES, REMINDERS_SUPPORTED } from '@/lib/reminders';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 
 SplashScreen.preventAutoHideAsync();
+
+// React Navigation themes in Flowku colors, so stack and modal backgrounds match the screens.
+const navigationTheme = (base: typeof DefaultTheme, colors: (typeof Colors)['light' | 'dark']) => ({
+  ...base,
+  colors: {
+    ...base.colors,
+    primary: colors.primary,
+    background: colors.background,
+    card: colors.backgroundElement,
+    text: colors.text,
+    border: colors.backgroundSelected,
+  },
+});
+const LIGHT_THEME = navigationTheme(DefaultTheme, Colors.light);
+const DARK_THEME = navigationTheme(DarkTheme, Colors.dark);
 
 // Tapping a review reminder opens that review, including when it launched the app.
 function useNativeReminderNavigation(enabled: boolean) {
@@ -61,7 +77,7 @@ function RootNavigator() {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={colorScheme === 'dark' ? DARK_THEME : LIGHT_THEME}>
       <SessionProvider>
         <RootNavigator />
       </SessionProvider>

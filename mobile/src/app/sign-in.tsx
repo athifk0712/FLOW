@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmailOtpForm } from '@/components/email-otp-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Wordmark } from '@/components/wordmark';
 import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
@@ -30,7 +31,7 @@ export default function SignInScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <SafeAreaView style={styles.flex}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <ThemedText type="subtitle">FLOW</ThemedText>
+            <Wordmark size={40} />
             <ThemedText themeColor="textSecondary">
               Masuk dengan email untuk membuka datamu di HP dan laptop.
             </ThemedText>

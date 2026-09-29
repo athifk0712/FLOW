@@ -186,11 +186,11 @@ export default function GoalsScreen() {
             onPress={saveGoal}
             style={({ pressed }) => [
               styles.button,
-              { backgroundColor: theme.text },
+              { backgroundColor: theme.primary },
               !canSaveGoal && !saving && styles.disabled,
               (pressed || saving) && styles.pressed,
             ]}>
-            <ThemedText type="smallBold" style={{ color: theme.background }}>
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
               Simpan
             </ThemedText>
           </Pressable>
@@ -229,11 +229,11 @@ export default function GoalsScreen() {
                   onPress={() => move(goal, 1)}
                   style={({ pressed }) => [
                     styles.button,
-                    { backgroundColor: theme.text },
+                    { backgroundColor: theme.primary },
                     (!deposit || saving) && styles.disabled,
                     pressed && styles.pressed,
                   ]}>
-                  <ThemedText type="smallBold" style={{ color: theme.background }}>
+                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                     Sisihkan
                   </ThemedText>
                 </Pressable>

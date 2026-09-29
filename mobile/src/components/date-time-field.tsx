@@ -43,8 +43,8 @@ export function DateTimeField({ value, onChange }: Props) {
   }
 
   const box = { backgroundColor: theme.backgroundElement };
-  const chip = (selected: boolean) => [styles.chip, { backgroundColor: selected ? theme.text : theme.backgroundElement }];
-  const chipText = (selected: boolean) => ({ color: selected ? theme.background : theme.text });
+  const chip = (selected: boolean) => [styles.chip, { backgroundColor: selected ? theme.primary : theme.backgroundElement }];
+  const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
 
   return (
     <View style={styles.container}>

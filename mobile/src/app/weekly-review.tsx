@@ -177,8 +177,8 @@ export default function WeeklyReviewScreen() {
             )}
             <Pressable
               onPress={closeModal}
-              style={({ pressed }) => [styles.close, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-              <ThemedText type="smallBold" style={{ color: theme.background }}>
+              style={({ pressed }) => [styles.close, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                 Selesai
               </ThemedText>
             </Pressable>

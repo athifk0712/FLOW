@@ -134,14 +134,14 @@ export function EmailOtpForm({
         onPress={submit}
         style={({ pressed }) => [
           styles.button,
-          { backgroundColor: theme.text },
+          { backgroundColor: theme.primary },
           !canSubmit && !busy && styles.disabled,
           (pressed || busy) && styles.pressed,
         ]}>
         {busy ? (
-          <ActivityIndicator color={theme.background} />
+          <ActivityIndicator color={theme.onPrimary} />
         ) : (
-          <ThemedText type="smallBold" style={{ color: theme.background }}>
+          <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
             {codeSent ? 'Verifikasi kode' : submitLabel}
           </ThemedText>
         )}

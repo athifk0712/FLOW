@@ -35,7 +35,7 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
       <ThemedView type={isFocused ? 'backgroundSelected' : 'backgroundElement'} style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'} numberOfLines={1}>
+        <ThemedText type={isFocused ? 'smallBold' : 'small'} themeColor={isFocused ? 'primary' : 'textSecondary'} numberOfLines={1}>
           {children}
         </ThemedText>
       </ThemedView>

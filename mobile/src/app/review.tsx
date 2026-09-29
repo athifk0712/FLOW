@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
+import { DANGER_COLOR, NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -222,6 +222,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });

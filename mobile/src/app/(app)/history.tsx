@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
+import { DANGER_COLOR, NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
@@ -23,7 +23,6 @@ const FILTERS: { value: Filter; label: string }[] = [
 ];
 
 const PAGE_SIZE = 50;
-const INCOME_COLOR = '#30a46c';
 
 const dayFormat = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -122,8 +121,8 @@ export default function HistoryScreen() {
                 <Pressable
                   key={f.value}
                   onPress={() => changeFilter(f.value)}
-                  style={[styles.chip, { backgroundColor: selected ? theme.text : theme.backgroundElement }]}>
-                  <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+                  style={[styles.chip, { backgroundColor: selected ? theme.primary : theme.backgroundElement }]}>
+                  <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
                     {f.label}
                   </ThemedText>
                 </Pressable>
@@ -170,6 +169,7 @@ export default function HistoryScreen() {
 }
 
 function HistoryItem({ item }: { item: TransactionRow }) {
+  const theme = useTheme();
   const sign = item.type === 'EXPENSE' ? '-' : item.type === 'INCOME' ? '+' : '';
   const dotColor =
     item.type === 'EXPENSE' ? (item.necessity ? NECESSITY[item.necessity].color : UNREVIEWED_COLOR) : null;
@@ -191,7 +191,7 @@ function HistoryItem({ item }: { item: TransactionRow }) {
             {item.receipt_id ? ' · ada struk' : ''}
           </ThemedText>
         </View>
-        <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: INCOME_COLOR }}>
+        <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: theme.primary }}>
           {sign}
           {formatRupiah(item.amount)}
         </ThemedText>
@@ -265,6 +265,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });

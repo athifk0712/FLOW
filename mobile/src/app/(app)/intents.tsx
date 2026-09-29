@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY } from '@/constants/necessity';
+import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -81,29 +81,30 @@ export default function IntentsScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="smallBold" themeColor="textSecondary">
-            SEBELUM BELI
+            TUNDA BELI
           </ThemedText>
+          <ThemedText type="subtitle">Tarik napas dulu.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Mau beli sesuatu yang lumayan? Catat dulu di sini. FLOW memberi jeda sesuai besarnya harga dibanding sisa
+            Mau beli sesuatu yang lumayan? Catat di sini. Flowku memberi jeda sesuai besarnya harga dibanding sisa
             budget keinginanmu, lalu kamu putuskan dengan kepala dingin.
           </ThemedText>
 
-          <ThemedView style={[styles.card, styles.heldBack]}>
-            <ThemedText type="small" style={styles.white}>
+          <ThemedView style={[styles.card, styles.heldBack, { backgroundColor: theme.accent }]}>
+            <ThemedText type="small" style={{ color: theme.onAccent }}>
               Ditahan bulan ini
             </ThemedText>
-            <ThemedText type="subtitle" style={[styles.white, styles.heldAmount]}>
+            <ThemedText type="subtitle" style={[{ color: theme.onAccent }, styles.heldAmount]}>
               {formatRupiah(heldBack.total)}
             </ThemedText>
-            <ThemedText type="small" style={styles.white}>
+            <ThemedText type="small" style={{ color: theme.onAccent }}>
               {heldBack.count} barang tidak jadi dibeli
             </ThemedText>
           </ThemedView>
 
           <Pressable
             onPress={() => router.push('/intent-new')}
-            style={({ pressed }) => [styles.addButton, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-            <ThemedText type="smallBold" style={{ color: theme.background }}>
+            style={({ pressed }) => [styles.addButton, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
               + Tambah niat beli
             </ThemedText>
           </Pressable>
@@ -223,8 +224,8 @@ function IntentCard({
               <Pressable
                 key={a.id}
                 onPress={() => setAccountId(a.id)}
-                style={[styles.chip, { backgroundColor: selected ? theme.text : theme.backgroundSelected }]}>
-                <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+                style={[styles.chip, { backgroundColor: selected ? theme.primary : theme.backgroundSelected }]}>
+                <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
                   {a.name}
                 </ThemedText>
               </Pressable>
@@ -292,7 +293,6 @@ const styles = StyleSheet.create({
   },
   heldBack: {
     gap: 0,
-    backgroundColor: NECESSITY.NEED.color,
   },
   heldAmount: {
     fontSize: 28,
@@ -355,6 +355,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });

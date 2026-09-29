@@ -9,7 +9,8 @@ import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY } from '@/constants/necessity';
+import { Wordmark } from '@/components/wordmark';
+import { DANGER_COLOR } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -107,9 +108,7 @@ export default function HomeScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            FLOW
-          </ThemedText>
+          <Wordmark />
 
           <View>
             <ThemedText type="small" themeColor="textSecondary">
@@ -123,11 +122,11 @@ export default function HomeScreen() {
           {heldBack > 0 && (
             <Link href="/intents" asChild>
               <Pressable>
-                <ThemedView style={[styles.card, styles.celebration]}>
-                  <ThemedText type="small" style={styles.celebrationText}>
+                <ThemedView style={[styles.card, { backgroundColor: theme.accent }]}>
+                  <ThemedText type="small" style={{ color: theme.onAccent }}>
                     Bulan ini kamu berhasil menahan
                   </ThemedText>
-                  <ThemedText type="subtitle" style={[styles.celebrationText, styles.celebrationAmount]}>
+                  <ThemedText type="subtitle" style={[{ color: theme.onAccent }, styles.celebrationAmount]}>
                     {formatRupiah(heldBack)}
                   </ThemedText>
                 </ThemedView>
@@ -219,8 +218,8 @@ export default function HomeScreen() {
 
         <Pressable
           onPress={() => router.push('/quick-log')}
-          style={({ pressed }) => [styles.fab, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-          <ThemedText type="smallBold" style={{ color: theme.background }}>
+          style={({ pressed }) => [styles.fab, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+          <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
             + Catat
           </ThemedText>
         </Pressable>
@@ -272,12 +271,6 @@ const styles = StyleSheet.create({
   goals: {
     gap: Spacing.three,
   },
-  celebration: {
-    backgroundColor: NECESSITY.NEED.color,
-  },
-  celebrationText: {
-    color: '#ffffff',
-  },
   celebrationAmount: {
     fontSize: 28,
     lineHeight: 34,
@@ -306,6 +299,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });

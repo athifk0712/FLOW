@@ -222,8 +222,8 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
         <ThemedText type="smallBold">{parts.length > 0 ? parts.join(' · ') : 'Tidak ada yang terbaca'}</ThemedText>
       </View>
       {parts.length > 0 && (
-        <Pressable onPress={onApply} style={({ pressed }) => [styles.apply, { backgroundColor: theme.text }, pressed && styles.pressed]}>
-          <ThemedText type="smallBold" style={{ color: theme.background }}>
+        <Pressable onPress={onApply} style={({ pressed }) => [styles.apply, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+          <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
             Terapkan
           </ThemedText>
         </Pressable>

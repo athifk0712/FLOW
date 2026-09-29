@@ -192,13 +192,13 @@ export default function SettingsScreen() {
                   onPress={saveBudgets}
                   style={({ pressed }) => [
                     styles.button,
-                    { backgroundColor: theme.text },
+                    { backgroundColor: theme.primary },
                     (pressed || savingBudget) && styles.pressed,
                   ]}>
                   {savingBudget ? (
-                    <ActivityIndicator color={theme.background} />
+                    <ActivityIndicator color={theme.onPrimary} />
                   ) : (
-                    <ThemedText type="smallBold" style={{ color: theme.background }}>
+                    <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
                       Simpan budget
                     </ThemedText>
                   )}
@@ -242,9 +242,9 @@ export default function SettingsScreen() {
                           onPress={() => updateReminder({ ...reminder, hour })}
                           style={[
                             styles.hour,
-                            { backgroundColor: selected ? theme.text : theme.backgroundSelected },
+                            { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
                           ]}>
-                          <ThemedText type="smallBold" style={{ color: selected ? theme.background : theme.text }}>
+                          <ThemedText type="smallBold" style={{ color: selected ? theme.onPrimary : theme.text }}>
                             {hour}.00
                           </ThemedText>
                         </Pressable>

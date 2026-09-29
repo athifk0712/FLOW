@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
@@ -140,9 +141,9 @@ export default function QuickLogScreen() {
 
   const chip = (selected: boolean) => [
     styles.chip,
-    { backgroundColor: selected ? theme.text : theme.backgroundElement },
+    { backgroundColor: selected ? theme.primary : theme.backgroundElement },
   ];
-  const chipText = (selected: boolean) => ({ color: selected ? theme.background : theme.text });
+  const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
 
   return (
     <ThemedView style={styles.container}>
@@ -163,7 +164,7 @@ export default function QuickLogScreen() {
             <Pressable
               key={m.value}
               onPress={() => switchMode(m.value)}
-              style={[styles.mode, m.value === mode && { backgroundColor: theme.text }]}>
+              style={[styles.mode, m.value === mode && { backgroundColor: theme.primary }]}>
               <ThemedText type="smallBold" style={chipText(m.value === mode)}>
                 {m.label}
               </ThemedText>
@@ -268,14 +269,14 @@ export default function QuickLogScreen() {
           onPress={save}
           style={({ pressed }) => [
             styles.save,
-            { backgroundColor: theme.text },
+            { backgroundColor: theme.primary },
             !canSave && !saving && styles.disabled,
             (pressed || saving) && styles.pressed,
           ]}>
           {saving ? (
-            <ActivityIndicator color={theme.background} />
+            <ActivityIndicator color={theme.onPrimary} />
           ) : (
-            <ThemedText type="smallBold" style={{ color: theme.background }}>
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
               {SAVE_LABEL[mode]}
             </ThemedText>
           )}
@@ -368,6 +369,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   error: {
-    color: '#e5484d',
+    color: DANGER_COLOR,
   },
 });
