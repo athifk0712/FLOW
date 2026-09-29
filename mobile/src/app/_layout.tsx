@@ -42,6 +42,7 @@ function RootNavigator() {
           <Stack.Screen name="review" options={{ presentation: 'modal' }} />
           <Stack.Screen name="weekly-review" options={{ presentation: 'modal' }} />
           <Stack.Screen name="intent-new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />

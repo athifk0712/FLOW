@@ -17,6 +17,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="history">
+        <NativeTabs.Trigger.Label>Riwayat</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="clock" md="history" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="intents">
         <NativeTabs.Trigger.Label>Sebelum Beli</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="hourglass" md="hourglass_empty" />
