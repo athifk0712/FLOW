@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "FLOW",
     "slug": "flow",
@@ -47,6 +47,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d390feda-59e6-4aac-ade2-4a051ff79bd5"
+      }
+    },
+    "owner": "athif00"
   }
 }
