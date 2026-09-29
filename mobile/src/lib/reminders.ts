@@ -1,4 +1,5 @@
-import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
+import type * as NotificationsModule from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // Local reminders for the nightly and weekly reviews. Preferences live on the device only.
@@ -22,8 +23,22 @@ export type ReminderSettings = { enabled: boolean; hour: number; weeklyEnabled: 
 
 const DEFAULT_SETTINGS: ReminderSettings = { enabled: false, hour: 21, weeklyEnabled: false };
 
-/** Scheduled local notifications are not supported in the browser. */
-export const REMINDERS_SUPPORTED = Platform.OS !== 'web';
+// Expo Go on Android throws as soon as expo-notifications is imported (push support was removed),
+// so reminders there need a development build.
+const EXPO_GO_ANDROID = Platform.OS === 'android' && isRunningInExpoGo();
+
+/** Scheduled local notifications are not supported in the browser or in Expo Go on Android. */
+export const REMINDERS_SUPPORTED = Platform.OS !== 'web' && !EXPO_GO_ANDROID;
+
+export const REMINDERS_UNAVAILABLE_NOTE = EXPO_GO_ANDROID
+  ? 'Pengingat belum bisa dipakai di Expo Go. Nanti aktif di versi aplikasi yang di-install.'
+  : 'Pengingat hanya tersedia di aplikasi HP. Aktifkan dari sana; review-nya tetap bisa dibuka di sini.';
+
+/** Loaded lazily so unsupported platforms never evaluate the module. Only use when REMINDERS_SUPPORTED. */
+export const Notifications: typeof NotificationsModule = REMINDERS_SUPPORTED
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- must not load in Expo Go on Android
+    require('expo-notifications')
+  : (null as unknown as typeof NotificationsModule);
 
 if (REMINDERS_SUPPORTED) {
   Notifications.setNotificationHandler({
@@ -47,6 +62,7 @@ export function getReminderSettings(): ReminderSettings {
 
 /** Applies the settings (schedules or cancels) and persists them. Returns false if permission was denied. */
 export async function applyReminderSettings(settings: ReminderSettings): Promise<boolean> {
+  if (!REMINDERS_SUPPORTED) return false;
   await Promise.all(
     [NIGHTLY_ID, WEEKLY_ID].map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})),
   );

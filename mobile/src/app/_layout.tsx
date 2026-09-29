@@ -1,11 +1,10 @@
-import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { REMINDER_ROUTES, REMINDERS_SUPPORTED } from '@/lib/reminders';
+import { Notifications, REMINDER_ROUTES, REMINDERS_SUPPORTED } from '@/lib/reminders';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 
 SplashScreen.preventAutoHideAsync();

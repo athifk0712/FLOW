@@ -26,6 +26,7 @@ import {
   getReminderSettings,
   REMINDER_HOURS,
   REMINDERS_SUPPORTED,
+  REMINDERS_UNAVAILABLE_NOTE,
   type ReminderSettings,
   WEEKLY_LABEL,
 } from '@/lib/reminders';
@@ -204,7 +205,7 @@ export default function SettingsScreen() {
               {!REMINDERS_SUPPORTED ? (
                 <ThemedView type="backgroundElement" style={styles.card}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Pengingat hanya tersedia di aplikasi HP. Aktifkan dari sana; review-nya tetap bisa dibuka di sini.
+                    {REMINDERS_UNAVAILABLE_NOTE}
                   </ThemedText>
                 </ThemedView>
               ) : (
