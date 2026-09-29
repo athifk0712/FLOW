@@ -16,6 +16,11 @@ import { supabase } from '@/lib/supabase';
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
 type Mode = 'EXPENSE' | 'INCOME' | 'TRANSFER';
+type CategoryBudget = Pick<Tables<'v_budget_remaining'>, 'category_id' | 'period' | 'limit_amount' | 'remaining'>;
+
+const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
+// Below this share of the limit left, the note turns into a gentle warning.
+const LOW_BUDGET_SHARE = 0.2;
 
 const MODES: { value: Mode; label: string }[] = [
   { value: 'EXPENSE', label: 'Keluar' },
@@ -51,6 +56,7 @@ export default function QuickLogScreen() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
   const [guess, setGuess] = useState<string | null>(null);
+  const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,14 +70,19 @@ export default function QuickLogScreen() {
         .eq('type', 'EXPENSE')
         .order('occurred_at', { ascending: false })
         .limit(100),
-    ]).then(([cats, accs, recent]) => {
-      const failed = cats.error ?? accs.error ?? recent.error;
+      supabase
+        .from('v_budget_remaining')
+        .select('category_id, period, limit_amount, remaining')
+        .eq('scope', 'CATEGORY'),
+    ]).then(([cats, accs, recent, buds]) => {
+      const failed = cats.error ?? accs.error ?? recent.error ?? buds.error;
       if (failed) return setError(failed.message);
 
       const accountRows = accs.data ?? [];
       const recentRows = recent.data ?? [];
       setCategories(cats.data ?? []);
       setAccounts(accountRows);
+      setBudgets(buds.data ?? []);
       setLoaded(true);
 
       // Default account: the one used last, else the first one.
@@ -101,6 +112,7 @@ export default function QuickLogScreen() {
   const canSave = amount > 0 && accountsValid && !saving;
   const visibleCategories = categories.filter((c) => c.kind === (mode === 'INCOME' ? 'INCOME' : 'EXPENSE'));
   const guessed = mode === 'EXPENSE' && !!guess && categoryId === guess;
+  const budgetNote = mode === 'EXPENSE' ? describeBudget(budgets, categories, categoryId, amount) : null;
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -246,6 +258,15 @@ export default function QuickLogScreen() {
           </>
         )}
 
+        {budgetNote && (
+          <ThemedText
+            type="small"
+            themeColor={budgetNote.level === 'ok' ? 'textSecondary' : undefined}
+            style={budgetNote.level === 'over' ? styles.error : budgetNote.level === 'low' && { color: theme.warning }}>
+            {budgetNote.text}
+          </ThemedText>
+        )}
+
         {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
         <View style={styles.keypad}>
@@ -284,6 +305,19 @@ export default function QuickLogScreen() {
       </SafeAreaView>
     </ThemedView>
   );
+}
+
+/** What logging `amount` in this category does to its budget, or null when it has none. Never blocks saving. */
+function describeBudget(budgets: CategoryBudget[], categories: Category[], categoryId: string | null, amount: number) {
+  const budget = budgets.find((b) => b.category_id === categoryId);
+  if (!budget || amount <= 0) return null;
+  const name = categories.find((c) => c.id === categoryId)?.name ?? 'kategori ini';
+  const period = PERIOD_LABEL[budget.period ?? 'MONTHLY'];
+  const after = (budget.remaining ?? 0) - amount;
+  if (after < 0) return { level: 'over' as const, text: `Ini melewati budget ${name} ${period} ${formatRupiah(-after)}.` };
+  if (after < (budget.limit_amount ?? 0) * LOW_BUDGET_SHARE)
+    return { level: 'low' as const, text: `Hati-hati, sisa budget ${name} ${period} tinggal ${formatRupiah(after)}.` };
+  return { level: 'ok' as const, text: `Sisa budget ${name} ${period} setelah ini: ${formatRupiah(after)}` };
 }
 
 const styles = StyleSheet.create({

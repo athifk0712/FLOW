@@ -20,6 +20,7 @@ export const Colors = {
     onPrimary: '#FFFFFF',
     accent: '#E9A23B',
     onAccent: '#1C2B2A',
+    warning: '#8A5A0B', // honey, dark enough for text on sand
   },
   dark: {
     text: '#F2EDE3',
@@ -31,6 +32,7 @@ export const Colors = {
     onPrimary: '#0E1716',
     accent: '#F0B454',
     onAccent: '#0E1716',
+    warning: '#F0B454',
   },
 } as const;
 
