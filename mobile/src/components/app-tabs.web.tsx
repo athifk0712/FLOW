@@ -35,7 +35,9 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
       <ThemedView type={isFocused ? 'backgroundSelected' : 'backgroundElement'} style={styles.tabButtonView}>
-        <ThemedText type={isFocused ? 'smallBold' : 'small'} themeColor={isFocused ? 'primary' : 'textSecondary'} numberOfLines={1}>
+        <ThemedText type={isFocused ? 'smallBold' : 'small'} themeColor={isFocused ? 'primary' : 'textSecondary'}
+          style={styles.label}
+          numberOfLines={1}>
           {children}
         </ThemedText>
       </ThemedView>
@@ -62,7 +64,8 @@ const styles = StyleSheet.create({
   },
   tabListContainer: {
     width: '100%',
-    padding: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.one,
     alignItems: 'center',
   },
   innerContainer: {
@@ -70,7 +73,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     padding: Spacing.one,
-    gap: Spacing.one,
+    gap: Spacing.half,
     borderRadius: Spacing.four,
   },
   tab: {
@@ -82,7 +85,10 @@ const styles = StyleSheet.create({
   tabButtonView: {
     alignItems: 'center',
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.one,
     borderRadius: Spacing.three,
+  },
+  // 13px keeps "Pengaturan" on one line on a 360px-wide phone.
+  label: {
+    fontSize: 13,
   },
 });
