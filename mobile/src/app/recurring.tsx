@@ -288,7 +288,7 @@ export default function RecurringScreen() {
       {kind === "EXPENSE" && (
         <>
           <ThemedText type="small" themeColor="textSecondary">
-            Penilaian (opsional, supaya tidak masuk review malam)
+            Penilaian (opsional, supaya tidak dibahas di obrolan malam)
           </ThemedText>
           <View style={styles.chips}>
             {NECESSITY_ORDER.map((n) => {

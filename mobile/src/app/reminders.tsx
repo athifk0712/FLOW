@@ -32,7 +32,7 @@ export default function RemindersScreen() {
       return;
     }
     const active = [
-      next.enabled && `review malam setiap hari jam ${String(next.hour).padStart(2, '0')}.00`,
+      next.enabled && `ngobrol malam setiap hari jam ${String(next.hour).padStart(2, '0')}.00`,
       next.weeklyEnabled && `refleksi mingguan setiap ${WEEKLY_LABEL}`,
       next.dueEnabled && `jatuh tempo jam ${DUE_LABEL}`,
     ].filter(Boolean);
@@ -54,9 +54,9 @@ export default function RemindersScreen() {
       <ThemedView type="backgroundElement" style={styles.card}>
         <View style={styles.row}>
           <View style={styles.flex}>
-            <ThemedText type="smallBold">Review malam</ThemedText>
+            <ThemedText type="smallBold">Ngobrol malam</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Setiap hari, untuk menilai pengeluaran hari itu.
+              Setiap hari, Flowku mengajak membahas uang yang keluar hari itu.
             </ThemedText>
           </View>
           <Switch value={reminder.enabled} onValueChange={(enabled) => update({ ...reminder, enabled })} />

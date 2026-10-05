@@ -250,7 +250,7 @@ export default function TransactionScreen() {
                 {tx.type === 'EXPENSE' && (
                   <>
                     <ThemedText type="small" themeColor="textSecondary">
-                      Penilaian{necessity ? '' : ' (belum dinilai, masuk review malam)'}
+                      Penilaian{necessity ? '' : ' (belum dinilai, dibahas di obrolan malam)'}
                     </ThemedText>
                     <View style={styles.options}>
                       {NECESSITY_ORDER.map((n) => {

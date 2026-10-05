@@ -84,7 +84,7 @@ export default function HabitsScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 {habits.reviewedShare === null
                   ? 'Belum ada pengeluaran minggu ini.'
-                  : `${Math.round(habits.reviewedShare * 100)}% pengeluaran minggu ini sudah dinilai. Yang belum, menunggu di review malam.`}
+                  : `${Math.round(habits.reviewedShare * 100)}% pengeluaran minggu ini sudah dinilai. Yang belum, dibahas di obrolan malam.`}
               </ThemedText>
             </ThemedView>
 

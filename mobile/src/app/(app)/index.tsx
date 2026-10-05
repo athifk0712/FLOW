@@ -1,8 +1,9 @@
-import { Link, router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
@@ -45,7 +46,6 @@ export default function HomeScreen() {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [mix, setMix] = useState<MixRow[]>([]);
-  const [heldBack, setHeldBack] = useState(0);
   const [unreviewed, setUnreviewed] = useState<Unreviewed[]>([]);
   const [weeklyDue, setWeeklyDue] = useState(0);
   const [regret, setRegret] = useState<RegretRow[]>([]);
@@ -72,7 +72,6 @@ export default function HomeScreen() {
           supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
           supabase.from('v_budget_remaining').select('*'),
           supabase.from('v_spending_mix_monthly').select('*').eq('month', month),
-          supabase.from('v_saved_money_monthly').select('total_held_back').eq('month', month).maybeSingle(),
           supabase
             .from('transactions')
             .select('id, amount, occurred_at, categories(name)')
@@ -113,12 +112,11 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows]) => {
+        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows]) => {
           const failed =
             bal.error ??
             bud.error ??
             mixRes.error ??
-            held.error ??
             rev.error ??
             due.error ??
             reg.error ??
@@ -135,7 +133,6 @@ export default function HomeScreen() {
           setBalances(bal.data ?? []);
           setBudgets(bud.data ?? []);
           setMix(mixRes.data ?? []);
-          setHeldBack(held.data?.total_held_back ?? 0);
           setUnreviewed(rev.data ?? []);
           setWeeklyDue(due.count ?? 0);
           setRegret(reg.data ?? []);
@@ -151,6 +148,8 @@ export default function HomeScreen() {
 
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
   const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
+  // From 18.00 the nightly chat becomes the first thing on the dashboard.
+  const evening = new Date().getHours() >= 18;
   const cycleEnd = cycleRange(new Date(), cycleDay).end;
   const essential = budgets.find((b) => b.scope === 'ESSENTIAL' && b.period === 'WEEKLY');
   const safe = computeSafeToSpend({
@@ -182,34 +181,26 @@ export default function HomeScreen() {
 
           {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
-          {heldBack > 0 && (
-            <Link href="/intents" asChild>
-              <Pressable>
-                <ThemedView style={[styles.card, { backgroundColor: theme.accent }]}>
-                  <ThemedText type="small" style={{ color: theme.onAccent }}>
-                    Bulan ini kamu berhasil menahan
-                  </ThemedText>
-                  <ThemedText type="subtitle" style={[{ color: theme.onAccent }, styles.celebrationAmount]}>
-                    {formatMoney(heldBack)}
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
-            </Link>
-          )}
-
-          {unreviewed.length > 0 && (
-            <Pressable onPress={() => router.push('/review')}>
-              <ThemedView type="backgroundElement" style={[styles.card, styles.reviewCard]}>
+          {(unreviewed.length > 0 || evening) && (
+            <Pressable onPress={() => router.push('/coach')} style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView
+                style={[styles.card, styles.reviewCard, { backgroundColor: evening ? theme.primary : theme.backgroundElement }]}>
+                <View style={[styles.coachIcon, { backgroundColor: evening ? theme.onPrimary : theme.primary }]}>
+                  <AppSymbol material="nightlight" sf="moon.stars.fill" size={20} color={theme.accent} />
+                </View>
                 <View style={styles.flex}>
-                  <ThemedText type="smallBold">
-                    {unreviewed.length} transaksi belum dinilai
+                  <ThemedText type="smallBold" style={evening && { color: theme.onPrimary }}>
+                    {evening ? 'Waktunya ngobrol malam' : 'Ngobrol malam dengan Flowku'}
                   </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatMoney(unreviewedTotal)} · terakhir {timeFormat.format(new Date(unreviewed[0].occurred_at))}{' '}
-                    {unreviewed[0].categories?.name ?? ''}
+                  <ThemedText type="small" themeColor={evening ? undefined : 'textSecondary'} style={evening && { color: theme.onPrimary }}>
+                    {unreviewed.length > 0
+                      ? `${unreviewed.length} pengeluaran (${formatMoney(unreviewedTotal)}) belum dibahas · terakhir ${timeFormat.format(new Date(unreviewed[0].occurred_at))}`
+                      : 'Ceritakan harimu, Flowku bantu lihat polanya.'}
                   </ThemedText>
                 </View>
-                <ThemedText type="smallBold">Review →</ThemedText>
+                <ThemedText type="smallBold" style={evening && { color: theme.onPrimary }}>
+                  →
+                </ThemedText>
               </ThemedView>
             </Pressable>
           )}
@@ -377,13 +368,17 @@ const styles = StyleSheet.create({
   goals: {
     gap: Spacing.three,
   },
-  celebrationAmount: {
-    fontSize: 28,
-    lineHeight: 34,
+  coachIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reviewCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.three,
   },
   flex: {
     flex: 1,

@@ -15,8 +15,7 @@ function on(daysAgo: number, extra: Partial<HabitTransaction> = {}): HabitTransa
 
 const input = (transactions: HabitTransaction[], extra: Partial<HabitInput> = {}): HabitInput => ({
   transactions,
-  heldBackTotal: 0,
-  heldBackCount: 0,
+  chatCount: 0,
   goalReached: false,
   ...extra,
 });
@@ -75,8 +74,8 @@ describe('computeHabits', () => {
     expect(done(computeHabits(input([...calm, on(1, { necessity: 'IMPULSE' })]), now))).toContain('calm-week');
   });
 
-  it('awards held-back and goal milestones from their inputs', () => {
-    const h = computeHabits(input([], { heldBackCount: 2, heldBackTotal: 1_000_000, goalReached: true }), now);
-    expect(done(h)).toEqual(['first-hold', 'held-1m', 'goal']);
+  it('awards chat and goal milestones from their inputs', () => {
+    const h = computeHabits(input([], { chatCount: 7, goalReached: true }), now);
+    expect(done(h)).toEqual(['first-chat', 'chat-7', 'goal']);
   });
 });

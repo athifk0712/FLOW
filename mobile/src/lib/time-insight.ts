@@ -18,7 +18,7 @@ const SLOTS: Slot[] = [
   { key: 'morning', phrase: 'pagi hari (05.00–11.00)', tip: 'Pagi biasanya terburu-buru. Siapkan dulu yang rutin dari malam sebelumnya.', has: (d) => d.getHours() >= 5 && d.getHours() < 11 },
   { key: 'midday', phrase: 'siang hari (11.00–15.00)', tip: 'Jam istirahat sering jadi jam jajan. Bawa bekal atau tentukan batas makan siang.', has: (d) => d.getHours() >= 11 && d.getHours() < 15 },
   { key: 'afternoon', phrase: 'sore hari (15.00–18.00)', tip: 'Sore saat lelah, godaan lebih kuat. Tarik napas dulu sebelum checkout.', has: (d) => d.getHours() >= 15 && d.getHours() < 18 },
-  { key: 'evening', phrase: 'malam hari (18.00–22.00)', tip: 'Malam hari, masukkan dulu ke Tunda Beli dan putuskan besok pagi.', has: (d) => d.getHours() >= 18 && d.getHours() < 22 },
+  { key: 'evening', phrase: 'malam hari (18.00–22.00)', tip: 'Malam hari, simpan dulu di keranjang dan putuskan besok pagi.', has: (d) => d.getHours() >= 18 && d.getHours() < 22 },
   { key: 'late', phrase: 'larut malam (22.00–05.00)', tip: 'Larut malam bukan waktu terbaik memutuskan. Tidur dulu, putuskan besok.', has: (d) => d.getHours() >= 22 || d.getHours() < 5 },
   { key: 'weekend', phrase: 'akhir pekan', tip: 'Rencanakan anggaran akhir pekan sejak Jumat supaya tidak kebablasan.', has: (d) => d.getDay() === 0 || d.getDay() === 6 },
 ];

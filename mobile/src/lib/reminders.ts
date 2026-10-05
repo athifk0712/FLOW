@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import { planDueReminders } from '@/lib/due-plan';
 import { supabase } from '@/lib/supabase';
 
-// Local reminders for the nightly and weekly reviews and for due dates. Preferences live on the device only.
+// Local reminders for the nightly chat, the weekly review and for due dates. Preferences live on the device only.
 
 const NIGHTLY_ID = 'nightly-review';
 const WEEKLY_ID = 'weekly-review';
@@ -13,7 +13,7 @@ const DUE_PREFIX = 'due-';
 const CHANNEL_ID = 'reminders';
 const STORAGE_KEY = 'flow.reminder';
 
-export const REVIEW_ROUTE = '/review';
+export const REVIEW_ROUTE = '/coach';
 export const WEEKLY_REVIEW_ROUTE = '/weekly-review';
 export const REMINDER_ROUTES = [REVIEW_ROUTE, WEEKLY_REVIEW_ROUTE, '/debts', '/recurring'] as const;
 export const REMINDER_HOURS = [20, 21, 22] as const;
@@ -36,7 +36,7 @@ export const REMINDERS_SUPPORTED = Platform.OS !== 'web' && !EXPO_GO_ANDROID;
 
 export const REMINDERS_UNAVAILABLE_NOTE = EXPO_GO_ANDROID
   ? 'Pengingat belum bisa dipakai di Expo Go. Nanti aktif di versi aplikasi yang di-install.'
-  : 'Pengingat hanya tersedia di aplikasi HP. Aktifkan dari sana; review-nya tetap bisa dibuka di sini.';
+  : 'Pengingat hanya tersedia di aplikasi HP. Aktifkan dari sana; obrolan malamnya tetap bisa dibuka di sini.';
 
 /** Loaded lazily so unsupported platforms never evaluate the module. Only use when REMINDERS_SUPPORTED. */
 export const Notifications: typeof NotificationsModule = REMINDERS_SUPPORTED
@@ -90,8 +90,8 @@ export async function applyReminderSettings(settings: ReminderSettings): Promise
     await Notifications.scheduleNotificationAsync({
       identifier: NIGHTLY_ID,
       content: {
-        title: 'Review malam',
-        body: 'Nilai pengeluaran hari ini. Cukup satu menit.',
+        title: 'Ngobrol malam',
+        body: 'Yuk bahas uang yang keluar hari ini. Cuma beberapa menit.',
         data: { url: REVIEW_ROUTE },
       },
       trigger: {

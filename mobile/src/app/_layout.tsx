@@ -58,9 +58,8 @@ function RootNavigator() {
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(app)" />
           <Stack.Screen name="quick-log" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="review" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
           <Stack.Screen name="weekly-review" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="intent-new" options={{ presentation: 'modal' }} />
           <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
           <Stack.Screen name="categories" options={{ presentation: 'modal' }} />

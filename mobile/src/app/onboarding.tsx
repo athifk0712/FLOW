@@ -40,8 +40,8 @@ const BUDGET_SUGGESTIONS = [200_000, 350_000, 500_000];
 
 const VALUES = [
   { title: 'Catat dalam dua ketukan', body: 'Nominal, kategori, selesai. Tidak perlu mikir panjang saat belanja.' },
-  { title: 'Nilai dengan jujur tiap malam', body: 'Butuh, penting, ingin, atau impulsif? Tanpa menghakimi.' },
-  { title: 'Tarik napas sebelum beli', body: 'Barang yang lumayan mahal diberi jeda dulu. Sering kali, keinginannya lewat.' },
+  { title: 'Ngobrol santai tiap malam', body: 'Flowku menanyakan pengeluaran hari itu: butuh, ingin, atau impulsif? Tanpa menghakimi.' },
+  { title: 'Lihat polanya', body: 'Diagram bulanan dan saran kecil untuk besok, dari kebiasaanmu sendiri.' },
 ];
 
 // First run for a guest with no accounts: what Flowku is, the first accounts, and a weekly "wants" budget.
@@ -236,7 +236,7 @@ export default function OnboardingScreen() {
                   <ThemedText type="subtitle">Berapa batas jajan keinginanmu per minggu?</ThemedText>
                   <ThemedText themeColor="textSecondary">
                     Untuk hal yang bukan kebutuhan: nongkrong, belanja iseng, hiburan. Flowku memakai angka ini untuk
-                    memberi jeda sebelum kamu beli barang yang lumayan mahal.
+                    menghitung berapa yang aman dibelanjakan tiap hari.
                   </ThemedText>
                 </View>
                 <View style={[styles.priceRow, styles.bigPrice, { backgroundColor: theme.backgroundElement }]}>
@@ -274,8 +274,8 @@ export default function OnboardingScreen() {
                 <View style={styles.titleBlock}>
                   <ThemedText type="subtitle">Siap. Pelan-pelan saja.</ThemedText>
                   <ThemedText themeColor="textSecondary">
-                    Setiap kali keluar uang, tekan &quot;+ Catat&quot;. Malamnya, Flowku akan mengajakmu menilai
-                    pengeluaran hari itu dengan jujur.
+                    Setiap kali keluar uang, tekan &quot;+ Catat&quot;. Malamnya, Flowku akan mengajakmu ngobrol
+                    soal pengeluaran hari itu.
                   </ThemedText>
                 </View>
               </>

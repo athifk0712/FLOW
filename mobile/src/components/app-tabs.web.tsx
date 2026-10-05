@@ -22,9 +22,6 @@ export default function AppTabs() {
           <TabTrigger name="charts" href="/charts" asChild>
             <TabButton>Diagram</TabButton>
           </TabTrigger>
-          <TabTrigger name="intents" href="/intents" asChild>
-            <TabButton>Tunda Beli</TabButton>
-          </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TabButton>Pengaturan</TabButton>
           </TabTrigger>

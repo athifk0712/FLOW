@@ -29,7 +29,7 @@ const MODES: { value: Mode; label: string }[] = [
 ];
 
 const SAVE_LABEL: Record<Mode, string> = {
-  EXPENSE: 'SIMPAN (review nanti malam)',
+  EXPENSE: 'SIMPAN (dibahas nanti malam)',
   INCOME: 'SIMPAN PEMASUKAN',
   TRANSFER: 'SIMPAN TRANSFER',
 };
@@ -46,8 +46,8 @@ const MAX_DIGITS = 12;
 // With cents, "000" would jump from $1 to $1000; "00" closes a whole amount instead.
 const keyDigits = (key: (typeof KEYS)[number]) => (key === '000' && getCurrency().decimals > 0 ? '00' : key);
 
-// Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly review.
-// Income and transfers use the same screen; only expenses go to the nightly review.
+// Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly chat.
+// Income and transfers use the same screen; only expenses go to the nightly chat.
 export default function QuickLogScreen() {
   const theme = useTheme();
   const [mode, setMode] = useState<Mode>('EXPENSE');

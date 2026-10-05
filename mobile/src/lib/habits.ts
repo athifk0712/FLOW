@@ -9,8 +9,7 @@ export type HabitTransaction = {
 
 export type HabitInput = {
   transactions: HabitTransaction[]; // the last HISTORY_DAYS days
-  heldBackTotal: number; // all cancelled buy intents
-  heldBackCount: number;
+  chatCount: number; // finished nightly chats
   goalReached: boolean;
 };
 
@@ -93,29 +92,28 @@ export function computeHabits(input: HabitInput, now = new Date()): Habits {
       hint: 'Seminggu penuh (Senin–Minggu) dengan minimal 3 pengeluaran dinilai, tanpa satu pun impulsif.',
       done: lastWeek.filter((t) => t.necessity).length >= 3 && !lastWeek.some((t) => t.necessity === 'IMPULSE'),
     },
-    { key: 'first-hold', title: 'Tarik napas pertama', hint: 'Batal membeli satu barang di Tunda Beli.', done: input.heldBackCount > 0 },
-    { key: 'held-1m', title: 'Sejuta tertahan', hint: 'Total Rp1.000.000 tidak jadi dibelanjakan.', done: input.heldBackTotal >= 1_000_000 },
+    { key: 'first-chat', title: 'Obrolan pertama', hint: 'Menyelesaikan satu ngobrol malam dengan Flowku.', done: input.chatCount > 0 },
+    { key: 'chat-7', title: 'Seminggu bercerita', hint: 'Tujuh kali ngobrol malam sampai selesai.', done: input.chatCount >= 7 },
     { key: 'goal', title: 'Target tercapai', hint: 'Satu target tabungan terkumpul penuh.', done: input.goalReached },
   ];
 
   return { streak, loggedToday, lastSeven, reviewedShare, milestones };
 }
 
-/** Loads what computeHabits needs: 90 days of transactions, held-back totals, and whether any goal is reached. */
+/** Loads what computeHabits needs: 90 days of transactions, finished nightly chats, and whether any goal is reached. */
 export async function fetchHabits(now = new Date()) {
   const since = daysAgo(HISTORY_DAYS, now).toISOString();
-  const [tx, held, goals] = await Promise.all([
+  const [tx, chats, goals] = await Promise.all([
     supabase.from('transactions').select('occurred_at, type, necessity').gte('occurred_at', since),
-    supabase.from('buy_intents').select('estimated_cost').eq('status', 'CANCELLED'),
+    supabase.from('coach_sessions').select('id', { count: 'exact', head: true }).not('summary', 'is', null),
     supabase.from('v_goal_progress').select('saved, target_amount'),
   ]);
-  const failed = tx.error ?? held.error ?? goals.error;
+  const failed = tx.error ?? chats.error ?? goals.error;
   if (failed) throw failed;
   return computeHabits(
     {
       transactions: tx.data ?? [],
-      heldBackTotal: (held.data ?? []).reduce((sum, i) => sum + i.estimated_cost, 0),
-      heldBackCount: held.data?.length ?? 0,
+      chatCount: chats.count ?? 0,
       goalReached: (goals.data ?? []).some((g) => (g.saved ?? 0) >= (g.target_amount ?? 1)),
     },
     now,

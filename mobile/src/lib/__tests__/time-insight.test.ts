@@ -23,7 +23,7 @@ describe('computeTimeInsight', () => {
     expect(insight).toEqual({
       headline: 'Hampir semua belanja impulsifmu terjadi malam hari (18.00–22.00).',
       detail: 'Padahal waktu itu hanya 20% dari semua pengeluaran yang sudah kamu nilai.',
-      tip: expect.stringContaining('Tunda Beli'),
+      tip: expect.stringContaining('besok pagi'),
     });
   });
 

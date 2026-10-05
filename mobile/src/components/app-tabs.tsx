@@ -28,10 +28,6 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf={{ default: 'chart.pie', selected: 'chart.pie.fill' }} md="pie_chart" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="intents">
-        <NativeTabs.Trigger.Label>Tunda Beli</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="hourglass" md="hourglass_empty" />
-      </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Pengaturan</NativeTabs.Trigger.Label>
