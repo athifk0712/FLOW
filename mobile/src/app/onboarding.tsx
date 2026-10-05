@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccountBadge } from '@/components/account-badge';
+import { AccountPicker } from '@/components/account-picker';
 import { CurrencyList } from '@/components/currency-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { saveCurrency } from '@/hooks/use-currency-sync';
 import { useTheme } from '@/hooks/use-theme';
+import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
 import type { Enums } from '@/lib/database.types';
 import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
@@ -31,17 +34,6 @@ type Picked = { name: string; type: AccountType; digits: string };
 
 const STEPS: Step[] = ['welcome', 'currency', 'accounts', 'budget', 'done'];
 
-const PRESETS: { name: string; type: AccountType }[] = [
-  { name: 'BCA', type: 'BANK' },
-  { name: 'Mandiri', type: 'BANK' },
-  { name: 'BRI', type: 'BANK' },
-  { name: 'BNI', type: 'BANK' },
-  { name: 'GoPay', type: 'EWALLET' },
-  { name: 'OVO', type: 'EWALLET' },
-  { name: 'DANA', type: 'EWALLET' },
-  { name: 'ShopeePay', type: 'EWALLET' },
-  { name: 'Tunai', type: 'CASH' },
-];
 
 // Rupiah only; other currencies type their own amount.
 const BUDGET_SUGGESTIONS = [200_000, 350_000, 500_000];
@@ -59,7 +51,6 @@ export default function OnboardingScreen() {
   const currency = useCurrency();
   const [step, setStep] = useState<Step>('welcome');
   const [picked, setPicked] = useState<Picked[]>([]);
-  const [customName, setCustomName] = useState('');
   const [budget, setBudget] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,19 +61,17 @@ export default function OnboardingScreen() {
     if (next === '/quick-log') router.push('/quick-log');
   }
 
-  function toggle(preset: { name: string; type: AccountType }) {
+  function toggle(entry: CatalogEntry) {
     setPicked((list) =>
-      list.some((p) => p.name === preset.name)
-        ? list.filter((p) => p.name !== preset.name)
-        : [...list, { ...preset, digits: '' }],
+      list.some((p) => p.name === entry.name)
+        ? list.filter((p) => p.name !== entry.name)
+        : [...list, { name: entry.name, type: GROUP_TYPE[entry.group], digits: '' }],
     );
   }
 
-  function addCustom() {
-    const name = customName.trim();
-    if (!name || picked.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
-    setPicked((list) => [...list, { name, type: 'BANK', digits: '' }]);
-    setCustomName('');
+  function addCustom(name: string) {
+    if (picked.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
+    setPicked((list) => [...list, { name: name.slice(0, 50), type: 'BANK', digits: '' }]);
   }
 
   async function saveAccounts() {
@@ -213,39 +202,13 @@ export default function OnboardingScreen() {
                 <View style={styles.titleBlock}>
                   <ThemedText type="subtitle">Uangmu ada di mana saja?</ThemedText>
                   <ThemedText themeColor="textSecondary">
-                    Pilih rekening, e-wallet, atau tunai. Isi saldonya sekarang; kira-kira juga tidak apa-apa.
+                    Pilih bank, e-wallet, saldo toko online, atau tunai. Isi saldonya di bawah; kira-kira juga tidak apa-apa.
                   </ThemedText>
                 </View>
-                <View style={styles.chips}>
-                  {PRESETS.map((p) => {
-                    const selected = picked.some((x) => x.name === p.name);
-                    return (
-                      <Pressable key={p.name} onPress={() => toggle(p)} style={chip(selected)}>
-                        <ThemedText type="small" style={chipText(selected)}>
-                          {p.name}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.inline}>
-                  <TextInput
-                    style={[styles.input, styles.flex, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-                    value={customName}
-                    onChangeText={setCustomName}
-                    onSubmitEditing={addCustom}
-                    placeholder="Nama lain, mis. Jenius"
-                    placeholderTextColor={theme.textSecondary}
-                    maxLength={50}
-                  />
-                  <Pressable onPress={addCustom} hitSlop={8} style={styles.addLink}>
-                    <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                      + Tambah
-                    </ThemedText>
-                  </Pressable>
-                </View>
+                <AccountPicker selected={picked.map((p) => p.name)} onPick={toggle} onCustom={addCustom} />
                 {picked.map((p) => (
                   <ThemedView key={p.name} type="backgroundElement" style={styles.balanceRow}>
+                    <AccountBadge name={p.name} type={p.type} size={28} />
                     <ThemedText type="smallBold" style={styles.balanceName} numberOfLines={1}>
                       {p.name}
                     </ThemedText>
@@ -424,20 +387,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.five,
-  },
-  inline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  input: {
-    fontSize: 16,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-  },
-  addLink: {
-    padding: Spacing.two,
   },
   balanceRow: {
     flexDirection: 'row',

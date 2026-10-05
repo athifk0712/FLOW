@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccountBadge } from '@/components/account-badge';
+import { AccountPicker } from '@/components/account-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
 import type { Enums, Tables } from '@/lib/database.types';
 import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
@@ -46,6 +49,8 @@ export default function AccountsScreen() {
   const [opening, setOpening] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // A new account starts at the bank / e-wallet picker; the form follows once one is chosen.
+  const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -59,7 +64,10 @@ export default function AccountsScreen() {
     const rows = accs.data ?? [];
     setAccounts(rows.map((a) => ({ ...a, balance: balance.get(a.id) ?? a.opening_balance })));
     // Open the add form straight away when there is nothing to list yet.
-    if (rows.length === 0) setEditing('new');
+    if (rows.length === 0) {
+      setEditing('new');
+      setPicking(true);
+    }
   }, []);
 
   useFocusEffect(
@@ -75,7 +83,19 @@ export default function AccountsScreen() {
     setType(account?.type ?? 'BANK');
     setOpening(account ? String(account.opening_balance) : '');
     setConfirmDelete(false);
+    setPicking(target === 'new');
     setError(null);
+  }
+
+  function pickEntry(entry: CatalogEntry) {
+    setName(entry.name);
+    setType(GROUP_TYPE[entry.group]);
+    setPicking(false);
+  }
+
+  function pickCustom(typed: string) {
+    setName(typed.slice(0, 50));
+    setPicking(false);
   }
 
   async function run(action: () => PromiseLike<{ error: { message: string; code?: string } | null }>) {
@@ -122,9 +142,36 @@ export default function AccountsScreen() {
   const active = accounts?.filter((a) => !a.archived_at) ?? [];
   const archived = accounts?.filter((a) => a.archived_at) ?? [];
 
-  const form = (
+  const picker = (
     <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold">{editing === 'new' ? 'Akun baru' : 'Edit akun'}</ThemedText>
+      <View style={styles.actions}>
+        <ThemedText type="smallBold">Uangnya di mana?</ThemedText>
+        {accounts && accounts.length > 0 && (
+          <Pressable onPress={() => setEditing(null)} hitSlop={8}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              Batal
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
+      <AccountPicker selected={accounts?.map((a) => a.name) ?? []} onPick={pickEntry} onCustom={pickCustom} />
+    </ThemedView>
+  );
+
+  const form = picking ? (
+    picker
+  ) : (
+    <ThemedView type="backgroundElement" style={styles.card}>
+      <View style={styles.actions}>
+        <ThemedText type="smallBold">{editing === 'new' ? 'Akun baru' : 'Edit akun'}</ThemedText>
+        {editing === 'new' && (
+          <Pressable onPress={() => setPicking(true)} hitSlop={8}>
+            <ThemedText type="smallBold" style={{ color: theme.primary }}>
+              Pilih dari daftar
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
       <TextInput
         style={inputStyle}
         value={name}
@@ -220,6 +267,7 @@ export default function AccountsScreen() {
         onPress={() => openForm(account.id)}
         style={({ pressed }) => pressed && styles.pressed}>
         <ThemedView type="backgroundElement" style={styles.row}>
+          <AccountBadge name={account.name} type={account.type} />
           <View style={styles.flex}>
             <ThemedText>{account.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
