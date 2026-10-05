@@ -1,8 +1,19 @@
 // Minimal Gemini API client (REST generateContent) shared by the edge functions. Asks for JSON matching a
 // schema and returns the parsed object, or a GeminiError carrying the HTTP status to send back to the app.
-// Tried in order: when one is overloaded or rate-limited, the next one answers instead.
-export const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+// Tried in order: when one is overloaded or rate-limited, the next one answers instead. The flash-lite models
+// sit on separate capacity, so they often still answer when the bigger ones are busy (common on the free tier).
+export const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+];
 const RETRYABLE = new Set([429, 500, 503, 504]);
+// One more pass over the list after a short pause, since busy spikes are usually brief.
+const PASSES = 2;
+const PASS_DELAY_MS = 1500;
+const BUSY_MESSAGE = 'Flowku AI lagi ramai. Coba kirim lagi sebentar.';
 
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 export type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
@@ -25,21 +36,26 @@ export async function generateJson<T>(opts: {
     generationConfig: { responseMimeType: 'application/json', responseJsonSchema: opts.schema },
   });
   let res!: Response;
-  for (const model of GEMINI_MODELS) {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
-      body,
-    });
-    if (!RETRYABLE.has(res.status) || model === GEMINI_MODELS[GEMINI_MODELS.length - 1]) break;
-    console.warn('Gemini', model, 'unavailable', res.status);
-    await res.body?.cancel();
+  let detail = '';
+  attempts: for (let pass = 0; pass < PASSES; pass++) {
+    if (pass > 0) await new Promise((resolve) => setTimeout(resolve, PASS_DELAY_MS));
+    for (const model of GEMINI_MODELS) {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+        body,
+      });
+      if (res.ok) break attempts;
+      detail = await res.text().catch(() => '');
+      // A model this key can't use (404) is skipped like a busy one; anything else is a real error.
+      if (!RETRYABLE.has(res.status) && res.status !== 404) break attempts;
+      console.warn('Gemini', model, 'unavailable', res.status);
+    }
   }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => '');
     console.error('Gemini error', res.status, detail);
-    if (res.status === 429) throw new GeminiError(429, 'AI sedang sibuk, coba lagi sebentar.');
+    if (RETRYABLE.has(res.status) || res.status === 404) throw new GeminiError(503, BUSY_MESSAGE);
     if (res.status === 400 && detail.includes('API_KEY_INVALID')) throw new GeminiError(503, 'GEMINI_API_KEY tidak valid.');
     if (res.status === 401 || res.status === 403) throw new GeminiError(503, 'GEMINI_API_KEY tidak valid.');
     throw new GeminiError(502, `AI gagal (${res.status}).`);

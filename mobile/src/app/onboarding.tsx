@@ -52,6 +52,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState<Step>('welcome');
   const [picked, setPicked] = useState<Picked[]>([]);
   const [budget, setBudget] = useState('');
+  const [budgetFocused, setBudgetFocused] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -239,12 +240,19 @@ export default function OnboardingScreen() {
                     menghitung berapa yang aman dibelanjakan tiap hari.
                   </ThemedText>
                 </View>
-                <View style={[styles.priceRow, styles.bigPrice, { backgroundColor: theme.backgroundElement }]}>
+                <View
+                  style={[
+                    styles.priceRow,
+                    styles.bigPrice,
+                    { backgroundColor: theme.backgroundElement, borderColor: budgetFocused ? theme.primary : 'transparent' },
+                  ]}>
                   <ThemedText type="smallBold">{currency.symbol.trim()}</ThemedText>
                   <TextInput
                     style={[styles.priceInput, styles.bigInput, { color: theme.text }]}
                     value={formatDigits(budget)}
                     onChangeText={(t) => setBudget(toDigits(t))}
+                    onFocus={() => setBudgetFocused(true)}
+                    onBlur={() => setBudgetFocused(false)}
                     placeholder="0"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="number-pad"
@@ -408,6 +416,8 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
+    // The browser's own focus ring is drawn off-position on web; the row shows focus instead.
+    outlineWidth: 0,
     fontSize: 16,
     fontWeight: 600,
     paddingVertical: Spacing.two,
@@ -415,6 +425,7 @@ const styles = StyleSheet.create({
   },
   bigPrice: {
     flex: 0,
+    borderWidth: 2,
     borderRadius: Spacing.three,
   },
   bigInput: {
