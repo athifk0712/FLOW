@@ -7,6 +7,7 @@ import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
+import { TimeInsightCard } from '@/components/dashboard/time-insight-card';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
@@ -23,6 +24,7 @@ import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, monthCycleEnd, type SafeRule } from '@/lib/safe-to-spend';
 import { supabase } from '@/lib/supabase';
+import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
 
 type Balance = Tables<'v_account_balances'>;
@@ -50,6 +52,7 @@ export default function HomeScreen() {
   const [habits, setHabits] = useState<Habits | null>(null);
   const [rules, setRules] = useState<SafeRule[]>([]);
   const [spentToday, setSpentToday] = useState(0);
+  const [timeInsight, setTimeInsight] = useState<TimeInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -59,6 +62,7 @@ export default function HomeScreen() {
       const week = weeklyReviewWindow();
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const insightSince = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString();
       const load = () =>
         Promise.all([
           supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
@@ -87,6 +91,12 @@ export default function HomeScreen() {
             .select('name, amount, type, active, next_due, day_of_month')
             .eq('active', true),
           supabase.from('transactions').select('amount').eq('type', 'EXPENSE').gte('occurred_at', todayStart),
+          supabase
+            .from('transactions')
+            .select('occurred_at, amount, necessity')
+            .eq('type', 'EXPENSE')
+            .not('necessity', 'is', null)
+            .gte('occurred_at', insightSince),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
@@ -99,7 +109,7 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows]) => {
+        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -112,7 +122,8 @@ export default function HomeScreen() {
             goalRows.error ??
             debtRows.error ??
             ruleRows.error ??
-            todayRows.error;
+            todayRows.error ??
+            judgedRows.error;
           if (failed) return setError(failed.message);
           setError(null);
           // A brand-new guest (no accounts, never onboarded) gets the first-run setup.
@@ -129,6 +140,7 @@ export default function HomeScreen() {
           setOpenDebts(debtRows.data ?? []);
           setRules(ruleRows.data ?? []);
           setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
+          setTimeInsight(computeTimeInsight(judgedRows.data ?? []));
         });
     }, []),
   );
@@ -228,8 +240,9 @@ export default function HomeScreen() {
             </Pressable>
           </Section>
 
-          {regret.some((r) => (r.reviewed ?? 0) > 0) && (
+          {(timeInsight || regret.some((r) => (r.reviewed ?? 0) > 0)) && (
             <Section title="REFLEKSI">
+              {timeInsight && <TimeInsightCard insight={timeInsight} />}
               <RegretInsight rows={regret} />
             </Section>
           )}
