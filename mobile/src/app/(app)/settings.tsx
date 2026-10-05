@@ -1,512 +1,297 @@
-import { type Href, router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View,
-} from 'react-native';
+import { type Href, router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AccountSection } from '@/components/settings/account-section';
-import { CycleSection } from '@/components/settings/cycle-section';
-import { DeleteAccountSection } from '@/components/settings/delete-account-section';
+import { AppSymbol } from '@/components/app-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
-import { biometricLabel, LOCK_SUPPORTED, setBiometric, useLockSettings } from '@/lib/app-lock';
-import { APPEARANCE_OPTIONS, setAppearance, useAppearance } from '@/lib/appearance';
-import type { Enums } from '@/lib/database.types';
-import { DUE_LABEL } from '@/lib/due-plan';
-import { exportTransactionsCsv } from '@/lib/export';
-import { formatDigits, getCurrency, toDigits, useCurrency } from '@/lib/money';
-import {
-  applyReminderSettings,
-  getReminderSettings,
-  REMINDER_HOURS,
-  REMINDERS_SUPPORTED,
-  REMINDERS_UNAVAILABLE_NOTE,
-  type ReminderSettings,
-  WEEKLY_LABEL,
-} from '@/lib/reminders';
-import { supabase } from '@/lib/supabase';
+import { useLockSettings } from '@/lib/app-lock';
+import { APPEARANCE_OPTIONS, useAppearance } from '@/lib/appearance';
+import { useCurrency } from '@/lib/money';
+import { useSession } from '@/providers/session-provider';
 
-type Scope = Extract<Enums<'budget_scope'>, 'DISCRETIONARY' | 'ESSENTIAL'>;
+type Row = {
+  title: string;
+  href: Href;
+  material: string;
+  sf: string;
+  /** Current value, shown greyed on the right. */
+  value?: string;
+  badge?: string;
+};
 
-const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = [
-  {
-    scope: 'DISCRETIONARY',
-    label: 'Ingin & Impulsif',
-    hint: 'Batas belanja keinginan per minggu.',
-    color: NECESSITY.WANT.color,
-  },
-  {
-    scope: 'ESSENTIAL',
-    label: 'Butuh & Penting',
-    hint: 'Opsional. Untuk memantau kebutuhan pokok per minggu, dan dicadangkan di Aman dibelanjakan.',
-    color: NECESSITY.NEED.color,
-  },
-];
-
+// Pengaturan as one calm list: a profile card on top, then grouped rows with an icon and a chevron.
+// Each row opens its own page, so this screen stays short.
 export default function SettingsScreen() {
   const theme = useTheme();
-  const appearance = useAppearance();
+  const { session } = useSession();
   const currency = useCurrency();
+  const appearance = useAppearance();
   const lock = useLockSettings();
-  const [bioLabel, setBioLabel] = useState<string | null>(null);
-  const [budgetIds, setBudgetIds] = useState<Partial<Record<Scope, string>>>({});
-  const [limits, setLimits] = useState<Record<Scope, string>>({ DISCRETIONARY: '', ESSENTIAL: '' });
-  const [savingBudget, setSavingBudget] = useState(false);
-  const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
-  const [reminder, setReminder] = useState<ReminderSettings>(getReminderSettings);
-  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const { day } = useCycleDay();
+  const user = session?.user;
+  const guest = !user || user.is_anonymous;
+  const name = guest ? 'Tamu Flowku' : (user.email?.split('@')[0] ?? 'Pengguna Flowku');
+  const initials = guest ? 'TF' : name.slice(0, 2).toUpperCase();
 
-  useFocusEffect(
-    useCallback(() => {
-      supabase
-        .from('budgets')
-        .select('id, scope, limit_amount')
-        .eq('period', 'WEEKLY')
-        .in('scope', ['DISCRETIONARY', 'ESSENTIAL'])
-        .is('active_to', null)
-        .then(({ data, error }) => {
-          if (error) return setBudgetMessage(error.message);
-          const ids: Partial<Record<Scope, string>> = {};
-          const values: Record<Scope, string> = { DISCRETIONARY: '', ESSENTIAL: '' };
-          for (const b of data ?? []) {
-            const scope = b.scope as Scope;
-            ids[scope] = b.id;
-            values[scope] = String(b.limit_amount);
-          }
-          setBudgetIds(ids);
-          setLimits(values);
-        });
-    }, []),
-  );
-
-  async function saveBudgets() {
-    setSavingBudget(true);
-    setBudgetMessage(null);
-    for (const { scope } of BUDGETS) {
-      const amount = Number(limits[scope] || '0');
-      const id = budgetIds[scope];
-      const { error } =
-        amount > 0
-          ? id
-            ? await supabase.from('budgets').update({ limit_amount: amount }).eq('id', id)
-            : await supabase.from('budgets').insert({ scope, period: 'WEEKLY', limit_amount: amount })
-          : id
-            ? await supabase.from('budgets').delete().eq('id', id)
-            : { error: null };
-      if (error) {
-        setSavingBudget(false);
-        return setBudgetMessage(error.message);
-      }
-    }
-    // Reload ids so a newly inserted budget is updated (not duplicated) on the next save.
-    const { data } = await supabase
-      .from('budgets')
-      .select('id, scope')
-      .eq('period', 'WEEKLY')
-      .in('scope', ['DISCRETIONARY', 'ESSENTIAL'])
-      .is('active_to', null);
-    setBudgetIds(Object.fromEntries((data ?? []).map((b) => [b.scope, b.id])));
-    setSavingBudget(false);
-    setBudgetMessage('Budget tersimpan');
-  }
-
-  useEffect(() => {
-    biometricLabel().then(setBioLabel, () => setBioLabel(null));
-  }, []);
-
-  async function exportCsv() {
-    setExporting(true);
-    setExportMessage(null);
-    try {
-      const count = await exportTransactionsCsv();
-      setExportMessage(count > 0 ? `${count} transaksi diekspor.` : 'Belum ada transaksi untuk diekspor.');
-    } catch (e) {
-      setExportMessage(e instanceof Error ? e.message : 'Ekspor gagal.');
-    }
-    setExporting(false);
-  }
-
-  async function updateReminder(next: ReminderSettings) {
-    setReminder(next);
-    setReminderMessage(null);
-    const ok = await applyReminderSettings(next);
-    if (!ok) {
-      setReminder({ ...next, enabled: false, weeklyEnabled: false, dueEnabled: false });
-      setReminderMessage('Izin notifikasi ditolak. Aktifkan dari pengaturan HP.');
-      return;
-    }
-    const active = [
-      next.enabled && `review malam setiap hari jam ${String(next.hour).padStart(2, '0')}.00`,
-      next.weeklyEnabled && `refleksi mingguan setiap ${WEEKLY_LABEL}`,
-      next.dueEnabled && `jatuh tempo jam ${DUE_LABEL}`,
-    ].filter(Boolean);
-    setReminderMessage(active.length > 0 ? `Pengingat aktif: ${active.join(' dan ')}.` : null);
-  }
-
-  const inputRow = [styles.priceRow, { backgroundColor: theme.backgroundSelected }];
+  const sections: { title: string; rows: Row[] }[] = [
+    {
+      title: 'Keuangan',
+      rows: [
+        { title: 'Mata uang', href: '/currency', material: 'currency_exchange', sf: 'coloncurrencysign.circle', value: currency.code },
+        { title: 'Akun & dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
+        { title: 'Kategori & ikon', href: '/categories', material: 'category', sf: 'square.grid.2x2' },
+        { title: 'Budget mingguan', href: '/weekly-budget', material: 'savings', sf: 'chart.bar' },
+        { title: 'Budget per kategori', href: '/budgets', material: 'donut_large', sf: 'chart.pie' },
+        { title: 'Siklus gajian', href: '/cycle', material: 'calendar_month', sf: 'calendar', value: `Tgl ${day}` },
+        { title: 'Transaksi rutin', href: '/recurring', material: 'event_repeat', sf: 'repeat' },
+        { title: 'Target tabungan', href: '/goals', material: 'flag', sf: 'flag' },
+        { title: 'Utang & piutang', href: '/debts', material: 'handshake', sf: 'person.2' },
+      ],
+    },
+    {
+      title: 'Preferensi',
+      rows: [
+        {
+          title: 'Tampilan',
+          href: '/appearance',
+          material: 'palette',
+          sf: 'paintpalette',
+          value: APPEARANCE_OPTIONS.find((o) => o.value === appearance)?.label,
+        },
+        { title: 'Pengingat', href: '/reminders', material: 'notifications', sf: 'bell' },
+        { title: 'Keamanan', href: '/security', material: 'shield_lock', sf: 'lock.shield', value: lock.enabled ? 'PIN aktif' : undefined },
+      ],
+    },
+    {
+      title: 'Aktivitas',
+      rows: [
+        { title: 'Laporan bulanan', href: '/report', material: 'bar_chart', sf: 'chart.bar.doc.horizontal' },
+        { title: 'Kebiasaan & pencapaian', href: '/habits', material: 'self_improvement', sf: 'leaf' },
+        { title: 'Data & cadangan', href: '/backup', material: 'download', sf: 'square.and.arrow.down' },
+      ],
+    },
+  ];
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              PENGATURAN
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={[styles.hero, { backgroundColor: theme.primary }]}>
+          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
+          <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
+          <SafeAreaView edges={['top', 'left', 'right']} style={styles.heroInner}>
+            <ThemedText type="subtitle" style={{ color: theme.onPrimary }}>
+              Profilku
             </ThemedText>
+          </SafeAreaView>
+        </View>
 
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                AKUN
+        <View style={styles.body}>
+          <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type="backgroundElement" style={styles.profile}>
+              <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+                <ThemedText type="smallBold" style={[styles.avatarText, { color: theme.onPrimary }]}>
+                  {initials}
+                </ThemedText>
+              </View>
+              <View style={styles.flex}>
+                <ThemedText type="subtitle" style={styles.name} numberOfLines={1}>
+                  {name}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                  {guest ? 'Mode tamu · belum tertaut email' : user.email}
+                </ThemedText>
+              </View>
+              <AppSymbol material="edit" sf="pencil" size={22} color={theme.text} />
+            </ThemedView>
+          </Pressable>
+
+          {guest && (
+            <Pressable
+              onPress={() => router.push('/profile')}
+              style={({ pressed }) => [styles.strip, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
+              <AppSymbol material="verified_user" sf="checkmark.shield.fill" size={22} color={theme.onAccent} />
+              <ThemedText type="smallBold" style={[styles.flex, { color: theme.onAccent }]}>
+                Simpan datamu dengan email
               </ThemedText>
-              <AccountSection />
-            </View>
+              <View style={[styles.stripArrow, { backgroundColor: theme.onAccent }]}>
+                <AppSymbol material="arrow_forward" sf="arrow.right" size={16} color={theme.accent} />
+              </View>
+            </Pressable>
+          )}
 
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                DATA
-              </ThemedText>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <LinkRow title="Mata uang" hint={`${currency.name} (${currency.code})`} href="/currency" />
-                <LinkRow title="Akun & dompet" hint="Bank, e-wallet, tunai, dan saldo awalnya" href="/accounts" />
-                <LinkRow title="Kategori" hint="Tambah, ganti nama, atau hapus kategori" href="/categories" />
-                <LinkRow title="Budget per kategori" hint="Batas mingguan atau bulanan per kategori" href="/budgets" />
-                <LinkRow title="Transaksi rutin" hint="Kos, langganan, gaji: dicatat otomatis tiap bulan" href="/recurring" />
-                <LinkRow title="Target tabungan" hint="Sisihkan uang untuk sesuatu yang kamu mau" href="/goals" />
-                <LinkRow title="Utang & piutang" hint="Siapa pinjam ke siapa, dan sudah dibayar berapa" href="/debts" />
-              </ThemedView>
-            </View>
-
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                TAMPILAN
-              </ThemedText>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <View style={styles.hours}>
-                  {APPEARANCE_OPTIONS.map(({ value, label }) => {
-                    const selected = value === appearance;
-                    return (
-                      <Pressable
-                        key={value}
-                        onPress={() => setAppearance(value)}
-                        style={[styles.hour, { backgroundColor: selected ? theme.primary : theme.backgroundSelected }]}>
-                        <ThemedText type="smallBold" style={{ color: selected ? theme.onPrimary : theme.text }}>
-                          {label}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </ThemedView>
-            </View>
-
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                KEAMANAN
+          {sections.map((section) => (
+            <View key={section.title} style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
+                {section.title}
               </ThemedText>
               <ThemedView type="backgroundElement" style={styles.card}>
-                {LOCK_SUPPORTED ? (
-                  <>
-                    <View style={styles.row}>
-                      <View style={styles.flex}>
-                        <ThemedText type="smallBold">Kunci dengan PIN</ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          Diminta saat Flowku dibuka, atau kembali setelah lebih dari 1 menit.
-                        </ThemedText>
-                      </View>
-                      <Switch
-                        value={lock.enabled}
-                        onValueChange={(on) => router.push(on ? '/pin-setup' : '/pin-setup?mode=disable')}
-                      />
-                    </View>
-                    {lock.enabled && bioLabel && (
-                      <View style={styles.row}>
-                        <View style={styles.flex}>
-                          <ThemedText type="smallBold">Buka dengan {bioLabel.toLowerCase()}</ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            PIN tetap bisa dipakai kapan saja.
+                {section.rows.map((row, i) => (
+                  <Pressable
+                    key={row.title}
+                    onPress={() => router.push(row.href)}
+                    style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
+                    <AppSymbol material={row.material} sf={row.sf} size={24} color={theme.text} />
+                    <View
+                      style={[
+                        styles.rowMain,
+                        i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.backgroundSelected },
+                      ]}>
+                      <ThemedText style={styles.flex} numberOfLines={1}>
+                        {row.title}
+                      </ThemedText>
+                      {row.badge && (
+                        <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                          <ThemedText type="smallBold" style={[styles.badgeText, { color: theme.onPrimary }]}>
+                            {row.badge}
                           </ThemedText>
                         </View>
-                        <Switch value={lock.biometric} onValueChange={setBiometric} />
-                      </View>
-                    )}
-                    {lock.enabled && (
-                      <LinkRow title="Ganti PIN" hint="Masukkan PIN lama, lalu buat yang baru" href="/pin-setup?mode=change" />
-                    )}
-                  </>
-                ) : (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Kunci PIN dan sidik jari tersedia di aplikasi HP.
-                  </ThemedText>
-                )}
-              </ThemedView>
-            </View>
-
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                CADANGAN
-              </ThemedText>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <View style={styles.flex}>
-                  <ThemedText type="smallBold">Ekspor transaksi (CSV)</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Semua catatanmu dalam satu file. Bisa dibuka di Excel atau Google Sheets.
-                  </ThemedText>
-                </View>
-                <Pressable
-                  disabled={exporting}
-                  onPress={exportCsv}
-                  style={({ pressed }) => [
-                    styles.button,
-                    { backgroundColor: theme.backgroundSelected },
-                    (pressed || exporting) && styles.pressed,
-                  ]}>
-                  {exporting ? (
-                    <ActivityIndicator color={theme.text} />
-                  ) : (
-                    <ThemedText type="smallBold">Ekspor CSV</ThemedText>
-                  )}
-                </Pressable>
-                {exportMessage && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {exportMessage}
-                  </ThemedText>
-                )}
-              </ThemedView>
-            </View>
-
-            <CycleSection />
-
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                BUDGET MINGGUAN
-              </ThemedText>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                {BUDGETS.map((b) => (
-                  <View key={b.scope} style={styles.field}>
-                    <View style={styles.label}>
-                      <View style={[styles.dot, { backgroundColor: b.color }]} />
-                      <ThemedText type="smallBold">{b.label}</ThemedText>
+                      )}
+                      {row.value && (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {row.value}
+                        </ThemedText>
+                      )}
+                      <AppSymbol material="chevron_right" sf="chevron.right" size={22} color={theme.textSecondary} />
                     </View>
-                    <View style={inputRow}>
-                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                      <TextInput
-                        style={[styles.priceInput, { color: theme.text }]}
-                        value={formatDigits(limits[b.scope])}
-                        onChangeText={(t) => setLimits((l) => ({ ...l, [b.scope]: toDigits(t) }))}
-                        placeholder="Belum diatur"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
-                      />
-                    </View>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {b.hint}
-                    </ThemedText>
-                  </View>
+                  </Pressable>
                 ))}
-
-                <Pressable
-                  disabled={savingBudget}
-                  onPress={saveBudgets}
-                  style={({ pressed }) => [
-                    styles.button,
-                    { backgroundColor: theme.primary },
-                    (pressed || savingBudget) && styles.pressed,
-                  ]}>
-                  {savingBudget ? (
-                    <ActivityIndicator color={theme.onPrimary} />
-                  ) : (
-                    <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                      Simpan budget
-                    </ThemedText>
-                  )}
-                </Pressable>
-                {budgetMessage && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {budgetMessage}
-                  </ThemedText>
-                )}
               </ThemedView>
             </View>
+          ))}
 
-            <View style={styles.section}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                PENGINGAT
-              </ThemedText>
-              {!REMINDERS_SUPPORTED ? (
-                <ThemedView type="backgroundElement" style={styles.card}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {REMINDERS_UNAVAILABLE_NOTE}
-                  </ThemedText>
-                </ThemedView>
-              ) : (
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <View style={styles.row}>
-                  <View style={styles.flex}>
-                    <ThemedText type="smallBold">Review malam</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Setiap hari, untuk menilai pengeluaran hari itu.
-                    </ThemedText>
-                  </View>
-                  <Switch value={reminder.enabled} onValueChange={(enabled) => updateReminder({ ...reminder, enabled })} />
-                </View>
-                {reminder.enabled && (
-                  <View style={styles.hours}>
-                    {REMINDER_HOURS.map((hour) => {
-                      const selected = hour === reminder.hour;
-                      return (
-                        <Pressable
-                          key={hour}
-                          onPress={() => updateReminder({ ...reminder, hour })}
-                          style={[
-                            styles.hour,
-                            { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
-                          ]}>
-                          <ThemedText type="smallBold" style={{ color: selected ? theme.onPrimary : theme.text }}>
-                            {hour}.00
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-                <View style={styles.row}>
-                  <View style={styles.flex}>
-                    <ThemedText type="smallBold">Refleksi mingguan</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {WEEKLY_LABEL}: masih puas dengan belanja minggu lalu, atau menyesal?
-                    </ThemedText>
-                  </View>
-                  <Switch
-                    value={reminder.weeklyEnabled}
-                    onValueChange={(weeklyEnabled) => updateReminder({ ...reminder, weeklyEnabled })}
-                  />
-                </View>
-                <View style={styles.row}>
-                  <View style={styles.flex}>
-                    <ThemedText type="smallBold">Jatuh tempo</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Utang, piutang, dan tagihan rutin: jam {DUE_LABEL} di harinya.
-                    </ThemedText>
-                  </View>
-                  <Switch
-                    value={reminder.dueEnabled}
-                    onValueChange={(dueEnabled) => updateReminder({ ...reminder, dueEnabled })}
-                  />
-                </View>
-                {reminderMessage && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {reminderMessage}
-                  </ThemedText>
-                )}
-              </ThemedView>
-              )}
-            </View>
-
-            <DeleteAccountSection onExport={exportCsv} exporting={exporting} />
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.footer}>
+            Flowku · uangmu mengalir tenang
+          </ThemedText>
+        </View>
+      </ScrollView>
     </ThemedView>
-  );
-}
-
-function LinkRow({ title, hint, href }: { title: string; hint: string; href: Href }) {
-  return (
-    <Pressable onPress={() => router.push(href)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <View style={styles.flex}>
-        <ThemedText type="smallBold">{title}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {hint}
-        </ThemedText>
-      </View>
-      <ThemedText type="smallBold">→</ThemedText>
-    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scroll: {
+    paddingBottom: BottomTabInset + Spacing.four,
+  },
+  hero: {
+    height: 150,
+    overflow: 'hidden',
+  },
+  heroInner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+  },
+  // Soft shapes in the band, echoing the sun-over-waves mark.
+  bubble: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  bubbleOne: {
+    width: 120,
+    height: 120,
+    right: -20,
+    top: -30,
+    opacity: 0.9,
+  },
+  bubbleTwo: {
+    width: 260,
+    height: 260,
+    right: -60,
+    top: 70,
+    opacity: 0.08,
+  },
+  body: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.three,
+    marginTop: -56,
+    gap: Spacing.four,
+  },
+  profile: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.four,
+    borderRadius: Spacing.four,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  flex: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
+  avatarText: {
+    fontSize: 20,
   },
-  content: {
+  name: {
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  strip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.four,
-    gap: Spacing.four,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    marginTop: -Spacing.two,
+  },
+  stripArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     gap: Spacing.two,
   },
+  sectionTitle: {
+    paddingHorizontal: Spacing.one,
+  },
   card: {
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  field: {
-    gap: Spacing.one,
-  },
-  label: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 600,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.two,
-  },
-  button: {
-    alignItems: 'center',
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Spacing.four,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    paddingLeft: Spacing.three,
   },
-  hours: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  hour: {
+  rowMain: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
+    gap: Spacing.two,
+    paddingVertical: Spacing.three + 2,
+    paddingRight: Spacing.two,
+  },
+  badge: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    borderRadius: Spacing.three,
+  },
+  badgeText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  flex: {
+    flex: 1,
+  },
+  footer: {
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.7,

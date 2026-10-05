@@ -72,6 +72,13 @@ function RootNavigator() {
           <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
           <Stack.Screen name="habits" options={{ presentation: 'modal' }} />
           <Stack.Screen name="currency" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="weekly-budget" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="cycle" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="appearance" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="reminders" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="security" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="backup" options={{ presentation: 'modal' }} />
           <Stack.Screen name="pin-setup" options={{ presentation: 'modal', gestureEnabled: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
