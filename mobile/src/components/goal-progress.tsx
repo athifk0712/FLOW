@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { NECESSITY } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { deadlineLabel, type Goal, goalStatus } from '@/lib/goals';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 const GOAL_COLOR = NECESSITY.NEED.color;
 
@@ -19,10 +19,10 @@ export function GoalProgress({ goal }: { goal: Goal }) {
   const line = status.done
     ? 'Tercapai!'
     : status.overdue
-      ? `Lewat tenggat · kurang ${formatRupiah(status.left)}`
+      ? `Lewat tenggat · kurang ${formatMoney(status.left)}`
       : status.perMonth
-        ? `Sisihkan ${formatRupiah(status.perMonth)}/bulan sampai ${deadlineLabel(goal.deadline!)}`
-        : `Kurang ${formatRupiah(status.left)}`;
+        ? `Sisihkan ${formatMoney(status.perMonth)}/bulan sampai ${deadlineLabel(goal.deadline!)}`
+        : `Kurang ${formatMoney(status.left)}`;
 
   return (
     <View style={styles.goal}>
@@ -31,7 +31,7 @@ export function GoalProgress({ goal }: { goal: Goal }) {
           {goal.name}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {formatRupiah(saved)} / {formatRupiah(target)}
+          {formatMoney(saved)} / {formatMoney(target)}
         </ThemedText>
       </View>
       <ProgressBar total={target} segments={[{ value: saved, color: GOAL_COLOR }]} />

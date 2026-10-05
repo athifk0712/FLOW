@@ -10,7 +10,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { cycleLabel, cycleRange } from '@/lib/cycle';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { buildReport, percentChange, type ReportTransaction } from '@/lib/report';
 import { supabase } from '@/lib/supabase';
@@ -125,7 +125,7 @@ export default function ReportScreen() {
                 {net >= 0 ? 'Sisa (pemasukan − pengeluaran)' : 'Minus (pengeluaran > pemasukan)'}
               </ThemedText>
               <ThemedText type="smallBold" themeColor={net < 0 ? 'danger' : 'text'}>
-                {formatRupiah(net)}
+                {formatMoney(net)}
               </ThemedText>
             </ThemedView>
 
@@ -139,7 +139,7 @@ export default function ReportScreen() {
                       <View key={c.key} style={styles.category}>
                         <View style={styles.row}>
                           <ThemedText type="smallBold">{c.name}</ThemedText>
-                          <ThemedText type="smallBold">{formatRupiah(c.total)}</ThemedText>
+                          <ThemedText type="smallBold">{formatMoney(c.total)}</ThemedText>
                         </View>
                         <View style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
                           <View
@@ -181,7 +181,7 @@ export default function ReportScreen() {
                           {dayFormat.format(new Date(t.occurred_at))}
                         </ThemedText>
                       </View>
-                      <ThemedText type="smallBold">{formatRupiah(t.amount)}</ThemedText>
+                      <ThemedText type="smallBold">{formatMoney(t.amount)}</ThemedText>
                     </Pressable>
                   ))}
                 </ThemedView>
@@ -211,7 +211,7 @@ function StatTile({
         {label}
       </ThemedText>
       <ThemedText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
-        {formatRupiah(value)}
+        {formatMoney(value)}
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {change ? `${change} vs ${previousLabel}` : `Tidak ada data ${previousLabel}`}

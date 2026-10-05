@@ -18,7 +18,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deadlineFromOffset, deadlineLabel, type Goal, offsetFromDeadline } from '@/lib/goals';
-import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -125,7 +125,7 @@ export default function GoalsScreen() {
         autoFocus={open === 'new'}
       />
       <View style={priceRow}>
-        <ThemedText type="smallBold">Rp</ThemedText>
+        <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
         <TextInput
           style={[styles.priceInput, { color: theme.text }]}
           value={formatDigits(target)}
@@ -212,7 +212,7 @@ export default function GoalsScreen() {
             <View style={styles.form}>
               <View style={styles.inline}>
                 <View style={[...priceRow, styles.flex]}>
-                  <ThemedText type="smallBold">Rp</ThemedText>
+                  <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
                   <TextInput
                     style={[styles.priceInput, { color: theme.text }]}
                     value={formatDigits(deposit)}
@@ -282,7 +282,7 @@ export default function GoalsScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 Sisihkan uang untuk sesuatu yang kamu mau. Ini penanda saja: saldo akunmu tidak berubah.
               </ThemedText>
-              {totalSaved > 0 && <ThemedText type="smallBold">Total disisihkan: {formatRupiah(totalSaved)}</ThemedText>}
+              {totalSaved > 0 && <ThemedText type="smallBold">Total disisihkan: {formatMoney(totalSaved)}</ThemedText>}
 
               {goals.map(renderGoal)}
 

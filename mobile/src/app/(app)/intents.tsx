@@ -13,7 +13,7 @@ import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { cycleKey } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
 type Intent = Tables<'buy_intents'>;
@@ -103,7 +103,7 @@ export default function IntentsScreen() {
               Ditahan bulan ini
             </ThemedText>
             <ThemedText type="subtitle" style={[{ color: theme.onAccent }, styles.heldAmount]}>
-              {formatRupiah(heldBack.total)}
+              {formatMoney(heldBack.total)}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.onAccent }}>
               {heldBack.count} barang tidak jadi dibeli
@@ -161,7 +161,7 @@ export default function IntentsScreen() {
                     </View>
                     <View style={styles.amountColumn}>
                       <ThemedText type="small" style={i.status === 'CANCELLED' ? styles.saved : undefined}>
-                        {formatRupiah(i.estimated_cost)}
+                        {formatMoney(i.estimated_cost)}
                       </ThemedText>
                       {i.status === 'CANCELLED' && !savedIntentIds.has(i.id) && offer?.id !== i.id && (
                         <Pressable onPress={() => setOffer(i)} hitSlop={8}>
@@ -239,7 +239,7 @@ function IntentCard({
             </ThemedText>
           </View>
         </View>
-        <ThemedText type="smallBold">{formatRupiah(intent.estimated_cost)}</ThemedText>
+        <ThemedText type="smallBold">{formatMoney(intent.estimated_cost)}</ThemedText>
       </View>
 
       {phase === 'COOLING' ? (

@@ -8,7 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -41,6 +41,9 @@ const FROM_LABEL: Record<Mode, string> = {
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'del'] as const;
 const MAX_DIGITS = 12;
+
+// With cents, "000" would jump from $1 to $1000; "00" closes a whole amount instead.
+const keyDigits = (key: (typeof KEYS)[number]) => (key === '000' && getCurrency().decimals > 0 ? '00' : key);
 
 // Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly review.
 // Income and transfers use the same screen; only expenses go to the nightly review.
@@ -129,7 +132,7 @@ export default function QuickLogScreen() {
   function press(key: (typeof KEYS)[number]) {
     if (key === 'del') return setDigits((d) => d.slice(0, -1));
     setDigits((d) => {
-      const next = (d + key).replace(/^0+/, '');
+      const next = (d + keyDigits(key)).replace(/^0+/, '');
       return next.length > MAX_DIGITS ? d : next;
     });
   }
@@ -184,7 +187,7 @@ export default function QuickLogScreen() {
         </View>
 
         <ThemedText style={styles.amount} numberOfLines={1} adjustsFontSizeToFit>
-          {formatRupiah(amount)}
+          {formatMoney(amount)}
         </ThemedText>
 
         <ThemedText type="small" themeColor="textSecondary">
@@ -278,7 +281,7 @@ export default function QuickLogScreen() {
                 { backgroundColor: theme.backgroundElement },
                 pressed && styles.pressed,
               ]}>
-              <ThemedText style={styles.keyText}>{key === 'del' ? '⌫' : key}</ThemedText>
+              <ThemedText style={styles.keyText}>{key === 'del' ? '⌫' : keyDigits(key)}</ThemedText>
             </Pressable>
           ))}
         </View>
@@ -312,10 +315,10 @@ function describeBudget(budgets: CategoryBudget[], categories: Category[], categ
   const name = categories.find((c) => c.id === categoryId)?.name ?? 'kategori ini';
   const period = PERIOD_LABEL[budget.period ?? 'MONTHLY'];
   const after = (budget.remaining ?? 0) - amount;
-  if (after < 0) return { level: 'over' as const, text: `Ini melewati budget ${name} ${period} ${formatRupiah(-after)}.` };
+  if (after < 0) return { level: 'over' as const, text: `Ini melewati budget ${name} ${period} ${formatMoney(-after)}.` };
   if (after < (budget.limit_amount ?? 0) * LOW_BUDGET_SHARE)
-    return { level: 'low' as const, text: `Hati-hati, sisa budget ${name} ${period} tinggal ${formatRupiah(after)}.` };
-  return { level: 'ok' as const, text: `Sisa budget ${name} ${period} setelah ini: ${formatRupiah(after)}` };
+    return { level: 'low' as const, text: `Hati-hati, sisa budget ${name} ${period} tinggal ${formatMoney(after)}.` };
+  return { level: 'ok' as const, text: `Sisa budget ${name} ${period} setelah ini: ${formatMoney(after)}` };
 }
 
 const styles = StyleSheet.create({

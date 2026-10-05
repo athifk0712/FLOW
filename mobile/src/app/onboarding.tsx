@@ -13,21 +13,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CurrencyList } from '@/components/currency-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { saveCurrency } from '@/hooks/use-currency-sync';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
-import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
-type Step = 'welcome' | 'accounts' | 'budget' | 'done';
+type Step = 'welcome' | 'currency' | 'accounts' | 'budget' | 'done';
 type AccountType = Enums<'account_type'>;
 type Picked = { name: string; type: AccountType; digits: string };
 
-const STEPS: Step[] = ['welcome', 'accounts', 'budget', 'done'];
+const STEPS: Step[] = ['welcome', 'currency', 'accounts', 'budget', 'done'];
 
 const PRESETS: { name: string; type: AccountType }[] = [
   { name: 'BCA', type: 'BANK' },
@@ -41,6 +43,7 @@ const PRESETS: { name: string; type: AccountType }[] = [
   { name: 'Tunai', type: 'CASH' },
 ];
 
+// Rupiah only; other currencies type their own amount.
 const BUDGET_SUGGESTIONS = [200_000, 350_000, 500_000];
 
 const VALUES = [
@@ -53,6 +56,7 @@ const VALUES = [
 // Every step can be skipped; the dashboard's empty states still guide the user afterwards.
 export default function OnboardingScreen() {
   const theme = useTheme();
+  const currency = useCurrency();
   const [step, setStep] = useState<Step>('welcome');
   const [picked, setPicked] = useState<Picked[]>([]);
   const [customName, setCustomName] = useState('');
@@ -91,6 +95,15 @@ export default function OnboardingScreen() {
     setSaving(false);
     if (error) return setError(error.message);
     setStep('budget');
+  }
+
+  async function pickCurrency(code: string) {
+    setError(null);
+    try {
+      await saveCurrency(code);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal menyimpan mata uang.');
+    }
   }
 
   async function saveBudget() {
@@ -183,6 +196,18 @@ export default function OnboardingScreen() {
               </>
             )}
 
+            {step === 'currency' && (
+              <>
+                <View style={styles.titleBlock}>
+                  <ThemedText type="subtitle">Pakai mata uang apa?</ThemedText>
+                  <ThemedText themeColor="textSecondary">
+                    Semua nominal di Flowku ditampilkan dalam mata uang ini. Bisa diganti nanti di Pengaturan.
+                  </ThemedText>
+                </View>
+                <CurrencyList selected={currency.code} onSelect={pickCurrency} />
+              </>
+            )}
+
             {step === 'accounts' && (
               <>
                 <View style={styles.titleBlock}>
@@ -225,7 +250,7 @@ export default function OnboardingScreen() {
                       {p.name}
                     </ThemedText>
                     <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText type="small">Rp</ThemedText>
+                      <ThemedText type="small">{currency.symbol.trim()}</ThemedText>
                       <TextInput
                         style={[styles.priceInput, { color: theme.text }]}
                         value={formatDigits(p.digits)}
@@ -252,7 +277,7 @@ export default function OnboardingScreen() {
                   </ThemedText>
                 </View>
                 <View style={[styles.priceRow, styles.bigPrice, { backgroundColor: theme.backgroundElement }]}>
-                  <ThemedText type="smallBold">Rp</ThemedText>
+                  <ThemedText type="smallBold">{currency.symbol.trim()}</ThemedText>
                   <TextInput
                     style={[styles.priceInput, styles.bigInput, { color: theme.text }]}
                     value={formatDigits(budget)}
@@ -263,12 +288,12 @@ export default function OnboardingScreen() {
                   />
                 </View>
                 <View style={styles.chips}>
-                  {BUDGET_SUGGESTIONS.map((value) => {
+                  {currency.code === 'IDR' && BUDGET_SUGGESTIONS.map((value) => {
                     const selected = Number(budget) === value;
                     return (
                       <Pressable key={value} onPress={() => setBudget(String(value))} style={chip(selected)}>
                         <ThemedText type="small" style={chipText(selected)}>
-                          {formatRupiah(value)}
+                          {formatMoney(value)}
                         </ThemedText>
                       </Pressable>
                     );
@@ -297,7 +322,8 @@ export default function OnboardingScreen() {
           </ScrollView>
 
           <View style={styles.footer}>
-            {step === 'welcome' && primaryButton('Mulai', () => setStep('accounts'))}
+            {step === 'welcome' && primaryButton('Mulai', () => setStep('currency'))}
+            {step === 'currency' && primaryButton(`Lanjut dengan ${currency.code}`, () => setStep('accounts'))}
             {step === 'accounts' && primaryButton('Simpan akun', saveAccounts, picked.length > 0)}
             {step === 'budget' && (
               <>

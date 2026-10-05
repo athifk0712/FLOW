@@ -1,6 +1,6 @@
 import type { Enums } from '@/lib/database.types';
 import { localDate } from '@/lib/debts';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 // Which due-date reminders to schedule. Pure, so it can be tested without expo-notifications.
 
@@ -49,8 +49,8 @@ export function planDueReminders(debts: DueDebt[], rules: DueRule[], now = new D
       date: at9(d.due_date),
       title: owe ? 'Utang jatuh tempo hari ini' : 'Piutang jatuh tempo hari ini',
       body: owe
-        ? `Sisa ${formatRupiah(d.remaining)} ke ${d.person ?? 'seseorang'}.`
-        : `${d.person ?? 'Seseorang'} masih punya sisa ${formatRupiah(d.remaining)}. Saatnya mengingatkan dengan baik.`,
+        ? `Sisa ${formatMoney(d.remaining)} ke ${d.person ?? 'seseorang'}.`
+        : `${d.person ?? 'Seseorang'} masih punya sisa ${formatMoney(d.remaining)}. Saatnya mengingatkan dengan baik.`,
       url: '/debts',
     });
   }
@@ -61,7 +61,7 @@ export function planDueReminders(debts: DueDebt[], rules: DueRule[], now = new D
       id: `due-rule-${r.id}`,
       date: at9(r.next_due),
       title: `Hari ini: ${r.name}`,
-      body: `${formatRupiah(r.amount)} tercatat otomatis saat kamu membuka Flowku. Pastikan saldonya cukup.`,
+      body: `${formatMoney(r.amount)} tercatat otomatis saat kamu membuka Flowku. Pastikan saldonya cukup.`,
       url: '/recurring',
     });
   }

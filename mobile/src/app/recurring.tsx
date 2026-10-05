@@ -23,7 +23,7 @@ import {
 import { MaxContentWidth, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import type { Tables } from "@/lib/database.types";
-import { formatDigits, formatRupiah, toDigits } from "@/lib/money";
+import { formatDigits, formatMoney, getCurrency, toDigits } from "@/lib/money";
 import { closeModal } from "@/lib/navigation";
 import { syncDueReminders } from "@/lib/reminders";
 import { supabase } from "@/lib/supabase";
@@ -212,7 +212,7 @@ export default function RecurringScreen() {
             { backgroundColor: theme.backgroundSelected },
           ]}
         >
-          <ThemedText type="smallBold">Rp</ThemedText>
+          <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
           <TextInput
             style={[styles.priceInput, { color: theme.text }]}
             value={formatDigits(digits)}
@@ -400,7 +400,7 @@ export default function RecurringScreen() {
           </View>
           <ThemedText type="smallBold">
             {rule.type === "INCOME" ? "+" : "-"}
-            {formatRupiah(rule.amount)}
+            {formatMoney(rule.amount)}
           </ThemedText>
         </ThemedView>
       </Pressable>
@@ -449,7 +449,7 @@ export default function RecurringScreen() {
               </ThemedText>
               {monthlyOut > 0 && (
                 <ThemedText type="smallBold">
-                  Pengeluaran rutin: {formatRupiah(monthlyOut)} / bulan
+                  Pengeluaran rutin: {formatMoney(monthlyOut)} / bulan
                 </ThemedText>
               )}
 

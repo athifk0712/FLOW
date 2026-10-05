@@ -1,4 +1,4 @@
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 // Tunda Beli pause, relative to the daily safe limit. The server (public.intent_cooldown) is the authority;
 // this mirror only previews the pause while the price is being typed.
@@ -14,7 +14,7 @@ export function cooldownHours(cost: number, dailyLimit: number) {
 
 /** One calm sentence explaining the pause, in terms of the daily limit the user sees on the dashboard. */
 export function describeCooldown(hours: number, dailyLimit: number | null) {
-  const limit = dailyLimit && dailyLimit > 0 ? formatRupiah(dailyLimit) : null;
+  const limit = dailyLimit && dailyLimit > 0 ? formatMoney(dailyLimit) : null;
   if (hours <= 0) return limit ? `Tanpa jeda: masih jauh di bawah batas amanmu ${limit}/hari.` : 'Tanpa jeda.';
   if (!limit) return 'Dijeda 24 jam: belum ada ruang aman untuk belanja sampai periode ini selesai.';
   if (hours === 1) return `Dijeda 1 jam: mendekati batas amanmu ${limit}/hari. Sebentar saja, lalu putuskan.`;

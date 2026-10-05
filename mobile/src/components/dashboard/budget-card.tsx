@@ -8,7 +8,7 @@ import { NECESSITY } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 type Budget = Tables<'v_budget_remaining'>;
 
@@ -67,16 +67,16 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
             <View style={styles.row}>
               <ThemedText type="smallBold">{label}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {formatRupiah(spent)} / {formatRupiah(limit)}
+                {formatMoney(spent)} / {formatMoney(limit)}
               </ThemedText>
             </View>
             <ProgressBar total={limit} segments={[{ value: spent, color: over ? theme.danger : SCOPE_COLOR[scope] }]} />
             <ThemedText type="small" themeColor={over ? 'danger' : 'textSecondary'}>
-              {over ? `Lewat ${formatRupiah(-remaining)} ${period}` : `Sisa ${formatRupiah(remaining)} ${period}`}
+              {over ? `Lewat ${formatMoney(-remaining)} ${period}` : `Sisa ${formatMoney(remaining)} ${period}`}
             </ThemedText>
             {(b.unreviewed_amount ?? 0) > 0 && (
               <ThemedText type="small" themeColor="textSecondary">
-                + {formatRupiah(b.unreviewed_amount ?? 0)} belum dinilai, belum dihitung di sini
+                + {formatMoney(b.unreviewed_amount ?? 0)} belum dinilai, belum dihitung di sini
               </ThemedText>
             )}
           </View>

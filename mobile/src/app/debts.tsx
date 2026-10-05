@@ -26,7 +26,7 @@ import {
   formatDay,
   sortDebts,
 } from '@/lib/debts';
-import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { syncDueReminders } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
@@ -126,7 +126,7 @@ export default function DebtsScreen() {
 
   function pay(debt: Debt, value: number) {
     if (!debt.id || value <= 0 || saving) return;
-    if (value > (debt.remaining ?? 0)) return setError(`Sisanya tinggal ${formatRupiah(debt.remaining ?? 0)}.`);
+    if (value > (debt.remaining ?? 0)) return setError(`Sisanya tinggal ${formatMoney(debt.remaining ?? 0)}.`);
     run(() => supabase.from('debt_payments').insert({ debt_id: debt.id!, amount: value }), value === debt.remaining);
   }
 
@@ -156,7 +156,7 @@ export default function DebtsScreen() {
         autoFocus={open === 'new'}
       />
       <View style={priceRow}>
-        <ThemedText type="smallBold">Rp</ThemedText>
+        <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
         <TextInput
           style={[styles.priceInput, { color: theme.text }]}
           value={formatDigits(amount)}
@@ -254,7 +254,7 @@ export default function DebtsScreen() {
               {debt.person}
             </ThemedText>
             <ThemedText type="smallBold">
-              {debt.settled ? 'Lunas' : formatRupiah(debt.remaining ?? 0)}
+              {debt.settled ? 'Lunas' : formatMoney(debt.remaining ?? 0)}
             </ThemedText>
           </View>
           {!debt.settled && (debt.paid ?? 0) > 0 && (
@@ -263,8 +263,8 @@ export default function DebtsScreen() {
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
             {[
               (debt.paid ?? 0) > 0 && !debt.settled
-                ? `${settledVerb} ${formatRupiah(debt.paid ?? 0)} dari ${formatRupiah(debt.amount ?? 0)}`
-                : formatRupiah(debt.amount ?? 0),
+                ? `${settledVerb} ${formatMoney(debt.paid ?? 0)} dari ${formatMoney(debt.amount ?? 0)}`
+                : formatMoney(debt.amount ?? 0),
               debt.note,
             ]
               .filter(Boolean)
@@ -286,7 +286,7 @@ export default function DebtsScreen() {
                 <>
                   <View style={styles.inline}>
                     <View style={[...priceRow, styles.flex]}>
-                      <ThemedText type="smallBold">Rp</ThemedText>
+                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
                       <TextInput
                         style={[styles.priceInput, { color: theme.text }]}
                         value={formatDigits(payment)}
@@ -320,7 +320,7 @@ export default function DebtsScreen() {
                       <ActivityIndicator color={theme.onPrimary} />
                     ) : (
                       <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                        Tandai lunas ({formatRupiah(debt.remaining ?? 0)})
+                        Tandai lunas ({formatMoney(debt.remaining ?? 0)})
                       </ThemedText>
                     )}
                   </Pressable>
@@ -381,7 +381,7 @@ export default function DebtsScreen() {
                 <ThemedText type="small" themeColor="textSecondary">
                   {meta.hint} · belum lunas
                 </ThemedText>
-                <ThemedText style={styles.total}>{formatRupiah(total)}</ThemedText>
+                <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
               </View>
 
               {active.map(renderDebt)}

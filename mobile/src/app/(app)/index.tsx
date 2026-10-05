@@ -21,7 +21,7 @@ import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
 import type { Goal } from '@/lib/goals';
 import { fetchHabits, type Habits } from '@/lib/habits';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
@@ -176,7 +176,7 @@ export default function HomeScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 Total uang
               </ThemedText>
-              <ThemedText style={styles.total}>{formatRupiah(total)}</ThemedText>
+              <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
             </View>
           )}
 
@@ -190,7 +190,7 @@ export default function HomeScreen() {
                     Bulan ini kamu berhasil menahan
                   </ThemedText>
                   <ThemedText type="subtitle" style={[{ color: theme.onAccent }, styles.celebrationAmount]}>
-                    {formatRupiah(heldBack)}
+                    {formatMoney(heldBack)}
                   </ThemedText>
                 </ThemedView>
               </Pressable>
@@ -205,7 +205,7 @@ export default function HomeScreen() {
                     {unreviewed.length} transaksi belum dinilai
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {formatRupiah(unreviewedTotal)} · terakhir {timeFormat.format(new Date(unreviewed[0].occurred_at))}{' '}
+                    {formatMoney(unreviewedTotal)} · terakhir {timeFormat.format(new Date(unreviewed[0].occurred_at))}{' '}
                     {unreviewed[0].categories?.name ?? ''}
                   </ThemedText>
                 </View>
@@ -281,7 +281,7 @@ export default function HomeScreen() {
                 {balances.map((b) => (
                   <View key={b.account_id} style={styles.row}>
                     <ThemedText>{b.name}</ThemedText>
-                    <ThemedText>{formatRupiah(b.current_balance ?? 0)}</ThemedText>
+                    <ThemedText>{formatMoney(b.current_balance ?? 0)}</ThemedText>
                   </View>
                 ))}
                 <ThemedText type="small" themeColor="textSecondary">
@@ -317,13 +317,13 @@ function DebtsCard({ debts }: { debts: Debt[] }) {
         {owedToMe > 0 && (
           <View style={styles.row}>
             <ThemedText>Piutang (orang pinjam ke kamu)</ThemedText>
-            <ThemedText type="smallBold">{formatRupiah(owedToMe)}</ThemedText>
+            <ThemedText type="smallBold">{formatMoney(owedToMe)}</ThemedText>
           </View>
         )}
         {iOwe > 0 && (
           <View style={styles.row}>
             <ThemedText>Utang (kamu pinjam)</ThemedText>
-            <ThemedText type="smallBold">{formatRupiah(iOwe)}</ThemedText>
+            <ThemedText type="smallBold">{formatMoney(iOwe)}</ThemedText>
           </View>
         )}
         <ThemedText type="small" themeColor={overdue > 0 ? 'danger' : 'textSecondary'}>

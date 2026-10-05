@@ -6,6 +6,7 @@ import { LockScreen } from '@/components/lock-screen';
 import { AnimatedSplashOverlay } from '@/components/splash-overlay';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCurrencySync } from '@/hooks/use-currency-sync';
 import { Notifications, REMINDER_ROUTES, REMINDERS_SUPPORTED } from '@/lib/reminders';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 
@@ -45,6 +46,7 @@ const useReminderNavigation: (enabled: boolean) => void = REMINDERS_SUPPORTED ? 
 function RootNavigator() {
   const { session, isLoading } = useSession();
   useReminderNavigation(!!session);
+  useCurrencySync(session?.user.id ?? null);
 
   // Keep the native splash up until the stored session has been restored.
   if (isLoading) return null;
@@ -69,6 +71,7 @@ function RootNavigator() {
           <Stack.Screen name="debts" options={{ presentation: 'modal' }} />
           <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
           <Stack.Screen name="habits" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="currency" options={{ presentation: 'modal' }} />
           <Stack.Screen name="pin-setup" options={{ presentation: 'modal', gestureEnabled: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>

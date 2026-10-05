@@ -17,7 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
-import { formatDigits, toDigits } from '@/lib/money';
+import { formatDigits, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -160,7 +160,7 @@ export default function BudgetsScreen() {
                       </View>
                     </View>
                     <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText type="smallBold">Rp</ThemedText>
+                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
                       <TextInput
                         style={[styles.priceInput, { color: theme.text }]}
                         value={formatDigits(r.digits)}

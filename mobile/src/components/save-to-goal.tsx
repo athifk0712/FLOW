@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Goal } from '@/lib/goals';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
 type Props = { intentId: string; itemName: string; amount: number; onClose: () => void };
@@ -50,7 +50,7 @@ export function SaveToGoal({ intentId, itemName, amount, onClose }: Props) {
       {savedTo ? (
         <>
           <ThemedText type="smallBold" style={text}>
-            {formatRupiah(amount)} masuk ke &quot;{savedTo}&quot;.
+            {formatMoney(amount)} masuk ke &quot;{savedTo}&quot;.
           </ThemedText>
           <ThemedText type="small" style={text}>
             Keinginan yang ditahan jadi langkah menuju yang lebih kamu mau.
@@ -64,7 +64,7 @@ export function SaveToGoal({ intentId, itemName, amount, onClose }: Props) {
       ) : (
         <>
           <ThemedText type="smallBold" style={text}>
-            Kamu menahan {formatRupiah(amount)} untuk {itemName}.
+            Kamu menahan {formatMoney(amount)} untuk {itemName}.
           </ThemedText>
           <ThemedText type="small" style={text}>
             Sisihkan ke target tabungan? Saldo akunmu tidak berubah, ini penanda saja.

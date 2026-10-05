@@ -17,7 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
-import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -154,7 +154,7 @@ export default function AccountsScreen() {
           Saldo awal (saat mulai pakai Flowku)
         </ThemedText>
         <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
-          <ThemedText type="smallBold">Rp</ThemedText>
+          <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
           <TextInput
             style={[styles.priceInput, { color: theme.text }]}
             value={formatDigits(opening)}
@@ -226,7 +226,7 @@ export default function AccountsScreen() {
               {TYPE_LABEL[account.type]}
             </ThemedText>
           </View>
-          <ThemedText type="smallBold">{formatRupiah(account.balance)}</ThemedText>
+          <ThemedText type="smallBold">{formatMoney(account.balance)}</ThemedText>
         </ThemedView>
       </Pressable>
     );

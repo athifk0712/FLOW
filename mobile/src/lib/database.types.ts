@@ -304,18 +304,21 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          currency: string
           cycle_start_day: number
           id: string
           timezone: string
         }
         Insert: {
           created_at?: string
+          currency?: string
           cycle_start_day?: number
           id: string
           timezone?: string
         }
         Update: {
           created_at?: string
+          currency?: string
           cycle_start_day?: number
           id?: string
           timezone?: string

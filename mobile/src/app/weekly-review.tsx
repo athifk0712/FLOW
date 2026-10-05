@@ -9,7 +9,7 @@ import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
@@ -101,7 +101,7 @@ export default function WeeklyReviewScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 {dateFormat.format(new Date(item.occurred_at))}
               </ThemedText>
-              <ThemedText style={styles.amount}>{formatRupiah(item.amount)}</ThemedText>
+              <ThemedText style={styles.amount}>{formatMoney(item.amount)}</ThemedText>
               <ThemedText>{item.merchant ?? item.categories?.name ?? 'Tanpa kategori'}</ThemedText>
               {item.description && (
                 <ThemedText type="small" themeColor="textSecondary">
@@ -165,7 +165,7 @@ export default function WeeklyReviewScreen() {
                 ? 'Pengeluaran muncul di sini 3 hari setelah dinilai di review malam.'
                 : regretted.count === 0
                   ? 'Tidak ada yang disesali minggu ini.'
-                  : `${regretted.count} pengeluaran disesali, total ${formatRupiah(regretted.amount)}.`}
+                  : `${regretted.count} pengeluaran disesali, total ${formatMoney(regretted.amount)}.`}
             </ThemedText>
             {summary && summary.length > 0 && (
               <>

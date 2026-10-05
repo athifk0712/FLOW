@@ -6,7 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 type RegretRow = Tables<'v_regret_by_necessity'>;
 
@@ -61,7 +61,7 @@ export function RegretInsight({ rows }: { rows: RegretRow[] }) {
       ))}
       {totalRegretted > 0 && (
         <ThemedText type="small" themeColor="textSecondary">
-          Total yang disesali: {formatRupiah(totalRegretted)}
+          Total yang disesali: {formatMoney(totalRegretted)}
         </ThemedText>
       )}
       {takeaway && <ThemedText type="small">{takeaway}</ThemedText>}

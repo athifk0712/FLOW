@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { isScanResult, type ScanResult, scanReceipt } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -207,7 +207,7 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
   const date = /^(d{4})-(d{2})-(d{2})$/.exec(scan.date);
   const parts = [
     scan.merchant,
-    scan.total > 0 && formatRupiah(scan.total),
+    scan.total > 0 && formatMoney(scan.total),
     date && scanDateFormat.format(new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]))),
     scan.time,
     scan.category,

@@ -8,7 +8,7 @@ import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessit
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -90,7 +90,7 @@ export default function ReviewScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 {dateTimeFormat.format(new Date(item.occurred_at))} · {item.accounts?.name ?? '-'}
               </ThemedText>
-              <ThemedText style={styles.amount}>{formatRupiah(item.amount)}</ThemedText>
+              <ThemedText style={styles.amount}>{formatMoney(item.amount)}</ThemedText>
               <ThemedText>{item.merchant ?? item.categories?.name ?? 'Tanpa kategori'}</ThemedText>
               {item.description && (
                 <ThemedText type="small" themeColor="textSecondary">

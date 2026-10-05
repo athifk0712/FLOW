@@ -6,7 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NECESSITY, NECESSITY_ORDER, UNREVIEWED_COLOR } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import type { Tables } from '@/lib/database.types';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
 type MixRow = Pick<Tables<'v_spending_mix_monthly'>, 'necessity' | 'total'>;
 
@@ -62,7 +62,7 @@ export function SpendingMix({ rows }: { rows: MixRow[] }) {
                 <ThemedText type="small">{s.label}</ThemedText>
               </View>
               <ThemedText type="small" themeColor="textSecondary">
-                {formatRupiah(s.value)} · {percent(s.value, total)}%
+                {formatMoney(s.value)} · {percent(s.value, total)}%
               </ThemedText>
             </View>
           ))}

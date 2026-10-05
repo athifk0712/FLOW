@@ -26,7 +26,7 @@ import { APPEARANCE_OPTIONS, setAppearance, useAppearance } from '@/lib/appearan
 import type { Enums } from '@/lib/database.types';
 import { DUE_LABEL } from '@/lib/due-plan';
 import { exportTransactionsCsv } from '@/lib/export';
-import { formatDigits, toDigits } from '@/lib/money';
+import { formatDigits, getCurrency, toDigits, useCurrency } from '@/lib/money';
 import {
   applyReminderSettings,
   getReminderSettings,
@@ -58,6 +58,7 @@ const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = 
 export default function SettingsScreen() {
   const theme = useTheme();
   const appearance = useAppearance();
+  const currency = useCurrency();
   const lock = useLockSettings();
   const [bioLabel, setBioLabel] = useState<string | null>(null);
   const [budgetIds, setBudgetIds] = useState<Partial<Record<Scope, string>>>({});
@@ -179,6 +180,7 @@ export default function SettingsScreen() {
                 DATA
               </ThemedText>
               <ThemedView type="backgroundElement" style={styles.card}>
+                <LinkRow title="Mata uang" hint={`${currency.name} (${currency.code})`} href="/currency" />
                 <LinkRow title="Akun & dompet" hint="Bank, e-wallet, tunai, dan saldo awalnya" href="/accounts" />
                 <LinkRow title="Kategori" hint="Tambah, ganti nama, atau hapus kategori" href="/categories" />
                 <LinkRow title="Budget per kategori" hint="Batas mingguan atau bulanan per kategori" href="/budgets" />
@@ -300,7 +302,7 @@ export default function SettingsScreen() {
                       <ThemedText type="smallBold">{b.label}</ThemedText>
                     </View>
                     <View style={inputRow}>
-                      <ThemedText type="smallBold">Rp</ThemedText>
+                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
                       <TextInput
                         style={[styles.priceInput, { color: theme.text }]}
                         value={formatDigits(limits[b.scope])}

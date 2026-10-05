@@ -8,7 +8,7 @@ import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessit
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
-import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { cooldownHours, describeCooldown } from '@/lib/cooldown';
 import { supabase } from '@/lib/supabase';
@@ -75,7 +75,7 @@ export default function NewIntentScreen() {
           </ThemedText>
           <ThemedText style={styles.centerText}>{name.trim()}</ThemedText>
           <ThemedText type="smallBold" style={styles.centerText}>
-            {formatRupiah(Number(digits))}
+            {formatMoney(Number(digits))}
           </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.centerText}>
             {result}
@@ -125,7 +125,7 @@ export default function NewIntentScreen() {
               Perkiraan harga
             </ThemedText>
             <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText style={styles.prefix}>Rp</ThemedText>
+              <ThemedText style={styles.prefix}>{getCurrency().symbol.trim()}</ThemedText>
               <TextInput
                 style={[styles.priceInput, { color: theme.text }]}
                 value={formatDigits(digits)}

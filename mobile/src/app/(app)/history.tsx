@@ -18,7 +18,7 @@ import {
   PERIODS,
   type TypeFilter,
 } from '@/lib/history-filters';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, transactionTitle, type TransactionRow } from '@/lib/transactions';
 
@@ -267,8 +267,8 @@ export default function HistoryScreen() {
             <View style={styles.summary}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
                 {summary.count} transaksi
-                {summary.out > 0 ? ` · keluar ${formatRupiah(summary.out)}` : ''}
-                {summary.in > 0 ? ` · masuk ${formatRupiah(summary.in)}` : ''}
+                {summary.out > 0 ? ` · keluar ${formatMoney(summary.out)}` : ''}
+                {summary.in > 0 ? ` · masuk ${formatMoney(summary.in)}` : ''}
               </ThemedText>
               <Pressable onPress={reset} hitSlop={8}>
                 <ThemedText type="smallBold" style={{ color: theme.primary }}>
@@ -298,7 +298,7 @@ export default function HistoryScreen() {
                 </ThemedText>
                 {section.total > 0 && (
                   <ThemedText type="small" themeColor="textSecondary">
-                    -{formatRupiah(section.total)}
+                    -{formatMoney(section.total)}
                   </ThemedText>
                 )}
               </View>
@@ -342,7 +342,7 @@ function HistoryItem({ item }: { item: TransactionRow }) {
         </View>
         <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: theme.primary }}>
           {sign}
-          {formatRupiah(item.amount)}
+          {formatMoney(item.amount)}
         </ThemedText>
       </ThemedView>
     </Pressable>

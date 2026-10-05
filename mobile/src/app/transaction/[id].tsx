@@ -20,7 +20,7 @@ import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessit
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
-import { formatDigits, toDigits } from '@/lib/money';
+import { formatDigits, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
@@ -191,7 +191,7 @@ export default function TransactionScreen() {
                 <DateTimeField key={occurredAt.getTime()} value={occurredAt} onChange={setOccurredAt} />
 
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
-                  <ThemedText style={styles.prefix}>Rp</ThemedText>
+                  <ThemedText style={styles.prefix}>{getCurrency().symbol.trim()}</ThemedText>
                   <TextInput
                     style={[styles.priceInput, { color: theme.text }]}
                     value={formatDigits(digits)}

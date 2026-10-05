@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatRupiah } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import type { SafeToSpend } from '@/lib/safe-to-spend';
 
 const dayFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
@@ -30,7 +30,7 @@ export function SafeToSpendCard({ data, cash, until }: { data: SafeToSpend; cash
           Aman dibelanjakan
         </ThemedText>
         <ThemedText style={[styles.amount, short && { color: theme.warning }]}>
-          {short ? formatRupiah(0) : formatRupiah(data.safe)}
+          {short ? formatMoney(0) : formatMoney(data.safe)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {data.daysLeft} hari lagi sampai {until}
@@ -39,17 +39,17 @@ export function SafeToSpendCard({ data, cash, until }: { data: SafeToSpend; cash
 
       {short ? (
         <ThemedText type="small" themeColor="warning">
-          Kebutuhan wajib sampai {until} melebihi saldomu {formatRupiah(-data.safe)}. Tahan dulu belanja keinginan,
+          Kebutuhan wajib sampai {until} melebihi saldomu {formatMoney(-data.safe)}. Tahan dulu belanja keinginan,
           ya.
         </ThemedText>
       ) : (
         <View style={styles.today}>
           <View style={styles.row}>
             <ThemedText type="smallBold">
-              {overToday ? `Lewat ${formatRupiah(-data.leftToday)} hari ini` : `Sisa hari ini ${formatRupiah(data.leftToday)}`}
+              {overToday ? `Lewat ${formatMoney(-data.leftToday)} hari ini` : `Sisa hari ini ${formatMoney(data.leftToday)}`}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              dari {formatRupiah(data.dailyLimit)}/hari
+              dari {formatMoney(data.dailyLimit)}/hari
             </ThemedText>
           </View>
           <ProgressBar
@@ -108,7 +108,7 @@ function Line({ label, amount, bold, onPress }: { label: string; amount: number;
         {label}
       </ThemedText>
       <ThemedText type={bold ? 'smallBold' : 'small'}>
-        {amount < 0 ? `− ${formatRupiah(-amount)}` : formatRupiah(amount)}
+        {amount < 0 ? `− ${formatMoney(-amount)}` : formatMoney(amount)}
       </ThemedText>
     </View>
   );
