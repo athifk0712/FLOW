@@ -14,8 +14,3 @@ export function formatDigits(digits: string) {
 export function toDigits(text: string, maxDigits = 12) {
   return text.replace(/\D/g, '').replace(/^0+/, '').slice(0, maxDigits);
 }
-
-/** Local calendar month key matching the views' `month` column, e.g. "2026-09-01". */
-export function currentMonthKey(now = new Date()) {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-}

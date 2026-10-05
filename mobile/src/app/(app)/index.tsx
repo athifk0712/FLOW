@@ -14,15 +14,17 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Wordmark } from '@/components/wordmark';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
+import { cycleKey, cycleRange, untilLabel } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
 import type { Goal } from '@/lib/goals';
 import { fetchHabits, type Habits } from '@/lib/habits';
-import { currentMonthKey, formatRupiah } from '@/lib/money';
+import { formatRupiah } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
-import { computeSafeToSpend, monthCycleEnd, type SafeRule } from '@/lib/safe-to-spend';
+import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
 import { supabase } from '@/lib/supabase';
 import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
@@ -39,6 +41,7 @@ const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [mix, setMix] = useState<MixRow[]>([]);
@@ -58,9 +61,10 @@ export default function HomeScreen() {
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
   useFocusEffect(
     useCallback(() => {
-      const month = currentMonthKey();
-      const week = weeklyReviewWindow();
+      if (!cycleLoaded) return; // month keys depend on the payday cycle
       const now = new Date();
+      const month = cycleKey(now, cycleDay);
+      const week = weeklyReviewWindow();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const insightSince = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString();
       const load = () =>
@@ -142,11 +146,12 @@ export default function HomeScreen() {
           setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
           setTimeInsight(computeTimeInsight(judgedRows.data ?? []));
         });
-    }, []),
+    }, [cycleDay, cycleLoaded]),
   );
 
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
   const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
+  const cycleEnd = cycleRange(new Date(), cycleDay).end;
   const essential = budgets.find((b) => b.scope === 'ESSENTIAL' && b.period === 'WEEKLY');
   const safe = computeSafeToSpend({
     cash: total,
@@ -155,7 +160,7 @@ export default function HomeScreen() {
     goalsSaved: goals.reduce((sum, g) => sum + (g.saved ?? 0), 0),
     essential: essential ? { limit_amount: essential.limit_amount ?? 0, remaining: essential.remaining ?? 0 } : null,
     spentToday,
-    cycleEnd: monthCycleEnd(),
+    cycleEnd,
   });
 
   return (
@@ -165,7 +170,7 @@ export default function HomeScreen() {
           <Wordmark />
 
           {balances.length > 0 ? (
-            <SafeToSpendCard data={safe} cash={total} until="akhir bulan" />
+            <SafeToSpendCard data={safe} cash={total} until={untilLabel(cycleEnd, cycleDay)} />
           ) : (
             <View>
               <ThemedText type="small" themeColor="textSecondary">

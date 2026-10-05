@@ -7,13 +7,14 @@ import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
+import { cycleLabel, cycleRange } from '@/lib/cycle';
 import { formatRupiah } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
-import { buildReport, monthRange, percentChange, type ReportTransaction } from '@/lib/report';
+import { buildReport, percentChange, type ReportTransaction } from '@/lib/report';
 import { supabase } from '@/lib/supabase';
 
-const monthFormat = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
 const shortMonthFormat = new Intl.DateTimeFormat('id-ID', { month: 'short' });
 const dayFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
 
@@ -25,18 +26,21 @@ export default function ReportScreen() {
   const [rows, setRows] = useState<ReportTransaction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { day } = useCycleDay();
   const now = useMemo(() => new Date(), []);
-  const { start } = useMemo(() => monthRange(now, offset), [now, offset]);
-  const previousLabel = shortMonthFormat.format(monthRange(now, offset - 1).start);
+  const { start } = useMemo(() => cycleRange(now, day, offset), [now, day, offset]);
+  const previousStart = cycleRange(now, day, offset - 1).start;
+  // "Sep" for calendar months; "25 Agt" for a payday cycle, where the month name alone is ambiguous.
+  const previousLabel = (day === 1 ? shortMonthFormat : dayFormat).format(previousStart);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const range = monthRange(now, offset);
+      const range = cycleRange(now, day, offset);
       supabase
         .from('transactions')
         .select('id, type, amount, necessity, merchant, occurred_at, category_id, categories(name)')
-        .gte('occurred_at', monthRange(now, offset - 1).start.toISOString())
+        .gte('occurred_at', cycleRange(now, day, offset - 1).start.toISOString())
         .lt('occurred_at', range.end.toISOString())
         .then(({ data, error }) => {
           if (!active) return;
@@ -47,7 +51,7 @@ export default function ReportScreen() {
       return () => {
         active = false;
       };
-    }, [now, offset]),
+    }, [now, day, offset]),
   );
 
   const report = useMemo(() => (rows ? buildReport(rows, start) : null), [rows, start]);
@@ -80,7 +84,7 @@ export default function ReportScreen() {
             <ThemedText type="smallBold">‹</ThemedText>
           </Pressable>
           <ThemedText type="smallBold" style={styles.month}>
-            {monthFormat.format(start)}
+            {cycleLabel(start, day)}
           </ThemedText>
           <Pressable
             disabled={offset >= 0}
@@ -97,7 +101,8 @@ export default function ReportScreen() {
           !error && <ActivityIndicator style={styles.flex} />
         ) : empty ? (
           <ThemedText themeColor="textSecondary" style={styles.empty}>
-            Belum ada transaksi di {monthFormat.format(start)}.
+            Belum ada transaksi di {day === 1 ? '' : 'periode '}
+            {cycleLabel(start, day)}.
           </ThemedText>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>

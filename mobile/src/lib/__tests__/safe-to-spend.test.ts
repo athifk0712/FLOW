@@ -1,7 +1,7 @@
-import { computeSafeToSpend, monthCycleEnd, occurrences, type SafeInput, type SafeRule } from '@/lib/safe-to-spend';
+import { computeSafeToSpend, occurrences, type SafeInput, type SafeRule } from '@/lib/safe-to-spend';
 
 const now = new Date(2026, 9, 20, 10); // Tuesday 20 Oct 2026
-const cycleEnd = monthCycleEnd(now); // 1 Nov -> 12 days left including today
+const cycleEnd = new Date(2026, 10, 1); // 1 Nov -> 12 days left including today
 
 const rule = (extra: Partial<SafeRule>): SafeRule => ({
   name: 'Kos',

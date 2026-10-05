@@ -9,9 +9,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
+import { cycleKey } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
-import { currentMonthKey, formatRupiah } from '@/lib/money';
+import { formatRupiah } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 
 type Intent = Tables<'buy_intents'>;
@@ -40,6 +42,7 @@ function formatDuration(ms: number) {
 // "Before You Buy": park a purchase, wait out a proportional cooldown, then decide.
 export default function IntentsScreen() {
   const theme = useTheme();
+  const { day: cycleDay } = useCycleDay();
   const [intents, setIntents] = useState<Intent[] | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [heldBack, setHeldBack] = useState({ total: 0, count: 0 });
@@ -56,7 +59,7 @@ export default function IntentsScreen() {
       supabase
         .from('v_saved_money_monthly')
         .select('total_held_back, items_held_back')
-        .eq('month', currentMonthKey())
+        .eq('month', cycleKey(new Date(), cycleDay))
         .maybeSingle(),
       supabase.from('goal_contributions').select('intent_id').not('intent_id', 'is', null),
     ]).then(([int, acc, held, saved]) => {
@@ -69,7 +72,7 @@ export default function IntentsScreen() {
       setSavedIntentIds(new Set((saved.data ?? []).map((c) => c.intent_id!)));
       setNow(Date.now());
     });
-  }, []);
+  }, [cycleDay]);
 
   useFocusEffect(load);
 

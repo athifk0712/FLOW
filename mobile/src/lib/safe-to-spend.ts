@@ -57,11 +57,6 @@ export function occurrences(rule: SafeRule, end: Date) {
   return dates;
 }
 
-/** End of the cycle: the 1st of next month (payday cycles plug in here). */
-export function monthCycleEnd(now = new Date()) {
-  return new Date(now.getFullYear(), now.getMonth() + 1, 1);
-}
-
 export function computeSafeToSpend(input: SafeInput, now = new Date()): SafeToSpend {
   const today = startOfDay(now);
   const daysLeft = Math.max(1, Math.round((input.cycleEnd.getTime() - today.getTime()) / DAY));

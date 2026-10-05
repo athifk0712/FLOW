@@ -304,16 +304,19 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          cycle_start_day: number
           id: string
           timezone: string
         }
         Insert: {
           created_at?: string
+          cycle_start_day?: number
           id: string
           timezone?: string
         }
         Update: {
           created_at?: string
+          cycle_start_day?: number
           id?: string
           timezone?: string
         }
@@ -707,6 +710,7 @@ export type Database = {
       }
     }
     Functions: {
+      cycle_start: { Args: { p_day: number; p_local: string }; Returns: string }
       delete_my_account: { Args: never; Returns: undefined }
       intent_cooldown: {
         Args: { p_cost: number; p_user_id: string }

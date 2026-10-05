@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountSection } from '@/components/settings/account-section';
+import { CycleSection } from '@/components/settings/cycle-section';
 import { DeleteAccountSection } from '@/components/settings/delete-account-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -284,6 +285,8 @@ export default function SettingsScreen() {
                 )}
               </ThemedView>
             </View>
+
+            <CycleSection />
 
             <View style={styles.section}>
               <ThemedText type="smallBold" themeColor="textSecondary">
