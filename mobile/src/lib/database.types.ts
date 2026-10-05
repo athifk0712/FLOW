@@ -717,6 +717,10 @@ export type Database = {
         Returns: string
       }
       post_due_recurring: { Args: never; Returns: number }
+      safe_to_spend: {
+        Args: { p_user_id: string }
+        Returns: { daily_limit: number; days_left: number; safe: number }[]
+      }
       purchase_intent: {
         Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
         Returns: string

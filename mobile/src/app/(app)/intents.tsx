@@ -94,8 +94,8 @@ export default function IntentsScreen() {
           </ThemedText>
           <ThemedText type="subtitle">Tarik napas dulu.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Mau beli sesuatu yang lumayan? Catat di sini. Flowku memberi jeda sesuai besarnya harga dibanding sisa
-            budget keinginanmu, lalu kamu putuskan dengan kepala dingin.
+            Mau beli sesuatu yang lumayan? Catat di sini. Flowku memberi jeda sesuai besarnya harga dibanding batas
+            aman harianmu, lalu kamu putuskan dengan kepala dingin.
           </ThemedText>
 
           <ThemedView style={[styles.card, styles.heldBack, { backgroundColor: theme.accent }]}>

@@ -10,17 +10,11 @@ import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
+import { cooldownHours, describeCooldown } from '@/lib/cooldown';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session-provider';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name'>;
-
-function describeCooldown(ms: number) {
-  if (ms < 60_000) return 'Tanpa jeda: harganya kecil dibanding sisa budget keinginanmu minggu ini.';
-  const hours = Math.round(ms / 3_600_000);
-  return hours >= 48
-    ? `Dikunci ${Math.round(hours / 24)} hari. Harganya besar dibanding sisa budget keinginanmu.`
-    : `Dikunci ${hours} jam. Tidur dulu, putuskan besok.`;
-}
 
 export default function NewIntentScreen() {
   const theme = useTheme();
@@ -32,6 +26,8 @@ export default function NewIntentScreen() {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  const userId = useSession().session?.user.id;
 
   useEffect(() => {
     supabase
@@ -41,6 +37,15 @@ export default function NewIntentScreen() {
       .order('created_at')
       .then(({ data }) => setCategories(data ?? []));
   }, []);
+
+  // The same daily limit the server uses for the pause, so the preview matches what will happen.
+  useEffect(() => {
+    if (!userId) return;
+    supabase.rpc('safe_to_spend', { p_user_id: userId }).then(({ data }) => setDailyLimit(data?.[0]?.daily_limit ?? null));
+  }, [userId]);
+
+  const cost = Number(digits);
+  const previewHours = dailyLimit !== null && cost > 0 ? cooldownHours(cost, dailyLimit) : null;
 
   const canSave = name.trim().length > 0 && Number(digits) > 0 && necessity !== null && !saving;
 
@@ -55,7 +60,8 @@ export default function NewIntentScreen() {
       .single();
     setSaving(false);
     if (error) return setError(error.message);
-    setResult(describeCooldown(new Date(data.cooldown_until).getTime() - new Date(data.created_at).getTime()));
+    const hours = Math.round((new Date(data.cooldown_until).getTime() - new Date(data.created_at).getTime()) / 3_600_000);
+    setResult(describeCooldown(hours, dailyLimit));
   }
 
   const inputStyle = [styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }];
@@ -129,6 +135,11 @@ export default function NewIntentScreen() {
                 keyboardType="number-pad"
               />
             </View>
+            {previewHours !== null && (
+              <ThemedText type="small" themeColor={previewHours === 0 ? 'textSecondary' : 'warning'}>
+                {describeCooldown(previewHours, dailyLimit)}
+              </ThemedText>
+            )}
 
             <ThemedText type="small" themeColor="textSecondary">
               Jujur, ini sebenarnya apa?
@@ -188,7 +199,7 @@ export default function NewIntentScreen() {
               <ActivityIndicator color={theme.onPrimary} />
             ) : (
               <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                Simpan & mulai jeda
+                {previewHours === 0 ? 'Simpan' : 'Simpan & mulai jeda'}
               </ThemedText>
             )}
           </Pressable>

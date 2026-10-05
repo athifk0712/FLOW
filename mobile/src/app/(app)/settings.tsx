@@ -44,13 +44,13 @@ const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = 
   {
     scope: 'DISCRETIONARY',
     label: 'Ingin & Impulsif',
-    hint: 'Batas belanja keinginan per minggu. Dipakai juga untuk menghitung jeda Sebelum Beli.',
+    hint: 'Batas belanja keinginan per minggu.',
     color: NECESSITY.WANT.color,
   },
   {
     scope: 'ESSENTIAL',
     label: 'Butuh & Penting',
-    hint: 'Opsional. Untuk memantau kebutuhan pokok per minggu.',
+    hint: 'Opsional. Untuk memantau kebutuhan pokok per minggu, dan dicadangkan di Aman dibelanjakan.',
     color: NECESSITY.NEED.color,
   },
 ];
