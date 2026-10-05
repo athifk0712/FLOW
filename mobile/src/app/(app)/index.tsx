@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
+import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +21,7 @@ import { fetchHabits, type Habits } from '@/lib/habits';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
+import { computeSafeToSpend, monthCycleEnd, type SafeRule } from '@/lib/safe-to-spend';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
 
@@ -46,6 +48,8 @@ export default function HomeScreen() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [openDebts, setOpenDebts] = useState<Debt[]>([]);
   const [habits, setHabits] = useState<Habits | null>(null);
+  const [rules, setRules] = useState<SafeRule[]>([]);
+  const [spentToday, setSpentToday] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
@@ -53,6 +57,8 @@ export default function HomeScreen() {
     useCallback(() => {
       const month = currentMonthKey();
       const week = weeklyReviewWindow();
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const load = () =>
         Promise.all([
           supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
@@ -76,6 +82,11 @@ export default function HomeScreen() {
           supabase.from('categories').select('id, name'),
           supabase.from('v_goal_progress').select('*').order('created_at'),
           supabase.from('v_debts').select('*').eq('settled', false),
+          supabase
+            .from('recurring_transactions')
+            .select('name, amount, type, active, next_due, day_of_month')
+            .eq('active', true),
+          supabase.from('transactions').select('amount').eq('type', 'EXPENSE').gte('occurred_at', todayStart),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
@@ -88,7 +99,7 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows]) => {
+        .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -99,7 +110,9 @@ export default function HomeScreen() {
             reg.error ??
             cats.error ??
             goalRows.error ??
-            debtRows.error;
+            debtRows.error ??
+            ruleRows.error ??
+            todayRows.error;
           if (failed) return setError(failed.message);
           setError(null);
           // A brand-new guest (no accounts, never onboarded) gets the first-run setup.
@@ -114,12 +127,24 @@ export default function HomeScreen() {
           setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
           setGoals(goalRows.data ?? []);
           setOpenDebts(debtRows.data ?? []);
+          setRules(ruleRows.data ?? []);
+          setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
         });
     }, []),
   );
 
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
   const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
+  const essential = budgets.find((b) => b.scope === 'ESSENTIAL' && b.period === 'WEEKLY');
+  const safe = computeSafeToSpend({
+    cash: total,
+    rules,
+    debts: openDebts,
+    goalsSaved: goals.reduce((sum, g) => sum + (g.saved ?? 0), 0),
+    essential: essential ? { limit_amount: essential.limit_amount ?? 0, remaining: essential.remaining ?? 0 } : null,
+    spentToday,
+    cycleEnd: monthCycleEnd(),
+  });
 
   return (
     <ThemedView style={styles.container}>
@@ -127,12 +152,16 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <Wordmark />
 
-          <View>
-            <ThemedText type="small" themeColor="textSecondary">
-              Total uang
-            </ThemedText>
-            <ThemedText style={styles.total}>{formatRupiah(total)}</ThemedText>
-          </View>
+          {balances.length > 0 ? (
+            <SafeToSpendCard data={safe} cash={total} until="akhir bulan" />
+          ) : (
+            <View>
+              <ThemedText type="small" themeColor="textSecondary">
+                Total uang
+              </ThemedText>
+              <ThemedText style={styles.total}>{formatRupiah(total)}</ThemedText>
+            </View>
+          )}
 
           {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
