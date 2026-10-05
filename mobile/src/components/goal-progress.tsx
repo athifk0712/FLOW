@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
-import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
+import { NECESSITY } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { deadlineLabel, type Goal, goalStatus } from '@/lib/goals';
 import { formatRupiah } from '@/lib/money';
@@ -35,7 +35,7 @@ export function GoalProgress({ goal }: { goal: Goal }) {
         </ThemedText>
       </View>
       <ProgressBar total={target} segments={[{ value: saved, color: GOAL_COLOR }]} />
-      <ThemedText type="small" themeColor="textSecondary" style={status.overdue && styles.danger}>
+      <ThemedText type="small" themeColor={status.overdue ? 'danger' : 'textSecondary'}>
         {percent}% · {line}
       </ThemedText>
     </View>
@@ -53,8 +53,5 @@ const styles = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
-  },
-  danger: {
-    color: DANGER_COLOR,
   },
 });

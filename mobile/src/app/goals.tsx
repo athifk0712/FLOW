@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deadlineFromOffset, deadlineLabel, type Goal, offsetFromDeadline } from '@/lib/goals';
@@ -168,7 +167,7 @@ export default function GoalsScreen() {
       <View style={styles.inline}>
         {open !== 'new' ? (
           <Pressable onPress={() => remove(open!)} disabled={saving} hitSlop={8}>
-            <ThemedText type="smallBold" style={{ color: DANGER_COLOR }}>
+            <ThemedText type="smallBold" themeColor="danger">
               {confirmDelete ? 'Ketuk lagi untuk hapus' : 'Hapus target'}
             </ThemedText>
           </Pressable>
@@ -238,7 +237,7 @@ export default function GoalsScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-              {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+              {error && <ThemedText themeColor="danger">{error}</ThemedText>}
               <View style={styles.inline}>
                 <Pressable onPress={() => move(goal, -1)} disabled={saving || !deposit} hitSlop={8}>
                   <ThemedText type="small" themeColor="textSecondary" style={!deposit && styles.disabled}>
@@ -274,7 +273,7 @@ export default function GoalsScreen() {
 
           {goals === null ? (
             error ? (
-              <ThemedText style={styles.error}>{error}</ThemedText>
+              <ThemedText themeColor="danger">{error}</ThemedText>
             ) : (
               <ActivityIndicator style={styles.flex} />
             )
@@ -291,7 +290,7 @@ export default function GoalsScreen() {
                 <ThemedView type="backgroundElement" style={styles.card}>
                   <ThemedText type="smallBold">Target baru</ThemedText>
                   {goalForm}
-                  {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+                  {error && <ThemedText themeColor="danger">{error}</ThemedText>}
                 </ThemedView>
               ) : (
                 <Pressable
@@ -391,8 +390,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

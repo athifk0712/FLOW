@@ -16,7 +16,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
-  DANGER_COLOR,
   NECESSITY,
   NECESSITY_ORDER,
   type Necessity,
@@ -240,7 +239,7 @@ export default function RecurringScreen() {
         </View>
       </View>
       {!dayValid && day !== "" && (
-        <ThemedText style={styles.error}>Tanggal harus 1–31.</ThemedText>
+        <ThemedText themeColor="danger">Tanggal harus 1–31.</ThemedText>
       )}
       {dayValid && dayNumber > 28 && (
         <ThemedText type="small" themeColor="textSecondary">
@@ -325,7 +324,7 @@ export default function RecurringScreen() {
         </View>
       )}
 
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
       <View style={styles.inline}>
         {editing !== "new" ? (
@@ -334,7 +333,7 @@ export default function RecurringScreen() {
             disabled={saving}
             hitSlop={8}
           >
-            <ThemedText type="smallBold" style={{ color: DANGER_COLOR }}>
+            <ThemedText type="smallBold" themeColor="danger">
               {confirmDelete ? "Ketuk lagi untuk hapus" : "Hapus"}
             </ThemedText>
           </Pressable>
@@ -433,7 +432,7 @@ export default function RecurringScreen() {
 
           {rules === null ? (
             error ? (
-              <ThemedText style={styles.error}>{error}</ThemedText>
+              <ThemedText themeColor="danger">{error}</ThemedText>
             ) : (
               <ActivityIndicator style={styles.flex} />
             )
@@ -602,8 +601,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

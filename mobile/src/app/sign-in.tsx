@@ -6,7 +6,6 @@ import { EmailOtpForm } from '@/components/email-otp-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Wordmark } from '@/components/wordmark';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -36,7 +35,7 @@ export default function SignInScreen() {
               Masuk dengan email untuk membuka datamu di HP dan laptop.
             </ThemedText>
 
-            {guestError && <ThemedText style={styles.error}>Gagal masuk sebagai tamu: {guestError}</ThemedText>}
+            {guestError && <ThemedText themeColor="danger">Gagal masuk sebagai tamu: {guestError}</ThemedText>}
 
             <EmailOtpForm mode="signin" allowSignUp submitLabel="Kirim kode masuk" />
 
@@ -49,7 +48,7 @@ export default function SignInScreen() {
                 </ThemedText>
               )}
             </Pressable>
-            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+            {error && <ThemedText themeColor="danger">{error}</ThemedText>}
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -76,8 +75,5 @@ const styles = StyleSheet.create({
   guest: {
     alignSelf: 'center',
     padding: Spacing.two,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

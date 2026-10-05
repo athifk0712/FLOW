@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR, NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
+import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -277,7 +277,7 @@ export default function HistoryScreen() {
               </Pressable>
             </View>
           )}
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+          {error && <ThemedText themeColor="danger">{error}</ThemedText>}
         </View>
 
         {rows === null && !error ? (
@@ -441,8 +441,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
+import { NECESSITY } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
 import { formatRupiah } from '@/lib/money';
 
@@ -28,6 +29,7 @@ const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
 /** Current budgets. Discretionary first: it is the one the app is really about.
  * Category budgets follow, the closest to their limit first. */
 export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; categoryNames: Map<string, string> }) {
+  const theme = useTheme();
   const weekly = budgets
     .filter((b) => b.period === 'WEEKLY' && b.scope !== 'CATEGORY')
     .sort((a, b) => Number(a.scope !== 'DISCRETIONARY') - Number(b.scope !== 'DISCRETIONARY'));
@@ -68,8 +70,8 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
                 {formatRupiah(spent)} / {formatRupiah(limit)}
               </ThemedText>
             </View>
-            <ProgressBar total={limit} segments={[{ value: spent, color: over ? DANGER_COLOR : SCOPE_COLOR[scope] }]} />
-            <ThemedText type="small" style={over ? styles.danger : undefined} themeColor="textSecondary">
+            <ProgressBar total={limit} segments={[{ value: spent, color: over ? theme.danger : SCOPE_COLOR[scope] }]} />
+            <ThemedText type="small" themeColor={over ? 'danger' : 'textSecondary'}>
               {over ? `Lewat ${formatRupiah(-remaining)} ${period}` : `Sisa ${formatRupiah(remaining)} ${period}`}
             </ThemedText>
             {(b.unreviewed_amount ?? 0) > 0 && (
@@ -97,8 +99,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.two,
-  },
-  danger: {
-    color: DANGER_COLOR,
   },
 });

@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
@@ -261,13 +260,12 @@ export default function QuickLogScreen() {
         {budgetNote && (
           <ThemedText
             type="small"
-            themeColor={budgetNote.level === 'ok' ? 'textSecondary' : undefined}
-            style={budgetNote.level === 'over' ? styles.error : budgetNote.level === 'low' && { color: theme.warning }}>
+            themeColor={budgetNote.level === 'ok' ? 'textSecondary' : budgetNote.level === 'over' ? 'danger' : 'warning'}>
             {budgetNote.text}
           </ThemedText>
         )}
 
-        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
         <View style={styles.keypad}>
           {KEYS.map((key) => (
@@ -401,8 +399,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

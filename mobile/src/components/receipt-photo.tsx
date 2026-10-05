@@ -5,7 +5,6 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRupiah } from '@/lib/money';
@@ -185,13 +184,13 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange, onApplyScan }
 
       {receiptId && !busy && (
         <Pressable onPress={remove} style={styles.remove} hitSlop={8}>
-          <ThemedText type="small" style={{ color: DANGER_COLOR }}>
+          <ThemedText type="small" themeColor="danger">
             {confirmRemove ? 'Ketuk lagi untuk hapus foto' : 'Hapus foto'}
           </ThemedText>
         </Pressable>
       )}
 
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText themeColor="danger">{error}</ThemedText>}
     </View>
   );
 }
@@ -290,8 +289,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

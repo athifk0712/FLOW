@@ -16,7 +16,7 @@ import { DateTimeField } from '@/components/date-time-field';
 import { deleteReceipt, ReceiptPhoto } from '@/components/receipt-photo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR, NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
+import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
@@ -180,7 +180,7 @@ export default function TransactionScreen() {
 
           {!tx ? (
             error ? (
-              <ThemedText style={styles.error}>{error}</ThemedText>
+              <ThemedText themeColor="danger">{error}</ThemedText>
             ) : (
               <ActivityIndicator style={styles.flex} />
             )
@@ -305,10 +305,10 @@ export default function TransactionScreen() {
                   multiline
                 />
 
-                {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+                {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
                 <Pressable onPress={remove} disabled={saving} style={styles.delete} hitSlop={8}>
-                  <ThemedText type="smallBold" style={{ color: DANGER_COLOR }}>
+                  <ThemedText type="smallBold" themeColor="danger">
                     {confirmDelete ? 'Ketuk lagi untuk menghapus' : 'Hapus transaksi'}
                   </ThemedText>
                 </Pressable>
@@ -433,8 +433,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

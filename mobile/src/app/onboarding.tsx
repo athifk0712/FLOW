@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
@@ -294,7 +293,7 @@ export default function OnboardingScreen() {
               </>
             )}
 
-            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+            {error && <ThemedText themeColor="danger">{error}</ThemedText>}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -466,8 +465,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

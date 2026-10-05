@@ -53,7 +53,7 @@ export function AccountSection() {
           </View>
         ) : (
           <Pressable onPress={() => setConfirmSignOut(true)} hitSlop={8}>
-            <ThemedText type="smallBold" style={styles.dangerText}>
+            <ThemedText type="smallBold" themeColor="danger">
               Keluar dari akun
             </ThemedText>
           </Pressable>
@@ -121,9 +121,6 @@ const styles = StyleSheet.create({
   },
   danger: {
     backgroundColor: DANGER_COLOR,
-  },
-  dangerText: {
-    color: DANGER_COLOR,
   },
   white: {
     color: '#ffffff',

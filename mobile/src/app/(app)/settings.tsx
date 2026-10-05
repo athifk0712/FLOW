@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { APPEARANCE_OPTIONS, setAppearance, useAppearance } from '@/lib/appearance';
 import type { Enums } from '@/lib/database.types';
 import { exportTransactionsCsv } from '@/lib/export';
 import { formatDigits, toDigits } from '@/lib/money';
@@ -52,6 +53,7 @@ const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = 
 
 export default function SettingsScreen() {
   const theme = useTheme();
+  const appearance = useAppearance();
   const [budgetIds, setBudgetIds] = useState<Partial<Record<Scope, string>>>({});
   const [limits, setLimits] = useState<Record<Scope, string>>({ DISCRETIONARY: '', ESSENTIAL: '' });
   const [savingBudget, setSavingBudget] = useState(false);
@@ -172,6 +174,29 @@ export default function SettingsScreen() {
                 <LinkRow title="Transaksi rutin" hint="Kos, langganan, gaji: dicatat otomatis tiap bulan" href="/recurring" />
                 <LinkRow title="Target tabungan" hint="Sisihkan uang untuk sesuatu yang kamu mau" href="/goals" />
                 <LinkRow title="Utang & piutang" hint="Siapa pinjam ke siapa, dan sudah dibayar berapa" href="/debts" />
+              </ThemedView>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                TAMPILAN
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <View style={styles.hours}>
+                  {APPEARANCE_OPTIONS.map(({ value, label }) => {
+                    const selected = value === appearance;
+                    return (
+                      <Pressable
+                        key={value}
+                        onPress={() => setAppearance(value)}
+                        style={[styles.hour, { backgroundColor: selected ? theme.primary : theme.backgroundSelected }]}>
+                        <ThemedText type="smallBold" style={{ color: selected ? theme.onPrimary : theme.text }}>
+                          {label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </ThemedView>
             </View>
 

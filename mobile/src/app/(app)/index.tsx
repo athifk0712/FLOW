@@ -11,7 +11,6 @@ import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Wordmark } from '@/components/wordmark';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -133,7 +132,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.total}>{formatRupiah(total)}</ThemedText>
           </View>
 
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+          {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
           {heldBack > 0 && (
             <Link href="/intents" asChild>
@@ -278,7 +277,7 @@ function DebtsCard({ debts }: { debts: Debt[] }) {
             <ThemedText type="smallBold">{formatRupiah(iOwe)}</ThemedText>
           </View>
         )}
-        <ThemedText type="small" themeColor={overdue ? undefined : 'textSecondary'} style={overdue > 0 && styles.error}>
+        <ThemedText type="small" themeColor={overdue > 0 ? 'danger' : 'textSecondary'}>
           {overdue > 0 ? `${overdue} lewat jatuh tempo · lihat →` : 'Kelola →'}
         </ThemedText>
       </ThemedView>
@@ -355,8 +354,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

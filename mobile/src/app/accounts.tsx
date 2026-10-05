@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
@@ -167,7 +166,7 @@ export default function AccountsScreen() {
         </View>
       </View>
 
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
       <View style={styles.actions}>
         {accounts && accounts.length > 0 && (
@@ -204,7 +203,7 @@ export default function AccountsScreen() {
             </ThemedText>
           </Pressable>
           <Pressable onPress={() => remove(editingAccount)} disabled={saving} hitSlop={8}>
-            <ThemedText type="smallBold" style={{ color: DANGER_COLOR }}>
+            <ThemedText type="smallBold" themeColor="danger">
               {confirmDelete ? 'Ketuk lagi untuk hapus' : 'Hapus'}
             </ThemedText>
           </Pressable>
@@ -250,7 +249,7 @@ export default function AccountsScreen() {
 
           {accounts === null ? (
             error ? (
-              <ThemedText style={styles.error}>{error}</ThemedText>
+              <ThemedText themeColor="danger">{error}</ThemedText>
             ) : (
               <ActivityIndicator style={styles.flex} />
             )
@@ -387,8 +386,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

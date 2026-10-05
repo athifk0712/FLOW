@@ -7,7 +7,7 @@ import { ProgressBar } from '@/components/progress-bar';
 import { SaveToGoal } from '@/components/save-to-goal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
+import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -128,7 +128,7 @@ export default function IntentsScreen() {
             />
           )}
 
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+          {error && <ThemedText themeColor="danger">{error}</ThemedText>}
           {intents === null && !error && <ActivityIndicator />}
 
           {pending.map((intent) => (
@@ -272,7 +272,7 @@ function IntentCard({
         </View>
       )}
 
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
       <View style={styles.actions}>
         <Pressable
@@ -394,8 +394,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

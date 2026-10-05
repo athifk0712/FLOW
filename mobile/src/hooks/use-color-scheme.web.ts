@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+import { useColorScheme as useSystemColorScheme } from 'react-native';
+
+import { useAppearance } from '@/lib/appearance';
 
 const subscribe = () => () => {};
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web.
- * The server snapshot is `false`, the client snapshot `true`, so hydration renders 'light' first.
+ * The scheme to render: the user's choice in Pengaturan, else the browser's.
+ * To support static rendering, the server snapshot is `false`, so hydration renders 'light' first.
  */
 export function useColorScheme() {
   const hasHydrated = useSyncExternalStore(
@@ -13,7 +15,8 @@ export function useColorScheme() {
     () => true,
     () => false,
   );
-  const colorScheme = useRNColorScheme();
-
-  return hasHydrated ? colorScheme : 'light';
+  const system = useSystemColorScheme();
+  const pref = useAppearance();
+  if (!hasHydrated) return 'light';
+  return pref === 'system' ? system : pref;
 }

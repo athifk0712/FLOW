@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRupiah } from '@/lib/money';
@@ -92,7 +91,7 @@ export default function ReportScreen() {
           </Pressable>
         </ThemedView>
 
-        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
         {!report ? (
           !error && <ActivityIndicator style={styles.flex} />
@@ -120,7 +119,7 @@ export default function ReportScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 {net >= 0 ? 'Sisa (pemasukan − pengeluaran)' : 'Minus (pengeluaran > pemasukan)'}
               </ThemedText>
-              <ThemedText type="smallBold" style={net < 0 && styles.error}>
+              <ThemedText type="smallBold" themeColor={net < 0 ? 'danger' : 'text'}>
                 {formatRupiah(net)}
               </ThemedText>
             </ThemedView>
@@ -322,8 +321,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

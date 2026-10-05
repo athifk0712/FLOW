@@ -92,7 +92,7 @@ export default function WeeklyReviewScreen() {
           </Pressable>
         </View>
 
-        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
         {items === null && !error && <ActivityIndicator style={styles.center} />}
 
         {item && tag && (
@@ -262,8 +262,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });

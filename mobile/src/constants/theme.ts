@@ -21,6 +21,7 @@ export const Colors = {
     accent: '#E9A23B',
     onAccent: '#1C2B2A',
     warning: '#8A5A0B', // honey, dark enough for text on sand
+    danger: '#B83A36',
   },
   dark: {
     text: '#F2EDE3',
@@ -33,6 +34,7 @@ export const Colors = {
     accent: '#F0B454',
     onAccent: '#0E1716',
     warning: '#F0B454',
+    danger: '#EF8A82', // 6.4:1 on dark cards; #B83A36 was 2.8:1
   },
 } as const;
 

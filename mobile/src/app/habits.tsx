@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { streakText, WeekDots } from '@/components/dashboard/habit-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DANGER_COLOR } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchHabits, type Habits } from '@/lib/habits';
@@ -50,7 +49,7 @@ export default function HabitsScreen() {
           </Pressable>
         </View>
 
-        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
         {!habits ? (
           !error && <ActivityIndicator style={styles.flex} />
@@ -200,8 +199,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  error: {
-    color: DANGER_COLOR,
   },
 });
