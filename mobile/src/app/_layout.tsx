@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-rout
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import { LockScreen } from '@/components/lock-screen';
 import { AnimatedSplashOverlay } from '@/components/splash-overlay';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -68,11 +69,13 @@ function RootNavigator() {
           <Stack.Screen name="debts" options={{ presentation: 'modal' }} />
           <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
           <Stack.Screen name="habits" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="pin-setup" options={{ presentation: 'modal', gestureEnabled: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />
         </Stack.Protected>
       </Stack>
+      {session && <LockScreen />}
     </>
   );
 }

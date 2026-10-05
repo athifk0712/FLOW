@@ -45,7 +45,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Flowku memakai Face ID untuk membuka aplikasi."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,5 +1,5 @@
 import { type Href, router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { biometricLabel, LOCK_SUPPORTED, setBiometric, useLockSettings } from '@/lib/app-lock';
 import { APPEARANCE_OPTIONS, setAppearance, useAppearance } from '@/lib/appearance';
 import type { Enums } from '@/lib/database.types';
 import { DUE_LABEL } from '@/lib/due-plan';
@@ -55,6 +56,8 @@ const BUDGETS: { scope: Scope; label: string; hint: string; color: string }[] = 
 export default function SettingsScreen() {
   const theme = useTheme();
   const appearance = useAppearance();
+  const lock = useLockSettings();
+  const [bioLabel, setBioLabel] = useState<string | null>(null);
   const [budgetIds, setBudgetIds] = useState<Partial<Record<Scope, string>>>({});
   const [limits, setLimits] = useState<Record<Scope, string>>({ DISCRETIONARY: '', ESSENTIAL: '' });
   const [savingBudget, setSavingBudget] = useState(false);
@@ -117,6 +120,10 @@ export default function SettingsScreen() {
     setSavingBudget(false);
     setBudgetMessage('Budget tersimpan');
   }
+
+  useEffect(() => {
+    biometricLabel().then(setBioLabel, () => setBioLabel(null));
+  }, []);
 
   async function exportCsv() {
     setExporting(true);
@@ -199,6 +206,48 @@ export default function SettingsScreen() {
                     );
                   })}
                 </View>
+              </ThemedView>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                KEAMANAN
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                {LOCK_SUPPORTED ? (
+                  <>
+                    <View style={styles.row}>
+                      <View style={styles.flex}>
+                        <ThemedText type="smallBold">Kunci dengan PIN</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          Diminta saat Flowku dibuka, atau kembali setelah lebih dari 1 menit.
+                        </ThemedText>
+                      </View>
+                      <Switch
+                        value={lock.enabled}
+                        onValueChange={(on) => router.push(on ? '/pin-setup' : '/pin-setup?mode=disable')}
+                      />
+                    </View>
+                    {lock.enabled && bioLabel && (
+                      <View style={styles.row}>
+                        <View style={styles.flex}>
+                          <ThemedText type="smallBold">Buka dengan {bioLabel.toLowerCase()}</ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            PIN tetap bisa dipakai kapan saja.
+                          </ThemedText>
+                        </View>
+                        <Switch value={lock.biometric} onValueChange={setBiometric} />
+                      </View>
+                    )}
+                    {lock.enabled && (
+                      <LinkRow title="Ganti PIN" hint="Masukkan PIN lama, lalu buat yang baru" href="/pin-setup?mode=change" />
+                    )}
+                  </>
+                ) : (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Kunci PIN dan sidik jari tersedia di aplikasi HP.
+                  </ThemedText>
+                )}
               </ThemedView>
             </View>
 
