@@ -19,6 +19,9 @@ export default function AppTabs() {
           <TabTrigger name="history" href="/history" asChild>
             <TabButton>Riwayat</TabButton>
           </TabTrigger>
+          <TabTrigger name="charts" href="/charts" asChild>
+            <TabButton>Diagram</TabButton>
+          </TabTrigger>
           <TabTrigger name="intents" href="/intents" asChild>
             <TabButton>Tunda Beli</TabButton>
           </TabTrigger>
