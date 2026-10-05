@@ -13,7 +13,7 @@ const base: TransactionRow = {
   from_account_id: 'a1',
   to_account_id: null,
   receipt_id: null,
-  categories: { name: 'Makan' },
+  categories: { name: 'Makan', icon: 'utensils' },
   from_account: { name: 'Cash' },
   to_account: null,
 };

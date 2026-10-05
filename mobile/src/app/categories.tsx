@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CategoryIcon } from '@/components/category-icon';
+import { IconPicker } from '@/components/icon-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { guessIcon } from '@/constants/category-icons';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
@@ -21,7 +24,7 @@ import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Kind = Enums<'category_kind'>;
-type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 // Adding to a kind, or editing a category by id.
 type Editing = { kind: Kind; id?: string } | null;
 
@@ -36,12 +39,15 @@ export default function CategoriesScreen() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState('dots');
+  // Until the user picks an icon themselves, it follows the name ("Bensin" -> fuel pump).
+  const [iconTouched, setIconTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from('categories').select('id, name, kind').order('created_at');
+    const { data, error } = await supabase.from('categories').select('id, name, kind, icon').order('created_at');
     if (error) return setError(error.message);
     setCategories(data ?? []);
   }, []);
@@ -54,7 +60,10 @@ export default function CategoriesScreen() {
 
   function openForm(target: Editing) {
     setEditing(target);
-    setName(categories?.find((c) => c.id === target?.id)?.name ?? '');
+    const category = categories?.find((c) => c.id === target?.id);
+    setName(category?.name ?? '');
+    setIcon(category?.icon ?? 'dots');
+    setIconTouched(!!category);
     setConfirmDelete(false);
     setError(null);
   }
@@ -75,8 +84,8 @@ export default function CategoriesScreen() {
     const trimmed = name.trim();
     run(() =>
       editing.id
-        ? supabase.from('categories').update({ name: trimmed }).eq('id', editing.id)
-        : supabase.from('categories').insert({ name: trimmed, kind: editing.kind }),
+        ? supabase.from('categories').update({ name: trimmed, icon }).eq('id', editing.id)
+        : supabase.from('categories').insert({ name: trimmed, kind: editing.kind, icon }),
     );
   }
 
@@ -90,15 +99,28 @@ export default function CategoriesScreen() {
   function form(target: NonNullable<Editing>) {
     return (
       <ThemedView type="backgroundElement" style={styles.card}>
-        <TextInput
-          style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
+        <View style={styles.nameRow}>
+          <CategoryIcon icon={icon} size={44} />
+          <TextInput
+          style={[styles.input, styles.grow, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
           value={name}
-          onChangeText={setName}
+          onChangeText={(text) => {
+            setName(text);
+            if (!iconTouched) setIcon(guessIcon(text));
+          }}
           onSubmitEditing={save}
           placeholder="Nama kategori"
           placeholderTextColor={theme.textSecondary}
           maxLength={50}
-          autoFocus
+          autoFocus={!target.id}
+          />
+        </View>
+        <IconPicker
+          value={icon}
+          onChange={(key) => {
+            setIcon(key);
+            setIconTouched(true);
+          }}
         />
         {target.id && (
           <ThemedText type="small" themeColor="textSecondary">
@@ -185,6 +207,7 @@ export default function CategoriesScreen() {
                             { backgroundColor: theme.backgroundElement },
                             pressed && styles.pressed,
                           ]}>
+                          <CategoryIcon icon={c.icon} size={24} />
                           <ThemedText type="small">{c.name}</ThemedText>
                         </Pressable>
                       ))}
@@ -205,7 +228,7 @@ export default function CategoriesScreen() {
                 </View>
               ))}
               <ThemedText type="small" themeColor="textSecondary">
-                Ketuk kategori untuk mengganti nama atau menghapusnya.
+                Ketuk kategori untuk mengganti nama, ikon, atau menghapusnya.
               </ThemedText>
             </ScrollView>
           )}
@@ -249,8 +272,12 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingLeft: Spacing.two,
+    paddingRight: Spacing.three,
+    paddingVertical: Spacing.one + 2,
     borderRadius: Spacing.five,
   },
   addChip: {
@@ -261,6 +288,14 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  grow: {
+    flex: 1,
   },
   input: {
     fontSize: 18,

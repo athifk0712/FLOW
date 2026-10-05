@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/date-time-field';
 import { deleteReceipt, ReceiptPhoto } from '@/components/receipt-photo';
+import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessity';
@@ -26,7 +27,7 @@ import { type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
-type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name' | 'archived_at'>;
 
 const TYPE_LABEL: Record<TransactionRow['type'], string> = {
@@ -60,7 +61,7 @@ export default function TransactionScreen() {
   useEffect(() => {
     Promise.all([
       supabase.from('transactions').select(TRANSACTION_SELECT).eq('id', id).single(),
-      supabase.from('categories').select('id, name, kind').order('created_at'),
+      supabase.from('categories').select('id, name, kind, icon').order('created_at'),
       supabase.from('accounts').select('id, name, archived_at').order('created_at'),
     ]).then(([t, cats, accs]) => {
       const failed = t.error ?? cats.error ?? accs.error;
@@ -235,7 +236,8 @@ export default function TransactionScreen() {
                           <Pressable
                             key={c.id}
                             onPress={() => setCategoryId(c.id === categoryId ? null : c.id)}
-                            style={chip(c.id === categoryId)}>
+                            style={[chip(c.id === categoryId), styles.iconChip]}>
+                            <CategoryIcon icon={c.icon} size={24} />
                             <ThemedText type="small" style={chipText(c.id === categoryId)}>
                               {c.name}
                             </ThemedText>
@@ -340,6 +342,12 @@ export default function TransactionScreen() {
 }
 
 const styles = StyleSheet.create({
+  iconChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingLeft: Spacing.one + 2,
+  },
   container: {
     flex: 1,
     flexDirection: 'row',

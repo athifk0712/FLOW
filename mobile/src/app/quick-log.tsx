@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -12,7 +13,7 @@ import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
-type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
 type Mode = 'EXPENSE' | 'INCOME' | 'TRANSFER';
 type CategoryBudget = Pick<Tables<'v_budget_remaining'>, 'category_id' | 'period' | 'limit_amount' | 'remaining'>;
@@ -64,7 +65,7 @@ export default function QuickLogScreen() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('categories').select('id, name, kind').order('created_at'),
+      supabase.from('categories').select('id, name, kind, icon').order('created_at'),
       supabase.from('accounts').select('id, name').is('archived_at', null).order('created_at'),
       supabase
         .from('transactions')
@@ -250,7 +251,8 @@ export default function QuickLogScreen() {
                 <Pressable
                   key={c.id}
                   onPress={() => setCategoryId(c.id === categoryId ? null : c.id)}
-                  style={chip(c.id === categoryId)}>
+                  style={[chip(c.id === categoryId), styles.iconChip]}>
+                  <CategoryIcon icon={c.icon} size={24} />
                   <ThemedText type="small" style={chipText(c.id === categoryId)}>
                     {c.name}
                   </ThemedText>
@@ -322,6 +324,12 @@ function describeBudget(budgets: CategoryBudget[], categories: Category[], categ
 }
 
 const styles = StyleSheet.create({
+  iconChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingLeft: Spacing.one + 2,
+  },
   container: {
     flex: 1,
     flexDirection: 'row',

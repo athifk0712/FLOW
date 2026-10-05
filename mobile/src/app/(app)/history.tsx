@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
@@ -22,7 +23,7 @@ import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, transactionTitle, type TransactionRow } from '@/lib/transactions';
 
-type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
 type Summary = { count: number; out: number; in: number };
 
@@ -134,7 +135,7 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       Promise.all([
-        supabase.from('categories').select('id, name, kind').order('created_at'),
+        supabase.from('categories').select('id, name, kind, icon').order('created_at'),
         supabase.from('accounts').select('id, name').is('archived_at', null).order('created_at'),
       ]).then(([cats, accs]) => {
         setCategories(cats.data ?? []);
@@ -188,8 +189,9 @@ export default function HistoryScreen() {
     { backgroundColor: selected ? theme.primary : onPanel ? theme.backgroundSelected : theme.backgroundElement },
   ];
   const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
-  const choice = (label: string, selected: boolean, onPress: () => void, onPanel = true) => (
-    <Pressable key={label} onPress={onPress} style={chip(selected, onPanel)}>
+  const choice = (label: string, selected: boolean, onPress: () => void, onPanel = true, icon?: string | null) => (
+    <Pressable key={label} onPress={onPress} style={[chip(selected, onPanel), icon !== undefined && styles.iconChip]}>
+      {icon !== undefined && <CategoryIcon icon={icon} size={22} />}
       <ThemedText type="small" style={chipText(selected)}>
         {label}
       </ThemedText>
@@ -245,8 +247,12 @@ export default function HistoryScreen() {
                 {categories
                   .filter((c) => filters.type === 'ALL' || c.kind === filters.type)
                   .map((c) =>
-                    choice(c.kind === 'INCOME' ? `${c.name} (masuk)` : c.name, c.id === filters.categoryId, () =>
-                      update({ categoryId: c.id === filters.categoryId ? null : c.id }),
+                    choice(
+                      c.kind === 'INCOME' ? `${c.name} (masuk)` : c.name,
+                      c.id === filters.categoryId,
+                      () => update({ categoryId: c.id === filters.categoryId ? null : c.id }),
+                      true,
+                      c.icon,
                     ),
                   )}
               </View>
@@ -332,7 +338,14 @@ function HistoryItem({ item }: { item: TransactionRow }) {
       onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: item.id } })}
       style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView type="backgroundElement" style={styles.row}>
-        {dotColor ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : <View style={styles.dot} />}
+        <View>
+          <CategoryIcon icon={item.type === 'TRANSFER' ? 'transfer' : item.categories?.icon} size={38} />
+          {dotColor && (
+            <View
+              style={[styles.dot, styles.dotBadge, { backgroundColor: dotColor, borderColor: theme.backgroundElement }]}
+            />
+          )}
+        </View>
         <View style={styles.rowText}>
           <ThemedText numberOfLines={1}>{transactionTitle(item)}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
@@ -404,6 +417,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: Spacing.five,
   },
+  iconChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingLeft: Spacing.one + 2,
+    paddingVertical: Spacing.one + 2,
+  },
   list: {
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
@@ -425,9 +445,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  // Necessity tag as a small dot on the icon's corner.
+  dotBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    borderWidth: 2,
   },
   empty: {
     textAlign: 'center',
