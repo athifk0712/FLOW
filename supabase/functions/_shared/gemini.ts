@@ -1,6 +1,8 @@
 // Minimal Gemini API client (REST generateContent) shared by the edge functions. Asks for JSON matching a
 // schema and returns the parsed object, or a GeminiError carrying the HTTP status to send back to the app.
-export const GEMINI_MODEL = 'gemini-3.8-flash';
+// Tried in order: when one is overloaded or rate-limited, the next one answers instead.
+export const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+const RETRYABLE = new Set([429, 500, 503, 504]);
 
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 export type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
@@ -17,15 +19,22 @@ export async function generateJson<T>(opts: {
   contents: GeminiContent[];
   schema: Record<string, unknown>;
 }): Promise<T> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
-    body: JSON.stringify({
-      ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
-      contents: opts.contents,
-      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: opts.schema },
-    }),
+  const body = JSON.stringify({
+    ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
+    contents: opts.contents,
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: opts.schema },
   });
+  let res!: Response;
+  for (const model of GEMINI_MODELS) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+      body,
+    });
+    if (!RETRYABLE.has(res.status) || model === GEMINI_MODELS[GEMINI_MODELS.length - 1]) break;
+    console.warn('Gemini', model, 'unavailable', res.status);
+    await res.body?.cancel();
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
