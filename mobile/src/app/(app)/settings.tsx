@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountSection } from '@/components/settings/account-section';
+import { DeleteAccountSection } from '@/components/settings/delete-account-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
@@ -409,6 +410,8 @@ export default function SettingsScreen() {
               </ThemedView>
               )}
             </View>
+
+            <DeleteAccountSection onExport={exportCsv} exporting={exporting} />
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>

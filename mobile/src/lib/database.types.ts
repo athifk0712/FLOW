@@ -707,6 +707,7 @@ export type Database = {
       }
     }
     Functions: {
+      delete_my_account: { Args: never; Returns: undefined }
       intent_cooldown: {
         Args: { p_cost: number; p_user_id: string }
         Returns: string
