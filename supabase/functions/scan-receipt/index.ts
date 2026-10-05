@@ -1,8 +1,8 @@
-// Reads a receipt photo with Claude and returns merchant, total, date/time and a category guess.
+// Reads a receipt photo with Gemini and returns merchant, total, date/time and a category guess.
 // Runs as the calling user (their JWT), so RLS decides which receipt and file they may read.
-import Anthropic from 'npm:@anthropic-ai/sdk@^0.129.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding/base64';
+import { GeminiError, generateJson } from '../_shared/gemini.ts';
 
 const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 type SupportedType = (typeof SUPPORTED_TYPES)[number];
@@ -43,8 +43,8 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return json({ error: 'OCR belum aktif: ANTHROPIC_API_KEY belum diisi di Supabase.' }, 503);
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) return json({ error: 'OCR belum aktif: GEMINI_API_KEY belum diisi di Supabase.' }, 503);
 
   const { receipt_id: receiptId } = await req.json().catch(() => ({}));
   if (typeof receiptId !== 'string') return json({ error: 'receipt_id wajib diisi.' }, 400);
@@ -66,23 +66,18 @@ Deno.serve(async (req) => {
   const image = encodeBase64(new Uint8Array(await file.data.arrayBuffer()));
 
   const categoryNames = (categories.data ?? []).map((c) => c.name).join(', ');
-  const client = new Anthropic({ apiKey });
 
-  let response;
+  let result: ScanResult;
   try {
-    response = await client.beta.messages.create({
-      model: 'claude-opus-5-5',
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: RESULT_SCHEMA } },
-      messages: [
+    result = await generateJson<ScanResult>({
+      apiKey,
+      schema: RESULT_SCHEMA,
+      contents: [
         {
           role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+          parts: [
+            { inline_data: { mime_type: mediaType, data: image } },
             {
-              type: 'text',
               text:
                 'This is a photo of a purchase receipt, usually from Indonesia. Extract the merchant name, the grand ' +
                 'total actually paid (after discounts and tax; rupiah uses "." as the thousands separator, so ' +
@@ -94,21 +89,9 @@ Deno.serve(async (req) => {
       ],
     });
   } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) return json({ error: 'OCR sedang sibuk, coba lagi sebentar.' }, 429);
-    if (error instanceof Anthropic.AuthenticationError) return json({ error: 'ANTHROPIC_API_KEY tidak valid.' }, 503);
-    if (error instanceof Anthropic.APIError) return json({ error: `OCR gagal (${error.status}).` }, 502);
-    throw error;
-  }
-
-  if (response.stop_reason === 'refusal') return json({ error: 'Struk ini tidak bisa dibaca.' }, 422);
-  const text = response.content.find((block) => block.type === 'text');
-  if (!text || text.type !== 'text') return json({ error: 'OCR tidak mengembalikan hasil.' }, 502);
-
-  let result: ScanResult;
-  try {
-    result = JSON.parse(text.text);
-  } catch {
-    return json({ error: 'Hasil OCR tidak terbaca.' }, 502);
+    if (!(error instanceof GeminiError)) throw error;
+    if (error.status === 422) return json({ error: 'Struk ini tidak bisa dibaca.' }, 422);
+    return json({ error: error.message.replace(/^AI/, 'OCR') }, error.status);
   }
 
   // Kept for later (e.g. re-applying without another scan); failure here should not hide the result.

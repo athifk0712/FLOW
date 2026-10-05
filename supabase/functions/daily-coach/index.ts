@@ -1,8 +1,8 @@
-// "Ngobrol malam": a short evening chat about the day's money with Claude. Each call gets the transcript so
+// "Ngobrol malam": a short evening chat about the day's money with Gemini. Each call gets the transcript so
 // far, re-reads the user's data (as the calling user, so RLS applies), and returns the coach's next turn:
 // a message, a few tap-to-answer options, and any necessity tags the user has confirmed, which are saved.
-import Anthropic from 'npm:@anthropic-ai/sdk@^0.129.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { type GeminiContent, GeminiError, generateJson } from '../_shared/gemini.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -76,8 +76,8 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return json({ error: 'AI belum aktif: ANTHROPIC_API_KEY belum diisi di Supabase.' }, 503);
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) return json({ error: 'AI belum aktif: GEMINI_API_KEY belum diisi di Supabase.' }, 503);
 
   const body = await req.json().catch(() => ({}));
   const messages: ChatMessage[] = Array.isArray(body.messages) ? body.messages : [];
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
     remaining_text: amountText(b.remaining ?? 0),
   }));
 
-  // The data block comes first and stays identical for the whole chat, so later turns hit the prompt cache.
+  // The data block comes first and stays identical for the whole chat.
   const context = JSON.stringify({
     currency,
     today_transactions: todayRows,
@@ -162,48 +162,27 @@ Deno.serve(async (req) => {
     ...(older.data ?? []).map((t) => t.id),
   ]);
 
-  const apiMessages: Anthropic.Beta.BetaMessageParam[] = [
+  const contents: GeminiContent[] = [
     {
       role: 'user',
-      content: [
-        { type: 'text', text: `Data for tonight's chat (JSON):\n${context}`, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: 'Mulai obrolan malam ini.' },
-      ],
+      parts: [{ text: `Data for tonight's chat (JSON):\n${context}` }, { text: 'Mulai obrolan malam ini.' }],
     },
-    ...messages.map((m): Anthropic.Beta.BetaMessageParam => ({ role: m.role, content: String(m.text).slice(0, 2000) })),
+    ...messages.map((m): GeminiContent => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.text).slice(0, 2000) }],
+    })),
   ];
-  if (apiMessages[apiMessages.length - 1].role !== 'user') return json({ error: 'Pesan terakhir harus dari pengguna.' }, 400);
-
-  const client = new Anthropic({ apiKey });
-  let response;
-  try {
-    response = await client.beta.messages.create({
-      model: 'claude-opus-5-5',
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system: SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: TURN_SCHEMA } },
-      messages: apiMessages,
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) return json({ error: 'Flowku sedang sibuk, coba lagi sebentar.' }, 429);
-    if (error instanceof Anthropic.AuthenticationError) return json({ error: 'ANTHROPIC_API_KEY tidak valid.' }, 503);
-    if (error instanceof Anthropic.APIError) return json({ error: `AI gagal (${error.status}).` }, 502);
-    throw error;
-  }
-
-  if (response.stop_reason === 'refusal') {
-    return json({ message: 'Maaf, aku tidak bisa membahas itu. Mau lanjut bahas pengeluaran hari ini?', options: ['Lanjut', 'Sudahi saja'], tags: [], done: false, summary: '' });
-  }
-  const text = response.content.find((block) => block.type === 'text');
-  if (!text || text.type !== 'text') return json({ error: 'AI tidak mengembalikan jawaban.' }, 502);
+  if (contents[contents.length - 1].role !== 'user') return json({ error: 'Pesan terakhir harus dari pengguna.' }, 400);
 
   let turn: Turn;
   try {
-    turn = JSON.parse(text.text);
-  } catch {
-    return json({ error: 'Jawaban AI tidak terbaca.' }, 502);
+    turn = await generateJson<Turn>({ apiKey, system: SYSTEM, contents, schema: TURN_SCHEMA });
+  } catch (error) {
+    if (!(error instanceof GeminiError)) throw error;
+    if (error.status === 422) {
+      return json({ message: 'Maaf, aku tidak bisa membahas itu. Mau lanjut bahas pengeluaran hari ini?', options: ['Lanjut', 'Sudahi saja'], tags: [], done: false, summary: '' });
+    }
+    return json({ error: error.message }, error.status);
   }
 
   // Only label expenses that were in the data, with a valid label; RLS keeps it to the user's own rows anyway.
