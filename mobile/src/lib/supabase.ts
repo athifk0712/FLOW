@@ -1,7 +1,7 @@
 import 'expo-sqlite/localStorage/install';
 
 import { createClient } from '@supabase/supabase-js';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import type { Database } from '@/lib/database.types';
 
@@ -33,7 +33,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
     storage: localStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // PKCE so Google login returns a one-time ?code= (lib/oauth.ts). On web the page itself comes back from Google
+    // with it, and supabase-js exchanges it on load, before the guest sign-in would kick in.
+    flowType: 'pkce',
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 

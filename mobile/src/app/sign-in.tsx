@@ -3,6 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmailOtpForm } from '@/components/email-otp-form';
+import { GoogleButton } from '@/components/google-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Wordmark } from '@/components/wordmark';
@@ -32,11 +33,15 @@ export default function SignInScreen() {
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <Wordmark size={40} />
             <ThemedText themeColor="textSecondary">
-              Masuk dengan email untuk membuka datamu di HP dan laptop.
+              Masuk dengan Google atau email untuk membuka datamu di HP dan laptop.
             </ThemedText>
 
             {guestError && <ThemedText themeColor="danger">Gagal masuk sebagai tamu: {guestError}</ThemedText>}
 
+            <GoogleButton mode="signin" label="Lanjut dengan Google" />
+            <ThemedText type="small" themeColor="textSecondary" style={styles.or}>
+              atau pakai email
+            </ThemedText>
             <EmailOtpForm mode="signin" allowSignUp submitLabel="Kirim kode masuk" />
 
             <Pressable disabled={startingGuest} onPress={continueAsGuest} style={styles.guest} hitSlop={8}>
@@ -71,6 +76,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
+  },
+  or: {
+    textAlign: 'center',
   },
   guest: {
     alignSelf: 'center',
