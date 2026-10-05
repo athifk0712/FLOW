@@ -2,16 +2,20 @@ import { isRunningInExpoGo } from 'expo';
 import type * as NotificationsModule from 'expo-notifications';
 import { Platform } from 'react-native';
 
-// Local reminders for the nightly and weekly reviews. Preferences live on the device only.
+import { planDueReminders } from '@/lib/due-plan';
+import { supabase } from '@/lib/supabase';
+
+// Local reminders for the nightly and weekly reviews and for due dates. Preferences live on the device only.
 
 const NIGHTLY_ID = 'nightly-review';
 const WEEKLY_ID = 'weekly-review';
+const DUE_PREFIX = 'due-';
 const CHANNEL_ID = 'reminders';
 const STORAGE_KEY = 'flow.reminder';
 
 export const REVIEW_ROUTE = '/review';
 export const WEEKLY_REVIEW_ROUTE = '/weekly-review';
-export const REMINDER_ROUTES = [REVIEW_ROUTE, WEEKLY_REVIEW_ROUTE] as const;
+export const REMINDER_ROUTES = [REVIEW_ROUTE, WEEKLY_REVIEW_ROUTE, '/debts', '/recurring'] as const;
 export const REMINDER_HOURS = [20, 21, 22] as const;
 
 // Weekly reflection: Sunday 19.00, before the nightly reminder so the two never stack.
@@ -19,9 +23,9 @@ const WEEKLY_WEEKDAY = 1; // expo-notifications: 1 = Sunday
 const WEEKLY_HOUR = 19;
 export const WEEKLY_LABEL = 'Minggu, 19.00';
 
-export type ReminderSettings = { enabled: boolean; hour: number; weeklyEnabled: boolean };
+export type ReminderSettings = { enabled: boolean; hour: number; weeklyEnabled: boolean; dueEnabled: boolean };
 
-const DEFAULT_SETTINGS: ReminderSettings = { enabled: false, hour: 21, weeklyEnabled: false };
+const DEFAULT_SETTINGS: ReminderSettings = { enabled: false, hour: 21, weeklyEnabled: false, dueEnabled: false };
 
 // Expo Go on Android throws as soon as expo-notifications is imported (push support was removed),
 // so reminders there need a development build.
@@ -67,7 +71,7 @@ export async function applyReminderSettings(settings: ReminderSettings): Promise
     [NIGHTLY_ID, WEEKLY_ID].map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})),
   );
 
-  if (settings.enabled || settings.weeklyEnabled) {
+  if (settings.enabled || settings.weeklyEnabled || settings.dueEnabled) {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
         name: 'Pengingat',
@@ -77,7 +81,7 @@ export async function applyReminderSettings(settings: ReminderSettings): Promise
 
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, enabled: false, weeklyEnabled: false }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, enabled: false, weeklyEnabled: false, dueEnabled: false }));
       return false;
     }
   }
@@ -118,5 +122,39 @@ export async function applyReminderSettings(settings: ReminderSettings): Promise
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  await syncDueReminders(settings);
   return true;
+}
+
+/**
+ * Reschedules the due-date reminders from the latest debts and recurring expenses. Call after they may have
+ * changed (dashboard focus, saving a debt or rule). Errors are swallowed: a missed reminder must not break a screen.
+ */
+export async function syncDueReminders(settings = getReminderSettings()) {
+  if (!REMINDERS_SUPPORTED) return;
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(
+      scheduled
+        .filter((n) => n.identifier.startsWith(DUE_PREFIX))
+        .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+    );
+    if (!settings.dueEnabled) return;
+
+    const [debts, rules] = await Promise.all([
+      supabase.from('v_debts').select('id, person, direction, remaining, due_date, settled').eq('settled', false),
+      supabase.from('recurring_transactions').select('id, name, amount, type, active, next_due').eq('active', true),
+    ]);
+    if (debts.error || rules.error) return;
+
+    for (const reminder of planDueReminders(debts.data ?? [], rules.data ?? [])) {
+      await Notifications.scheduleNotificationAsync({
+        identifier: reminder.id,
+        content: { title: reminder.title, body: reminder.body, data: { url: reminder.url } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminder.date, channelId: CHANNEL_ID },
+      });
+    }
+  } catch {
+    // Keep the screen working; the next sync tries again.
+  }
 }

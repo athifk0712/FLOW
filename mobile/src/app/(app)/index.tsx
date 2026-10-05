@@ -19,6 +19,7 @@ import type { Goal } from '@/lib/goals';
 import { fetchHabits, type Habits } from '@/lib/habits';
 import { currentMonthKey, formatRupiah } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
+import { syncDueReminders } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
 
@@ -84,6 +85,7 @@ export default function HomeScreen() {
         .rpc('post_due_recurring')
         .then(() => {
           loadHabits();
+          syncDueReminders(); // next_due may have moved on
           return load();
         })
         .then(([bal, bud, mixRes, held, rev, due, reg, cats, goalRows, debtRows]) => {

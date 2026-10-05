@@ -25,6 +25,7 @@ import { useTheme } from "@/hooks/use-theme";
 import type { Tables } from "@/lib/database.types";
 import { formatDigits, formatRupiah, toDigits } from "@/lib/money";
 import { closeModal } from "@/lib/navigation";
+import { syncDueReminders } from "@/lib/reminders";
 import { supabase } from "@/lib/supabase";
 
 type Rule = Tables<"recurring_transactions">;
@@ -79,6 +80,7 @@ export default function RecurringScreen() {
     const failed = r.error ?? a.error ?? c.error;
     if (failed) return setError(failed.message);
     setRules(r.data ?? []);
+    syncDueReminders();
     setAccounts(a.data ?? []);
     setCategories(c.data ?? []);
   }, []);

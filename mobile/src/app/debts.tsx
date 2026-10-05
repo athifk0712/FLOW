@@ -28,6 +28,7 @@ import {
 } from '@/lib/debts';
 import { formatDigits, formatRupiah, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
+import { syncDueReminders } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 
 // 'new' = the add form; an id = that debt is open (payment / edit).
@@ -68,6 +69,7 @@ export default function DebtsScreen() {
     const { data, error } = await supabase.from('v_debts').select('*');
     if (error) return setError(error.message);
     setDebts(sortDebts(data ?? []));
+    syncDueReminders();
   }, []);
 
   useFocusEffect(

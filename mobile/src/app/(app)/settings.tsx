@@ -21,6 +21,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { APPEARANCE_OPTIONS, setAppearance, useAppearance } from '@/lib/appearance';
 import type { Enums } from '@/lib/database.types';
+import { DUE_LABEL } from '@/lib/due-plan';
 import { exportTransactionsCsv } from '@/lib/export';
 import { formatDigits, toDigits } from '@/lib/money';
 import {
@@ -134,13 +135,14 @@ export default function SettingsScreen() {
     setReminderMessage(null);
     const ok = await applyReminderSettings(next);
     if (!ok) {
-      setReminder({ ...next, enabled: false, weeklyEnabled: false });
+      setReminder({ ...next, enabled: false, weeklyEnabled: false, dueEnabled: false });
       setReminderMessage('Izin notifikasi ditolak. Aktifkan dari pengaturan HP.');
       return;
     }
     const active = [
       next.enabled && `review malam setiap hari jam ${String(next.hour).padStart(2, '0')}.00`,
       next.weeklyEnabled && `refleksi mingguan setiap ${WEEKLY_LABEL}`,
+      next.dueEnabled && `jatuh tempo jam ${DUE_LABEL}`,
     ].filter(Boolean);
     setReminderMessage(active.length > 0 ? `Pengingat aktif: ${active.join(' dan ')}.` : null);
   }
@@ -336,6 +338,18 @@ export default function SettingsScreen() {
                   <Switch
                     value={reminder.weeklyEnabled}
                     onValueChange={(weeklyEnabled) => updateReminder({ ...reminder, weeklyEnabled })}
+                  />
+                </View>
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <ThemedText type="smallBold">Jatuh tempo</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Utang, piutang, dan tagihan rutin: jam {DUE_LABEL} di harinya.
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    value={reminder.dueEnabled}
+                    onValueChange={(dueEnabled) => updateReminder({ ...reminder, dueEnabled })}
                   />
                 </View>
                 {reminderMessage && (
