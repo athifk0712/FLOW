@@ -22,6 +22,10 @@ export const Colors = {
     onAccent: '#1C2B2A',
     warning: '#8A5A0B', // honey, dark enough for text on sand
     danger: '#B83A36',
+    // Kalender day cells: more came in than went out (positive) or the other way round (negative).
+    positive: '#1F6B4F',
+    positiveSoft: '#DCEFE6',
+    negativeSoft: '#F7DFDC',
   },
   dark: {
     text: '#F2EDE3',
@@ -35,6 +39,9 @@ export const Colors = {
     onAccent: '#0E1716',
     warning: '#F0B454',
     danger: '#EF8A82', // 6.4:1 on dark cards; #B83A36 was 2.8:1
+    positive: '#7FD3A8',
+    positiveSoft: '#173A2D',
+    negativeSoft: '#3E2220',
   },
 } as const;
 
@@ -77,3 +84,5 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+// Desktop layout (sidebar + two columns), see hooks/use-wide.
+export const WideContentWidth = 1200;

@@ -90,8 +90,8 @@ export async function applyReminderSettings(settings: ReminderSettings): Promise
     await Notifications.scheduleNotificationAsync({
       identifier: NIGHTLY_ID,
       content: {
-        title: 'Ngobrol malam',
-        body: 'Yuk bahas uang yang keluar hari ini. Cuma beberapa menit.',
+        title: 'Cek harian',
+        body: 'Tandai pengeluaran hari ini. Cuma semenit.',
         data: { url: REVIEW_ROUTE },
       },
       trigger: {

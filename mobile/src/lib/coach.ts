@@ -3,7 +3,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import type { CoachExpense, Necessity } from '@/lib/coach-local';
 import { supabase } from '@/lib/supabase';
 
-// The evening chat ("Ngobrol malam"): the AI coach (edge function daily-coach) when it is available,
+// The daily check ("Cek harian"): the AI coach (edge function daily-coach) when it is available,
 // otherwise the scripted local fallback in lib/coach-local.
 
 export type ChatMessage = { role: 'user' | 'assistant'; text: string };

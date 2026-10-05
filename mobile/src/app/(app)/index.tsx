@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppSymbol } from '@/components/app-symbol';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
+import { MenuGrid, type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
 import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
 import { TimeInsightCard } from '@/components/dashboard/time-insight-card';
@@ -13,10 +14,10 @@ import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Wordmark } from '@/components/wordmark';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
+import { useWide } from '@/hooks/use-wide';
 import { cycleKey, cycleRange, untilLabel } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
@@ -29,6 +30,7 @@ import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
 import { supabase } from '@/lib/supabase';
 import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
+import { useSession } from '@/providers/session-provider';
 
 type Balance = Tables<'v_account_balances'>;
 type Budget = Tables<'v_budget_remaining'>;
@@ -38,10 +40,25 @@ type Unreviewed = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at'> 
   categories: { name: string } | null;
 };
 
-const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
+const QUICK_ACTIONS: MenuItem[] = [
+  { label: 'Catat', href: '/quick-log', material: 'add', sf: 'plus' },
+  { label: 'Riwayat', href: '/history', material: 'receipt_long', sf: 'list.bullet.rectangle' },
+  { label: 'Kalender', href: '/calendar', material: 'calendar_month', sf: 'calendar' },
+  { label: 'Laporan', href: '/report', material: 'bar_chart', sf: 'chart.bar' },
+];
 
+// Height of the teal band the first card overlaps.
+const BAND_OVERLAP = 64;
+const HIDDEN_KEY = 'flowku.hideBalance';
+
+// Beranda, laid out like a banking app: a teal band with a greeting, the safe-to-spend card with quick actions,
+// a menu grid with everything that used to live under Pengaturan, small to-do rows, then the overview cards.
+// On a laptop-wide window the overview moves into a second column.
 export default function HomeScreen() {
   const theme = useTheme();
+  const wide = useWide();
+  const { session } = useSession();
+  const [hidden, toggleHidden] = useHiddenBalance();
   const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -146,10 +163,10 @@ export default function HomeScreen() {
     }, [cycleDay, cycleLoaded]),
   );
 
+  const user = session?.user;
+  const name = !user || user.is_anonymous ? 'Tamu Flowku' : (user.email?.split('@')[0] ?? 'Pengguna Flowku');
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
   const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
-  // From 18.00 the nightly chat becomes the first thing on the dashboard.
-  const evening = new Date().getHours() >= 18;
   const cycleEnd = cycleRange(new Date(), cycleDay).end;
   const essential = budgets.find((b) => b.scope === 'ESSENTIAL' && b.period === 'WEEKLY');
   const safe = computeSafeToSpend({
@@ -161,128 +178,177 @@ export default function HomeScreen() {
     spentToday,
     cycleEnd,
   });
+  const overdueDebts = openDebts.filter((d) => dueStatus(d)?.overdue).length;
+
+  const menu: MenuItem[] = [
+    { label: 'Akun & dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
+    { label: 'Budget', href: '/budgets', material: 'donut_large', sf: 'chart.pie' },
+    { label: 'Target tabungan', href: '/goals', material: 'flag', sf: 'flag' },
+    {
+      label: 'Utang & piutang',
+      href: '/debts',
+      material: 'handshake',
+      sf: 'person.2',
+      badge: overdueDebts > 0 ? String(overdueDebts) : undefined,
+    },
+    { label: 'Transaksi rutin', href: '/recurring', material: 'event_repeat', sf: 'repeat' },
+    { label: 'Kategori', href: '/categories', material: 'category', sf: 'square.grid.2x2' },
+    { label: 'Kebiasaan', href: '/habits', material: 'self_improvement', sf: 'leaf' },
+    { label: 'Lainnya', href: '/settings', material: 'more_horiz', sf: 'ellipsis' },
+  ];
+
+  const hero =
+    balances.length > 0 ? (
+      <SafeToSpendCard
+        data={safe}
+        cash={total}
+        until={untilLabel(cycleEnd, cycleDay)}
+        hidden={hidden}
+        onToggleHidden={toggleHidden}>
+        <QuickActions items={QUICK_ACTIONS} />
+      </SafeToSpendCard>
+    ) : (
+      <ThemedView type="backgroundElement" style={styles.card}>
+        <ThemedText type="small" themeColor="textSecondary">
+          Total uang
+        </ThemedText>
+        <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
+        <QuickActions items={QUICK_ACTIONS} />
+      </ThemedView>
+    );
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <Wordmark />
-
-          {balances.length > 0 ? (
-            <SafeToSpendCard data={safe} cash={total} until={untilLabel(cycleEnd, cycleDay)} />
-          ) : (
-            <View>
-              <ThemedText type="small" themeColor="textSecondary">
-                Total uang
+      <ScrollView contentContainerStyle={wide ? styles.scrollWide : styles.scroll}>
+        <View style={[styles.band, { backgroundColor: theme.primary }]}>
+          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
+          <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
+          <SafeAreaView
+            edges={['top', 'left', 'right']}
+            style={[styles.bandInner, { maxWidth: wide ? WideContentWidth : MaxContentWidth }]}>
+            <View style={styles.flex}>
+              <ThemedText type="small" style={[styles.greetingSmall, { color: theme.onPrimary }]}>
+                {greeting()}
               </ThemedText>
-              <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
+              <ThemedText type="subtitle" style={[styles.greeting, { color: theme.onPrimary }]} numberOfLines={1}>
+                {name}
+              </ThemedText>
             </View>
-          )}
+            {!wide && (
+              <Pressable
+                onPress={() => router.push('/settings')}
+                hitSlop={8}
+                accessibilityLabel="Pengaturan"
+                style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
+                <AppSymbol material="settings" sf="gearshape" size={24} color={theme.onPrimary} />
+              </Pressable>
+            )}
+          </SafeAreaView>
+        </View>
 
-          {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+        <View style={[styles.body, wide ? styles.bodyWide : { maxWidth: MaxContentWidth }]}>
+          <View style={[styles.column, wide && styles.leftColumn]}>
+            {hero}
 
-          {(unreviewed.length > 0 || evening) && (
-            <Pressable onPress={() => router.push('/coach')} style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView
-                style={[styles.card, styles.reviewCard, { backgroundColor: evening ? theme.primary : theme.backgroundElement }]}>
-                <View style={[styles.coachIcon, { backgroundColor: evening ? theme.onPrimary : theme.primary }]}>
-                  <AppSymbol material="nightlight" sf="moon.stars.fill" size={20} color={theme.accent} />
-                </View>
-                <View style={styles.flex}>
-                  <ThemedText type="smallBold" style={evening && { color: theme.onPrimary }}>
-                    {evening ? 'Waktunya ngobrol malam' : 'Ngobrol malam dengan Flowku'}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor={evening ? undefined : 'textSecondary'} style={evening && { color: theme.onPrimary }}>
-                    {unreviewed.length > 0
-                      ? `${unreviewed.length} pengeluaran (${formatMoney(unreviewedTotal)}) belum dibahas · terakhir ${timeFormat.format(new Date(unreviewed[0].occurred_at))}`
-                      : 'Ceritakan harimu, Flowku bantu lihat polanya.'}
-                  </ThemedText>
-                </View>
-                <ThemedText type="smallBold" style={evening && { color: theme.onPrimary }}>
-                  →
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
-          )}
+            <ThemedView type="backgroundElement" style={styles.card}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                MENU
+              </ThemedText>
+              <MenuGrid items={menu} />
+            </ThemedView>
 
-          {weeklyDue > 0 && (
-            <Pressable onPress={() => router.push('/weekly-review')}>
-              <ThemedView type="backgroundElement" style={[styles.card, styles.reviewCard]}>
-                <View style={styles.flex}>
-                  <ThemedText type="smallBold">Refleksi mingguan</ThemedText>
+            {/* Small to-do rows, not banners: the daily check is a quick labelling step, not the centre of the app. */}
+            {unreviewed.length > 0 && (
+              <TodoRow
+                material="checklist"
+                sf="checklist"
+                title="Cek harian"
+                detail={`${unreviewed.length} pengeluaran (${formatMoney(unreviewedTotal)}) belum dilabeli`}
+                onPress={() => router.push('/coach')}
+              />
+            )}
+            {weeklyDue > 0 && (
+              <TodoRow
+                material="rate_review"
+                sf="text.bubble"
+                title="Refleksi mingguan"
+                detail={`${weeklyDue} pengeluaran: masih puas, atau menyesal?`}
+                onPress={() => router.push('/weekly-review')}
+              />
+            )}
+          </View>
+
+          <View style={[styles.column, wide && styles.rightColumn]}>
+            {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+
+            {habits && habits.milestones[0].done && (
+              <Section title="KEBIASAAN">
+                <HabitCard habits={habits} />
+              </Section>
+            )}
+
+            <Section title="BUDGET">
+              <BudgetCard budgets={budgets} categoryNames={categoryNames} />
+            </Section>
+
+            <Section title="PENGELUARAN BULAN INI">
+              <SpendingMix rows={mix} />
+              <Pressable onPress={() => router.push('/report')} hitSlop={8}>
+                <ThemedText type="smallBold">Lihat laporan bulanan →</ThemedText>
+              </Pressable>
+            </Section>
+
+            {(timeInsight || regret.some((r) => (r.reviewed ?? 0) > 0)) && (
+              <Section title="REFLEKSI">
+                {timeInsight && <TimeInsightCard insight={timeInsight} />}
+                <RegretInsight rows={regret} />
+              </Section>
+            )}
+
+            <Section title="TARGET TABUNGAN">
+              <Pressable onPress={() => router.push('/goals')}>
+                <ThemedView type="backgroundElement" style={[styles.card, styles.goals]}>
+                  {goals.slice(0, 3).map((g) => (
+                    <GoalProgress key={g.id} goal={g} />
+                  ))}
                   <ThemedText type="small" themeColor="textSecondary">
-                    {weeklyDue} pengeluaran: masih puas, atau menyesal?
+                    {goals.length === 0
+                      ? 'Mau menabung untuk sesuatu? Buat target tabungan →'
+                      : goals.length > 3
+                        ? `Lihat semua ${goals.length} target →`
+                        : 'Kelola target →'}
                   </ThemedText>
-                </View>
-                <ThemedText type="smallBold">Mulai →</ThemedText>
-              </ThemedView>
-            </Pressable>
-          )}
-
-          {habits && habits.milestones[0].done && (
-            <Section title="KEBIASAAN">
-              <HabitCard habits={habits} />
+                </ThemedView>
+              </Pressable>
             </Section>
-          )}
 
-          <Section title="BUDGET">
-            <BudgetCard budgets={budgets} categoryNames={categoryNames} />
-          </Section>
+            {openDebts.length > 0 && (
+              <Section title="UTANG & PIUTANG">
+                <DebtsCard debts={openDebts} />
+              </Section>
+            )}
 
-          <Section title="PENGELUARAN BULAN INI">
-            <SpendingMix rows={mix} />
-            <Pressable onPress={() => router.push('/report')} hitSlop={8}>
-              <ThemedText type="smallBold">Lihat laporan bulanan →</ThemedText>
-            </Pressable>
-          </Section>
-
-          {(timeInsight || regret.some((r) => (r.reviewed ?? 0) > 0)) && (
-            <Section title="REFLEKSI">
-              {timeInsight && <TimeInsightCard insight={timeInsight} />}
-              <RegretInsight rows={regret} />
+            <Section title="AKUN">
+              <Pressable onPress={() => router.push('/accounts')}>
+                <ThemedView type="backgroundElement" style={styles.card}>
+                  {balances.map((b) => (
+                    <View key={b.account_id} style={styles.row}>
+                      <ThemedText>{b.name}</ThemedText>
+                      <ThemedText>{hidden ? '•••••' : formatMoney(b.current_balance ?? 0)}</ThemedText>
+                    </View>
+                  ))}
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {balances.length === 0 ? 'Belum ada akun. Ketuk untuk menambahkan →' : 'Kelola akun →'}
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
             </Section>
-          )}
+          </View>
+        </View>
+      </ScrollView>
 
-          <Section title="TARGET TABUNGAN">
-            <Pressable onPress={() => router.push('/goals')}>
-              <ThemedView type="backgroundElement" style={[styles.card, styles.goals]}>
-                {goals.slice(0, 3).map((g) => (
-                  <GoalProgress key={g.id} goal={g} />
-                ))}
-                <ThemedText type="small" themeColor="textSecondary">
-                  {goals.length === 0
-                    ? 'Mau menabung untuk sesuatu? Buat target tabungan →'
-                    : goals.length > 3
-                      ? `Lihat semua ${goals.length} target →`
-                      : 'Kelola target →'}
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
-          </Section>
-
-          {openDebts.length > 0 && (
-            <Section title="UTANG & PIUTANG">
-              <DebtsCard debts={openDebts} />
-            </Section>
-          )}
-
-          <Section title="AKUN">
-            <Pressable onPress={() => router.push('/accounts')}>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                {balances.map((b) => (
-                  <View key={b.account_id} style={styles.row}>
-                    <ThemedText>{b.name}</ThemedText>
-                    <ThemedText>{formatMoney(b.current_balance ?? 0)}</ThemedText>
-                  </View>
-                ))}
-                <ThemedText type="small" themeColor="textSecondary">
-                  {balances.length === 0 ? 'Belum ada akun. Ketuk untuk menambahkan →' : 'Kelola akun →'}
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
-          </Section>
-        </ScrollView>
-
+      {/* On a laptop the sidebar has the Catat button. */}
+      {!wide && (
         <Pressable
           onPress={() => router.push('/quick-log')}
           style={({ pressed }) => [styles.fab, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
@@ -290,8 +356,67 @@ export default function HomeScreen() {
             + Catat
           </ThemedText>
         </Pressable>
-      </SafeAreaView>
+      )}
     </ThemedView>
+  );
+}
+
+function greeting(now = new Date()) {
+  const hour = now.getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
+/** Whether amounts on Beranda are masked; remembered on this device. */
+function useHiddenBalance() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(HIDDEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () =>
+    setHidden((h) => {
+      try {
+        localStorage.setItem(HIDDEN_KEY, h ? '0' : '1');
+      } catch {
+        // Not remembered; it still toggles for now.
+      }
+      return !h;
+    });
+  return [hidden, toggle] as const;
+}
+
+function TodoRow({
+  material,
+  sf,
+  title,
+  detail,
+  onPress,
+}: {
+  material: string;
+  sf: string;
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
+      <ThemedView type="backgroundElement" style={[styles.card, styles.todo]}>
+        <AppSymbol material={material} sf={sf} size={22} color={theme.primary} />
+        <View style={styles.flex}>
+          <ThemedText type="smallBold">{title}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {detail}
+          </ThemedText>
+        </View>
+        <AppSymbol material="chevron_right" sf="chevron.right" size={20} color={theme.textSecondary} />
+      </ThemedView>
+    </Pressable>
   );
 }
 
@@ -339,18 +464,83 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
-  content: {
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
+  scroll: {
     paddingBottom: BottomTabInset + Spacing.six + Spacing.four,
+  },
+  scrollWide: {
+    paddingBottom: Spacing.five,
+  },
+  band: {
+    height: 170,
+    overflow: 'hidden',
+  },
+  bandInner: {
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+  },
+  // Soft shapes in the band, echoing the sun-over-waves mark (same as Pengaturan).
+  bubble: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  bubbleOne: {
+    width: 120,
+    height: 120,
+    right: -20,
+    top: -30,
+    opacity: 0.9,
+  },
+  bubbleTwo: {
+    width: 260,
+    height: 260,
+    right: -60,
+    top: 70,
+    opacity: 0.08,
+  },
+  greetingSmall: {
+    opacity: 0.85,
+  },
+  greeting: {
+    fontSize: 24,
+    lineHeight: 32,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  body: {
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.three,
+    marginTop: -BAND_OVERLAP,
     gap: Spacing.four,
+  },
+  bodyWide: {
+    maxWidth: WideContentWidth,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: Spacing.four,
+  },
+  column: {
+    gap: Spacing.four,
+  },
+  leftColumn: {
+    width: 420,
+  },
+  rightColumn: {
+    flex: 1,
+    // Starts below the band, on the page background.
+    paddingTop: BAND_OVERLAP + Spacing.two,
   },
   total: {
     fontSize: 36,
@@ -361,24 +551,17 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   card: {
-    gap: Spacing.two,
+    gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Spacing.four,
   },
   goals: {
     gap: Spacing.three,
   },
-  coachIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewCard: {
+  todo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    borderRadius: Spacing.three,
   },
   flex: {
     flex: 1,

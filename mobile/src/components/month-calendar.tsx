@@ -1,0 +1,158 @@
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { AppSymbol } from '@/components/app-symbol';
+import { ThemedText } from '@/components/themed-text';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { addMonths, dateKey, type DayTotals, monthGrid, sameDay, shortAmount, WEEKDAYS } from '@/lib/calendar';
+import { getCurrency } from '@/lib/money';
+
+const monthFormat = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
+
+type Props = {
+  month: Date;
+  onMonthChange: (month: Date) => void;
+  selected?: Date | null;
+  onSelect?: (day: Date) => void;
+  /** Per-day income/spending; when given, each day shows its net, tinted green or red. */
+  totals?: Map<string, DayTotals>;
+  /** Days after this can't be picked, and months after it can't be opened. */
+  maxDate?: Date;
+};
+
+/** Month grid, Monday first. Used as the Kalender tab's main view and as a compact date picker. */
+export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals, maxDate }: Props) {
+  const theme = useTheme();
+  const today = new Date();
+  const decimals = getCurrency().decimals;
+  const canGoNext = !maxDate || addMonths(month, 1) <= maxDate;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Pressable onPress={() => onMonthChange(addMonths(month, -1))} hitSlop={12} style={styles.arrow} accessibilityLabel="Bulan sebelumnya">
+          <AppSymbol material="chevron_left" sf="chevron.left" size={24} color={theme.text} />
+        </Pressable>
+        <ThemedText type="smallBold" style={styles.title}>
+          {monthFormat.format(month)}
+        </ThemedText>
+        <Pressable
+          onPress={() => onMonthChange(addMonths(month, 1))}
+          disabled={!canGoNext}
+          hitSlop={12}
+          style={[styles.arrow, !canGoNext && styles.disabled]}
+          accessibilityLabel="Bulan berikutnya">
+          <AppSymbol material="chevron_right" sf="chevron.right" size={24} color={theme.text} />
+        </Pressable>
+      </View>
+
+      <View style={styles.week}>
+        {WEEKDAYS.map((d) => (
+          <ThemedText key={d} type="small" themeColor="textSecondary" style={styles.weekday}>
+            {d}
+          </ThemedText>
+        ))}
+      </View>
+
+      {monthGrid(month).map((week, i) => (
+        <View key={i} style={styles.week}>
+          {week.map((day, j) => {
+            if (!day) return <View key={j} style={styles.cell} />;
+            const t = totals?.get(dateKey(day));
+            const net = t ? t.in - t.out : 0;
+            const isSelected = !!selected && sameDay(day, selected);
+            const isToday = sameDay(day, today);
+            const disabled = !!maxDate && day > maxDate;
+            const background = isSelected
+              ? theme.primary
+              : t && net > 0
+                ? theme.positiveSoft
+                : t && net < 0
+                  ? theme.negativeSoft
+                  : theme.backgroundElement;
+            const ink = isSelected ? theme.onPrimary : net > 0 ? theme.positive : net < 0 ? theme.danger : theme.text;
+            return (
+              <Pressable
+                key={j}
+                disabled={disabled || !onSelect}
+                onPress={() => onSelect?.(day)}
+                style={({ pressed }) => [
+                  styles.cell,
+                  styles.day,
+                  totals ? styles.tall : styles.short,
+                  { backgroundColor: background },
+                  isToday && !isSelected && { borderColor: theme.primary, borderWidth: 1.5 },
+                  disabled && styles.disabled,
+                  pressed && styles.pressed,
+                ]}>
+                <ThemedText type={isToday ? 'smallBold' : 'small'} style={{ color: isSelected ? theme.onPrimary : theme.text }}>
+                  {day.getDate()}
+                </ThemedText>
+                {totals && (
+                  <ThemedText type="smallBold" numberOfLines={1} adjustsFontSizeToFit style={[styles.value, { color: ink }]}>
+                    {t && net !== 0 ? shortAmount(net / 10 ** decimals) : '—'}
+                  </ThemedText>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    gap: Spacing.one + Spacing.half,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.one,
+  },
+  arrow: {
+    padding: Spacing.one,
+  },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+  },
+  week: {
+    flexDirection: 'row',
+    gap: Spacing.one + Spacing.half,
+  },
+  weekday: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  cell: {
+    flex: 1,
+  },
+  day: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Spacing.two + Spacing.one,
+  },
+  short: {
+    paddingVertical: Spacing.two,
+  },
+  tall: {
+    minHeight: 56,
+    paddingVertical: Spacing.one,
+    gap: Spacing.half,
+  },
+  // Sized so "−127rb" fits a 360px-wide phone's cell (adjustsFontSizeToFit does nothing on web).
+  value: {
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: -0.2,
+  },
+  disabled: {
+    opacity: 0.3,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+});

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { MonthCalendar } from '@/components/month-calendar';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,11 +27,22 @@ function onDay(d: Date, days: number) {
 
 type Props = { value: Date; onChange: (value: Date) => void };
 
-/** Day stepper plus a HH:MM field. Plain components, so it works the same on phones and web. Never goes past today. */
+/**
+ * Day stepper (tap the date for a month calendar) plus a HH:MM field. Plain components, so it works the same on
+ * phones and web. Never goes past today.
+ */
 export function DateTimeField({ value, onChange }: Props) {
   const theme = useTheme();
   const [time, setTime] = useState(timeText(value));
+  const [picking, setPicking] = useState(false);
+  const [month, setMonth] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
   const ago = daysAgo(value);
+  const endOfToday = new Date(startOfDay(new Date()).getTime() + 86_400_000 - 1);
+
+  function pickDay(day: Date) {
+    onChange(new Date(day.getFullYear(), day.getMonth(), day.getDate(), value.getHours(), value.getMinutes()));
+    setPicking(false);
+  }
 
   function commitTime() {
     const match = /^(\d{1,2})[:.]?(\d{2})$/.exec(time.trim());
@@ -52,9 +64,18 @@ export function DateTimeField({ value, onChange }: Props) {
         <Pressable onPress={() => onChange(onDay(value, ago + 1))} hitSlop={8} style={styles.arrow}>
           <ThemedText type="smallBold">‹</ThemedText>
         </Pressable>
-        <ThemedText type="smallBold" style={styles.day}>
-          {dayFormat.format(value)}
-        </ThemedText>
+        <Pressable
+          onPress={() => {
+            setMonth(new Date(value.getFullYear(), value.getMonth(), 1));
+            setPicking((p) => !p);
+          }}
+          style={styles.day}
+          accessibilityRole="button"
+          accessibilityLabel="Pilih tanggal di kalender">
+          <ThemedText type="smallBold" style={styles.dayText}>
+            {dayFormat.format(value)} {picking ? '▴' : '▾'}
+          </ThemedText>
+        </Pressable>
         <Pressable
           disabled={ago <= 0}
           onPress={() => onChange(onDay(value, ago - 1))}
@@ -63,6 +84,12 @@ export function DateTimeField({ value, onChange }: Props) {
           <ThemedText type="smallBold">›</ThemedText>
         </Pressable>
       </View>
+
+      {picking && (
+        <View style={[styles.calendar, box]}>
+          <MonthCalendar month={month} onMonthChange={setMonth} selected={value} onSelect={pickDay} maxDate={endOfToday} />
+        </View>
+      )}
 
       <View style={styles.row}>
         {[
@@ -110,7 +137,14 @@ const styles = StyleSheet.create({
   },
   day: {
     flex: 1,
+    paddingVertical: Spacing.two,
+  },
+  dayText: {
     textAlign: 'center',
+  },
+  calendar: {
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
   },
   row: {
     flexDirection: 'row',

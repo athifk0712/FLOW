@@ -92,8 +92,8 @@ export function computeHabits(input: HabitInput, now = new Date()): Habits {
       hint: 'Seminggu penuh (Senin–Minggu) dengan minimal 3 pengeluaran dinilai, tanpa satu pun impulsif.',
       done: lastWeek.filter((t) => t.necessity).length >= 3 && !lastWeek.some((t) => t.necessity === 'IMPULSE'),
     },
-    { key: 'first-chat', title: 'Obrolan pertama', hint: 'Menyelesaikan satu ngobrol malam dengan Flowku.', done: input.chatCount > 0 },
-    { key: 'chat-7', title: 'Seminggu bercerita', hint: 'Tujuh kali ngobrol malam sampai selesai.', done: input.chatCount >= 7 },
+    { key: 'first-chat', title: 'Cek harian pertama', hint: 'Menyelesaikan satu cek harian.', done: input.chatCount > 0 },
+    { key: 'chat-7', title: 'Seminggu rutin', hint: 'Tujuh kali cek harian sampai selesai.', done: input.chatCount >= 7 },
     { key: 'goal', title: 'Target tercapai', hint: 'Satu target tabungan terkumpul penuh.', done: input.goalReached },
   ];
 

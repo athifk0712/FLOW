@@ -5,12 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppSymbol } from '@/components/app-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { useLockSettings } from '@/lib/app-lock';
 import { APPEARANCE_OPTIONS, useAppearance } from '@/lib/appearance';
 import { useCurrency } from '@/lib/money';
+import { closeModal } from '@/lib/navigation';
 import { useSession } from '@/providers/session-provider';
 
 type Row = {
@@ -24,7 +25,7 @@ type Row = {
 };
 
 // Pengaturan as one calm list: a profile card on top, then grouped rows with an icon and a chevron.
-// Each row opens its own page, so this screen stays short.
+// Each row opens its own page, so this screen stays short. Opened from the gear on Beranda.
 export default function SettingsScreen() {
   const theme = useTheme();
   const { session } = useSession();
@@ -83,8 +84,11 @@ export default function SettingsScreen() {
           <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
           <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
           <SafeAreaView edges={['top', 'left', 'right']} style={styles.heroInner}>
+            <Pressable onPress={closeModal} hitSlop={12} style={styles.back} accessibilityLabel="Kembali">
+              <AppSymbol material="arrow_back" sf="chevron.left" size={24} color={theme.onPrimary} />
+            </Pressable>
             <ThemedText type="subtitle" style={{ color: theme.onPrimary }}>
-              Profilku
+              Pengaturan
             </ThemedText>
           </SafeAreaView>
         </View>
@@ -115,7 +119,7 @@ export default function SettingsScreen() {
               style={({ pressed }) => [styles.strip, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
               <AppSymbol material="verified_user" sf="checkmark.shield.fill" size={22} color={theme.onAccent} />
               <ThemedText type="smallBold" style={[styles.flex, { color: theme.onAccent }]}>
-                Simpan datamu dengan email
+                Simpan datamu dengan Google atau email
               </ThemedText>
               <View style={[styles.stripArrow, { backgroundColor: theme.onAccent }]}>
                 <AppSymbol material="arrow_forward" sf="arrow.right" size={16} color={theme.accent} />
@@ -177,7 +181,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.five,
   },
   hero: {
     height: 150,
@@ -187,8 +191,14 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
     paddingTop: Spacing.four,
+  },
+  back: {
+    padding: Spacing.one,
   },
   // Soft shapes in the band, echoing the sun-over-waves mark.
   bubble: {

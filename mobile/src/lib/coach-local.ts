@@ -44,7 +44,7 @@ const TRIGGER_TIP: Record<string, string> = {
   'Sudah direncanakan': 'Belanja yang direncanakan itu bagus. Pertahankan kebiasaan memutuskan dulu sebelum membeli.',
 };
 
-const MOODS = ['Tenang', 'Biasa saja', 'Agak menyesal', 'Khawatir soal uang'];
+const MOODS = ['Tenang', 'Biasa saja', 'Agak boros', 'Khawatir soal uang'];
 
 const time = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
 
@@ -59,7 +59,7 @@ export function startLocal(expenses: CoachExpense[]): { state: LocalState; turn:
     return {
       state,
       turn: {
-        message: 'Malam! Hari ini belum ada pengeluaran yang tercatat. Benar tidak ada uang yang keluar?',
+        message: 'Hari ini belum ada pengeluaran yang tercatat. Benar tidak ada uang yang keluar?',
         options: ['Iya, hari ini aman', 'Ada, tapi lupa dicatat'],
         done: false,
       },
@@ -70,8 +70,8 @@ export function startLocal(expenses: CoachExpense[]): { state: LocalState; turn:
     state: { ...state, step: 'necessity' },
     turn: {
       message:
-        `Malam! Ada ${expenses.length} pengeluaran yang belum dibahas, totalnya ${formatMoney(total)}. ` +
-        `Kita bahas satu per satu ya, santai saja.\n\nPertama: ${describe(expenses[0])}. Jujur, ini sebenarnya apa?`,
+        `Ada ${expenses.length} pengeluaran yang belum dilabeli, totalnya ${formatMoney(total)}.\n\n` +
+        `Pertama: ${describe(expenses[0])}. Ini termasuk apa?`,
       options: NECESSITY_OPTIONS.map((o) => o.label),
       done: false,
     },
@@ -93,7 +93,7 @@ function askNext(state: LocalState, prefix: string): { state: LocalState; turn: 
   return {
     state: { ...state, index: next, step: 'mood' },
     turn: {
-      message: `${prefix}Sudah semua. Satu lagi: setelah melihat pengeluaran hari ini, perasaanmu bagaimana?`,
+      message: `${prefix}Sudah semua. Terakhir: menurutmu pengeluaran hari ini bagaimana?`,
       options: MOODS,
       done: false,
     },
@@ -108,8 +108,8 @@ export function answerLocal(state: LocalState, answer: string): { state: LocalSt
       state: { ...state, step: 'done' },
       turn: {
         message: forgot
-          ? 'Tidak apa-apa, sering terjadi. Catat sekarang selagi masih ingat, nanti kita bahas besok malam.'
-          : 'Hari tanpa pengeluaran itu kecil tapi berarti. Istirahat yang nyenyak!',
+          ? 'Catat sekarang selagi masih ingat, nanti bisa dilabeli di cek harian berikutnya.'
+          : 'Hari tanpa pengeluaran. Mantap!',
         options: [],
         done: true,
         summary: forgot ? 'Ada pengeluaran yang belum dicatat.' : 'Tidak ada pengeluaran hari ini.',
@@ -128,8 +128,8 @@ export function answerLocal(state: LocalState, answer: string): { state: LocalSt
         turn: {
           message:
             necessity === 'IMPULSE'
-              ? 'Makasih sudah jujur, itu langkah paling penting. Kira-kira apa yang bikin tiba-tiba beli?'
-              : 'Oke, keinginan juga wajar. Apa yang mendorongmu membelinya?',
+              ? 'Tercatat impulsif. Pemicunya apa?'
+              : 'Tercatat keinginan. Pemicunya apa?',
           options: TRIGGERS,
           done: false,
         },
@@ -149,7 +149,7 @@ export function answerLocal(state: LocalState, answer: string): { state: LocalSt
     return { state: done, turn: { message: summary, options: [], done: true, summary } };
   }
 
-  return { state, turn: { message: 'Obrolan malam ini sudah selesai.', options: [], done: true } };
+  return { state, turn: { message: 'Cek harian sudah selesai.', options: [], done: true } };
 }
 
 /** The closing message: what was judged, how much went to wants, and one tip for the most common trigger. */
@@ -164,12 +164,12 @@ export function summarizeLocal(state: LocalState): string {
 
   const lines = [
     wants.length === 0
-      ? `Semua pengeluaran yang kita bahas (${formatMoney(total)}) untuk kebutuhan. Mantap!`
-      : `Dari ${formatMoney(total)} yang kita bahas, ${formatMoney(wantTotal)} untuk keinginan (${Math.round((wantTotal / Math.max(total, 1)) * 100)}%).`,
+      ? `Semua pengeluaran yang dilabeli (${formatMoney(total)}) untuk kebutuhan. Mantap!`
+      : `Dari ${formatMoney(total)} yang dilabeli, ${formatMoney(wantTotal)} untuk keinginan (${Math.round((wantTotal / Math.max(total, 1)) * 100)}%).`,
   ];
   if (topTrigger) lines.push(`Tips untuk besok: ${TRIGGER_TIP[topTrigger] ?? ''}`);
   if (state.mood === 'Khawatir soal uang') lines.push('Kalau sedang khawatir, lihat kartu Aman dibelanjakan di Beranda: itu batas harian yang masih aman.');
-  else if (state.mood === 'Agak menyesal') lines.push('Menyesal itu tanda kamu peduli. Besok kita coba lagi, pelan-pelan.');
+  else if (state.mood === 'Agak boros') lines.push('Besok coba tahan satu pengeluaran keinginan dulu.');
   lines.push('Selamat istirahat!');
   return lines.join('\n\n');
 }

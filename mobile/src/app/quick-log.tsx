@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useEffectEvent, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { CategoryIcon } from '@/components/category-icon';
+import { DateTimeField } from '@/components/date-time-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
 import { formatMoney, getCurrency } from '@/lib/money';
@@ -29,7 +31,7 @@ const MODES: { value: Mode; label: string }[] = [
 ];
 
 const SAVE_LABEL: Record<Mode, string> = {
-  EXPENSE: 'SIMPAN (dibahas nanti malam)',
+  EXPENSE: 'SIMPAN PENGELUARAN',
   INCOME: 'SIMPAN PEMASUKAN',
   TRANSFER: 'SIMPAN TRANSFER',
 };
@@ -39,6 +41,10 @@ const FROM_LABEL: Record<Mode, string> = {
   INCOME: 'Masuk ke akun',
   TRANSFER: 'Dari akun',
 };
+
+const whenFormat = new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+const QUICK_LOG_WIDTH = 520;
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'del'] as const;
 const MAX_DIGITS = 12;
@@ -62,6 +68,9 @@ export default function QuickLogScreen() {
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null = "now"; set when logging something from earlier (e.g. yesterday's lunch).
+  const [occurredAt, setOccurredAt] = useState<Date | null>(null);
+  const [pickingDate, setPickingDate] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -148,11 +157,31 @@ export default function QuickLogScreen() {
         : mode === 'INCOME'
           ? { type: mode, amount, to_account_id: accountId, category_id: categoryId }
           : { type: mode, amount, from_account_id: accountId, to_account_id: toAccountId };
+    if (occurredAt) row.occurred_at = occurredAt.toISOString();
     const { error } = await supabase.from('transactions').insert(row);
     setSaving(false);
     if (error) return setError(error.message);
     closeModal();
   }
+
+  // On a laptop: type the amount, Backspace to correct, Enter to save. Ignored while typing in a text field.
+  const onKey = useEffectEvent((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) press(e.key as (typeof KEYS)[number]);
+    else if (e.key === 'Backspace') press('del');
+    else if (e.key === 'Enter') save();
+    else if (e.key === 'Escape') closeModal();
+    else return;
+    e.preventDefault();
+  });
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const listener = (e: KeyboardEvent) => onKey(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
 
   const chip = (selected: boolean) => [
     styles.chip,
@@ -187,9 +216,24 @@ export default function QuickLogScreen() {
           ))}
         </View>
 
+        {/* Scrolls when the date calendar is open on a short phone screen; keypad and save stay put. */}
+        <ScrollView style={styles.middle} contentContainerStyle={styles.middleContent} keyboardShouldPersistTaps="handled">
         <ThemedText style={styles.amount} numberOfLines={1} adjustsFontSizeToFit>
           {formatMoney(amount)}
         </ThemedText>
+
+        <Pressable
+          onPress={() => setPickingDate((p) => !p)}
+          style={({ pressed }) => [styles.when, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Ubah tanggal transaksi">
+          <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
+          <ThemedText type="small">{occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}</ThemedText>
+          <ThemedText type="smallBold" themeColor="primary">
+            {pickingDate ? 'Selesai' : 'Ubah'}
+          </ThemedText>
+        </Pressable>
+        {pickingDate && <DateTimeField value={occurredAt ?? new Date()} onChange={setOccurredAt} />}
 
         <ThemedText type="small" themeColor="textSecondary">
           {FROM_LABEL[mode]}
@@ -271,8 +315,10 @@ export default function QuickLogScreen() {
         )}
 
         {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+        </ScrollView>
 
-        <View style={styles.keypad}>
+        {/* While the calendar is open it takes the keypad's place, so everything fits on a phone. */}
+        <View style={[styles.keypad, pickingDate && styles.hidden]}>
           {KEYS.map((key) => (
             <Pressable
               key={key}
@@ -324,6 +370,21 @@ function describeBudget(budgets: CategoryBudget[], categories: Category[], categ
 }
 
 const styles = StyleSheet.create({
+  middle: {
+    flex: 1,
+  },
+  middleContent: {
+    gap: Spacing.two,
+  },
+  when: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
+  },
   iconChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,7 +398,8 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    maxWidth: MaxContentWidth,
+    // Narrower than other screens: a keypad stretched across a laptop is hard to use.
+    maxWidth: QUICK_LOG_WIDTH,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     gap: Spacing.two,
@@ -407,6 +469,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.35,
+  },
+  hidden: {
+    display: 'none',
   },
   pressed: {
     opacity: 0.7,

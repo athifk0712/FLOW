@@ -23,15 +23,14 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="clock" md="history" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="calendar">
+        <NativeTabs.Trigger.Label>Kalender</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="calendar" md="calendar_month" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="charts">
         <NativeTabs.Trigger.Label>Diagram</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'chart.pie', selected: 'chart.pie.fill' }} md="pie_chart" />
-      </NativeTabs.Trigger>
-
-
-      <NativeTabs.Trigger name="settings">
-        <NativeTabs.Trigger.Label>Pengaturan</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

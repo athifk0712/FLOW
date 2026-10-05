@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,45 +12,70 @@ import { formatMoney } from '@/lib/money';
 import type { SafeToSpend } from '@/lib/safe-to-spend';
 
 const dayFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
+const HIDDEN = '•••••••';
+
+type Props = {
+  data: SafeToSpend;
+  cash: number;
+  until: string;
+  /** Amounts masked, e.g. when someone is looking over your shoulder. */
+  hidden?: boolean;
+  onToggleHidden?: () => void;
+  /** Shown under the headline numbers (Beranda puts its quick actions here). */
+  children?: React.ReactNode;
+};
 
 /**
  * The one number to check before spending. Calm by default: the breakdown stays folded until asked for,
  * and a shortfall is worded as a pause, not an alarm.
  */
-export function SafeToSpendCard({ data, cash, until }: { data: SafeToSpend; cash: number; until: string }) {
+export function SafeToSpendCard({ data, cash, until, hidden = false, onToggleHidden, children }: Props) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const short = data.safe < 0;
   const overToday = !short && data.leftToday < 0;
   const spentToday = data.dailyLimit - data.leftToday;
+  const money = (amount: number) => (hidden ? HIDDEN : formatMoney(amount));
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <View style={styles.head}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Aman dibelanjakan
-        </ThemedText>
+        <View style={styles.labelRow}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Aman dibelanjakan
+          </ThemedText>
+          {onToggleHidden && (
+            <Pressable onPress={onToggleHidden} hitSlop={12} accessibilityLabel={hidden ? 'Tampilkan saldo' : 'Sembunyikan saldo'}>
+              <AppSymbol
+                material={hidden ? 'visibility_off' : 'visibility'}
+                sf={hidden ? 'eye.slash' : 'eye'}
+                size={18}
+                color={theme.textSecondary}
+              />
+            </Pressable>
+          )}
+        </View>
         <ThemedText style={[styles.amount, short && { color: theme.warning }]}>
-          {short ? formatMoney(0) : formatMoney(data.safe)}
+          {hidden ? HIDDEN : short ? formatMoney(0) : formatMoney(data.safe)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {data.daysLeft} hari lagi sampai {until}
+          Total saldo {hidden ? HIDDEN : formatMoney(cash)} · {data.daysLeft} hari lagi sampai {until}
         </ThemedText>
       </View>
 
       {short ? (
         <ThemedText type="small" themeColor="warning">
-          Kebutuhan wajib sampai {until} melebihi saldomu {formatMoney(-data.safe)}. Tahan dulu belanja keinginan,
+          Kebutuhan wajib sampai {until} melebihi saldomu {money(-data.safe)}. Tahan dulu belanja keinginan,
           ya.
         </ThemedText>
       ) : (
         <View style={styles.today}>
           <View style={styles.row}>
             <ThemedText type="smallBold">
-              {overToday ? `Lewat ${formatMoney(-data.leftToday)} hari ini` : `Sisa hari ini ${formatMoney(data.leftToday)}`}
+              {overToday ? `Lewat ${money(-data.leftToday)} hari ini` : `Sisa hari ini ${money(data.leftToday)}`}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              dari {formatMoney(data.dailyLimit)}/hari
+              dari {money(data.dailyLimit)}/hari
             </ThemedText>
           </View>
           <ProgressBar
@@ -97,6 +123,7 @@ export function SafeToSpendCard({ data, cash, until }: { data: SafeToSpend; cash
           <Line label="Aman dibelanjakan" amount={data.safe} bold />
         </View>
       )}
+      {children}
     </ThemedView>
   );
 }
@@ -123,6 +150,11 @@ const styles = StyleSheet.create({
   },
   head: {
     gap: Spacing.half,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   amount: {
     fontSize: 36,

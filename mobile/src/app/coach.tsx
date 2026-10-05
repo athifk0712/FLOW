@@ -34,7 +34,7 @@ type Bubble = { role: 'user' | 'assistant'; text: string };
 
 const FORGOT = 'Ada, tapi lupa dicatat';
 
-// "Ngobrol malam": every evening Flowku talks through the day's spending, one question at a time, labels
+// "Cek harian": every evening Flowku talks through the day's spending, one question at a time, labels
 // each expense from the answers, and closes with a takeaway. AI when available, a scripted chat otherwise.
 export default function CoachScreen() {
   const theme = useTheme();
@@ -149,12 +149,12 @@ export default function CoachScreen() {
           <View style={styles.header}>
             <View style={styles.headerTitle}>
               <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                <AppSymbol material="nightlight" sf="moon.stars.fill" size={18} color={theme.accent} />
+                <AppSymbol material="checklist" sf="checklist" size={18} color={theme.onPrimary} />
               </View>
               <View>
-                <ThemedText type="smallBold">Ngobrol malam</ThemedText>
+                <ThemedText type="smallBold">Cek harian</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {mode === 'ai' ? 'Flowku AI' : mode === 'local' ? 'Mode tanpa AI' : 'Menyiapkan…'}
+                  {mode ? 'Tandai pengeluaranmu' : 'Menyiapkan…'}
                 </ThemedText>
               </View>
             </View>
@@ -173,12 +173,12 @@ export default function CoachScreen() {
             keyboardShouldPersistTaps="handled">
             {mode === 'local' && aiNote && (
               <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-                AI belum aktif, jadi malam ini pakai obrolan singkat tanpa AI. Penilaianmu tetap tersimpan.
+                Pakai versi cepat dulu. Labelmu tetap tersimpan.
               </ThemedText>
             )}
             {finishedEarlier && (
               <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
-                Kamu sudah ngobrol malam ini. Ini catatannya.
+                Cek harian hari ini sudah selesai. Ini catatannya.
               </ThemedText>
             )}
             {bubbles.map((b, i) => (
@@ -268,7 +268,7 @@ export default function CoachScreen() {
               {finishedEarlier && (
                 <Pressable onPress={start} hitSlop={8} style={styles.again}>
                   <ThemedText type="smallBold" themeColor="textSecondary">
-                    Ngobrol lagi
+                    Ulangi cek
                   </ThemedText>
                 </Pressable>
               )}

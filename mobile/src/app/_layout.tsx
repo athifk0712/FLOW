@@ -79,6 +79,7 @@ function RootNavigator() {
           <Stack.Screen name="security" options={{ presentation: 'modal' }} />
           <Stack.Screen name="backup" options={{ presentation: 'modal' }} />
           <Stack.Screen name="pin-setup" options={{ presentation: 'modal', gestureEnabled: false }} />
+          <Stack.Screen name="settings" />
         </Stack.Protected>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />

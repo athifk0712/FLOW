@@ -40,7 +40,7 @@ const BUDGET_SUGGESTIONS = [200_000, 350_000, 500_000];
 
 const VALUES = [
   { title: 'Catat dalam dua ketukan', body: 'Nominal, kategori, selesai. Tidak perlu mikir panjang saat belanja.' },
-  { title: 'Ngobrol santai tiap malam', body: 'Flowku menanyakan pengeluaran hari itu: butuh, ingin, atau impulsif? Tanpa menghakimi.' },
+  { title: 'Cek harian satu menit', body: 'Tandai pengeluaran hari itu: butuh, ingin, atau impulsif. Cukup beberapa ketukan.' },
   { title: 'Lihat polanya', body: 'Diagram bulanan dan saran kecil untuk besok, dari kebiasaanmu sendiri.' },
 ];
 
@@ -282,8 +282,8 @@ export default function OnboardingScreen() {
                 <View style={styles.titleBlock}>
                   <ThemedText type="subtitle">Siap. Pelan-pelan saja.</ThemedText>
                   <ThemedText themeColor="textSecondary">
-                    Setiap kali keluar uang, tekan &quot;+ Catat&quot;. Malamnya, Flowku akan mengajakmu ngobrol
-                    soal pengeluaran hari itu.
+                    Setiap kali keluar uang, tekan &quot;+ Catat&quot;. Malamnya, tandai pengeluaran hari itu lewat
+                    Cek harian.
                   </ThemedText>
                 </View>
               </>

@@ -1,4 +1,4 @@
-// "Ngobrol malam": a short evening chat about the day's money with Gemini. Each call gets the transcript so
+// "Cek harian": a quick daily step where Gemini helps label the day's expenses. Each call gets the transcript so
 // far, re-reads the user's data (as the calling user, so RLS applies), and returns the coach's next turn:
 // a message, a few tap-to-answer options, and any necessity tags the user has confirmed, which are saved.
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -15,7 +15,7 @@ type Necessity = (typeof NECESSITY)[number];
 const TURN_SCHEMA = {
   type: 'object',
   properties: {
-    message: { type: 'string', description: 'What Flowku says now, in casual Indonesian. 1-4 short sentences.' },
+    message: { type: 'string', description: 'What Flowku says now, in casual Indonesian. 1-2 short sentences.' },
     options: {
       type: 'array',
       items: { type: 'string' },
@@ -49,24 +49,28 @@ type ChatMessage = { role: 'user' | 'assistant'; text: string };
 
 const ZERO_DECIMAL = new Set(['IDR', 'JPY', 'KRW', 'VND']);
 
-const SYSTEM = `You are Flowku, a calm, warm money companion inside a personal-finance app used mostly in Indonesia.
-Every evening you have a short chat with the user about the money that moved today. Your goals, in order:
-1. Help the user label each of today's unlabeled expenses honestly: NEED (kebutuhan pokok), IMPORTANT (penting tapi
-   bisa ditunda), WANT (keinginan), or IMPULSE (impulsif, tidak direncanakan).
-2. Understand why: when something was a want or an impulse, ask one gentle follow-up about the trigger (lapar, bosan,
-   stres, promo, ikut teman, ...) or the feeling, and branch from the answer.
-3. Close with a short, specific takeaway grounded in their numbers (budget left, safe-to-spend, patterns) and one
-   small, concrete thing to try tomorrow.
+const SYSTEM = `You are Flowku's "Cek harian" (daily check) inside a personal-finance app used mostly in Indonesia: a quick
+step where the user labels today's expenses. You are a money tool, not a counselor or a chat buddy.
 
-How to talk:
-- Casual, kind Indonesian ("kamu"), never judgmental, never preachy. Short messages; this is a phone chat at night.
-- Ask exactly one question per turn and give 2-4 short answer options that fit it. The user can also type freely.
-- Group small similar expenses (e.g. several coffees) into one question instead of asking about each.
+What to do, in order:
+1. Get each unlabeled expense labeled as NEED (kebutuhan pokok), IMPORTANT (penting tapi bisa ditunda), WANT
+   (keinginan) or IMPULSE (impulsif, tidak direncanakan). Group small similar expenses (e.g. several coffees) into one
+   question.
+2. For a WANT or IMPULSE you may ask at most ONE short trigger question in the whole check (lapar, bosan, promo, ikut
+   teman, ...), with tap options. Do not ask about feelings or mood and do not dig further.
+3. Close with one short takeaway grounded in their numbers (budget left, safe-to-spend, how much went to wants) and
+   one small, concrete thing to try tomorrow.
+
+Style:
+- Casual Indonesian ("kamu"), 1-2 short sentences per turn, like an app prompt, not a conversation.
+- No emotional validation or small talk ("makasih sudah jujur", "gimana harimu", "gimana perasaanmu").
+- Label options are always in Indonesian: "Butuh", "Penting", "Ingin", "Impulsif". Never show the English codes.
 - Only use amounts and facts from the data you are given; quote amounts exactly as given in amount_text.
 - Put a label in "tags" only when the user's latest answer makes it clear; use the exact transaction ids given.
-- Aim to finish within about 4-8 of your turns. If there is nothing to discuss, ask how the day went money-wise and
-  close warmly. Set done=true only on the closing turn, with options=[] and a summary.
-- If the user wants to stop, close immediately and kindly.
+- Finish within about 2-6 of your turns. If there is nothing to label, say so in one line and close right away
+  (done=true) without asking anything. Set done=true only on the closing turn, with options=[] and a summary.
+- If the user writes about something unrelated, steer back to the expenses in one sentence. If they want to stop,
+  close immediately.
 - This is not professional financial advice; don't recommend specific investments or loans.`;
 
 function json(body: unknown, status = 200) {
@@ -148,7 +152,7 @@ Deno.serve(async (req) => {
     remaining_text: amountText(b.remaining ?? 0),
   }));
 
-  // The data block comes first and stays identical for the whole chat.
+  // The data block comes first and stays identical for the whole check.
   const context = JSON.stringify({
     currency,
     today_transactions: todayRows,
@@ -165,7 +169,7 @@ Deno.serve(async (req) => {
   const contents: GeminiContent[] = [
     {
       role: 'user',
-      parts: [{ text: `Data for tonight's chat (JSON):\n${context}` }, { text: 'Mulai obrolan malam ini.' }],
+      parts: [{ text: `Data for today's check (JSON):\n${context}` }, { text: 'Mulai cek harian.' }],
     },
     ...messages.map((m): GeminiContent => ({
       role: m.role === 'assistant' ? 'model' : 'user',

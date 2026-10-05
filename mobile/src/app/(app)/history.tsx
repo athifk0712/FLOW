@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
+import { TransactionItem } from '@/components/transaction-item';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables } from '@/lib/database.types';
@@ -21,7 +21,7 @@ import {
 } from '@/lib/history-filters';
 import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
-import { TRANSACTION_SELECT, transactionTitle, type TransactionRow } from '@/lib/transactions';
+import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
@@ -38,7 +38,6 @@ const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 350;
 
 const dayFormat = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
 
 function dayKey(iso: string) {
   const d = new Date(iso);
@@ -309,7 +308,7 @@ export default function HistoryScreen() {
                 )}
               </View>
             )}
-            renderItem={({ item }) => <HistoryItem item={item} />}
+            renderItem={({ item }) => <TransactionItem item={item} />}
             ListEmptyComponent={
               <ThemedText themeColor="textSecondary" style={styles.empty}>
                 {narrowed ? 'Tidak ada transaksi yang cocok.' : 'Belum ada transaksi.'}
@@ -320,45 +319,6 @@ export default function HistoryScreen() {
         )}
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-function HistoryItem({ item }: { item: TransactionRow }) {
-  const theme = useTheme();
-  const sign = item.type === 'EXPENSE' ? '-' : item.type === 'INCOME' ? '+' : '';
-  const dotColor =
-    item.type === 'EXPENSE' ? (item.necessity ? NECESSITY[item.necessity].color : UNREVIEWED_COLOR) : null;
-  const account =
-    item.type === 'TRANSFER'
-      ? `${item.from_account?.name ?? '-'} → ${item.to_account?.name ?? '-'}`
-      : ((item.type === 'INCOME' ? item.to_account : item.from_account)?.name ?? '-');
-
-  return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: item.id } })}
-      style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView type="backgroundElement" style={styles.row}>
-        <View>
-          <CategoryIcon icon={item.type === 'TRANSFER' ? 'transfer' : item.categories?.icon} size={38} />
-          {dotColor && (
-            <View
-              style={[styles.dot, styles.dotBadge, { backgroundColor: dotColor, borderColor: theme.backgroundElement }]}
-            />
-          )}
-        </View>
-        <View style={styles.rowText}>
-          <ThemedText numberOfLines={1}>{transactionTitle(item)}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-            {timeFormat.format(new Date(item.occurred_at))} · {account}
-            {item.receipt_id ? ' · ada struk' : ''}
-          </ThemedText>
-        </View>
-        <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: theme.primary }}>
-          {sign}
-          {formatMoney(item.amount)}
-        </ThemedText>
-      </ThemedView>
-    </Pressable>
   );
 }
 
@@ -433,28 +393,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: Spacing.three,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  rowText: {
-    flex: 1,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  // Necessity tag as a small dot on the icon's corner.
-  dotBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    borderWidth: 2,
   },
   empty: {
     textAlign: 'center',
