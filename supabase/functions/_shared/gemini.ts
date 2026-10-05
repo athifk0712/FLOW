@@ -1,18 +1,18 @@
 // Minimal Gemini API client (REST generateContent) shared by the edge functions. Asks for JSON matching a
 // schema and returns the parsed object, or a GeminiError carrying the HTTP status to send back to the app.
-// Tried in order: when one is overloaded or rate-limited, the next one answers instead. The flash-lite models
-// sit on separate capacity, so they often still answer when the bigger ones are busy (common on the free tier).
-export const GEMINI_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
+// Tried in order until one answers. Flash-Lite first: it is the fastest and the least often overloaded on the
+// free tier, and a short chat turn or a receipt doesn't need more. Each gets the lowest thinking level it supports
+// (3.8 Flash has no 'minimal'), since thinking is most of the latency.
+export const GEMINI_MODELS: { id: string; thinking: 'minimal' | 'low' }[] = [
+  { id: 'gemini-3.5-flash-lite', thinking: 'minimal' },
+  { id: 'gemini-3.6-flash', thinking: 'minimal' },
+  { id: 'gemini-3.8-flash', thinking: 'low' },
+  { id: 'gemini-3.1-flash-lite', thinking: 'minimal' },
 ];
 const RETRYABLE = new Set([429, 500, 503, 504]);
-// One more pass over the list after a short pause, since busy spikes are usually brief.
-const PASSES = 2;
-const PASS_DELAY_MS = 1500;
+// A busy model sometimes takes ~25 s just to say so: give each try at most ATTEMPT_MS, the whole call DEADLINE_MS.
+const ATTEMPT_MS = 10_000;
+const DEADLINE_MS = 30_000;
 const BUSY_MESSAGE = 'Flowku AI lagi ramai. Coba kirim lagi sebentar.';
 
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
@@ -30,29 +30,51 @@ export async function generateJson<T>(opts: {
   contents: GeminiContent[];
   schema: Record<string, unknown>;
 }): Promise<T> {
-  const body = JSON.stringify({
-    ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
-    contents: opts.contents,
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: opts.schema },
-  });
-  let res!: Response;
+  const request = (thinking: string) =>
+    JSON.stringify({
+      ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
+      contents: opts.contents,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseJsonSchema: opts.schema,
+        thinkingConfig: { thinkingLevel: thinking },
+      },
+    });
+
+  const deadline = Date.now() + DEADLINE_MS;
+  let res: Response | null = null;
   let detail = '';
-  attempts: for (let pass = 0; pass < PASSES; pass++) {
-    if (pass > 0) await new Promise((resolve) => setTimeout(resolve, PASS_DELAY_MS));
+  // Two rounds over the list, as long as time is left: busy spikes are usually brief.
+  attempts: for (let round = 0; round < 2; round++) {
     for (const model of GEMINI_MODELS) {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
-        body,
-      });
-      if (res.ok) break attempts;
+      const remaining = deadline - Date.now();
+      if (remaining < 1_000) break attempts;
+      const started = Date.now();
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+          body: request(model.thinking),
+          signal: AbortSignal.timeout(Math.min(ATTEMPT_MS, remaining)),
+        });
+      } catch (error) {
+        if (!(error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError'))) throw error;
+        console.warn('Gemini', model.id, 'timed out after', Date.now() - started, 'ms');
+        res = null;
+        continue;
+      }
+      if (res.ok) {
+        console.log('Gemini', model.id, 'answered in', Date.now() - started, 'ms');
+        break attempts;
+      }
       detail = await res.text().catch(() => '');
       // A model this key can't use (404) is skipped like a busy one; anything else is a real error.
       if (!RETRYABLE.has(res.status) && res.status !== 404) break attempts;
-      console.warn('Gemini', model, 'unavailable', res.status);
+      console.warn('Gemini', model.id, 'unavailable', res.status, 'after', Date.now() - started, 'ms');
     }
   }
 
+  if (!res) throw new GeminiError(503, BUSY_MESSAGE);
   if (!res.ok) {
     console.error('Gemini error', res.status, detail);
     if (RETRYABLE.has(res.status) || res.status === 404) throw new GeminiError(503, BUSY_MESSAGE);
