@@ -44,7 +44,8 @@
           "cameraPermission": "FLOW memakai kamera untuk memotret struk belanja.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

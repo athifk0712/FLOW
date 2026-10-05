@@ -20,6 +20,7 @@ import { NECESSITY } from '@/constants/necessity';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums } from '@/lib/database.types';
+import { exportTransactionsCsv } from '@/lib/export';
 import { formatDigits, toDigits } from '@/lib/money';
 import {
   applyReminderSettings,
@@ -57,6 +58,8 @@ export default function SettingsScreen() {
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
   const [reminder, setReminder] = useState<ReminderSettings>(getReminderSettings);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -112,6 +115,18 @@ export default function SettingsScreen() {
     setBudgetMessage('Budget tersimpan');
   }
 
+  async function exportCsv() {
+    setExporting(true);
+    setExportMessage(null);
+    try {
+      const count = await exportTransactionsCsv();
+      setExportMessage(count > 0 ? `${count} transaksi diekspor.` : 'Belum ada transaksi untuk diekspor.');
+    } catch (e) {
+      setExportMessage(e instanceof Error ? e.message : 'Ekspor gagal.');
+    }
+    setExporting(false);
+  }
+
   async function updateReminder(next: ReminderSettings) {
     setReminder(next);
     setReminderMessage(null);
@@ -157,6 +172,39 @@ export default function SettingsScreen() {
                 <LinkRow title="Transaksi rutin" hint="Kos, langganan, gaji: dicatat otomatis tiap bulan" href="/recurring" />
                 <LinkRow title="Target tabungan" hint="Sisihkan uang untuk sesuatu yang kamu mau" href="/goals" />
                 <LinkRow title="Utang & piutang" hint="Siapa pinjam ke siapa, dan sudah dibayar berapa" href="/debts" />
+              </ThemedView>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                CADANGAN
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <View style={styles.flex}>
+                  <ThemedText type="smallBold">Ekspor transaksi (CSV)</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Semua catatanmu dalam satu file. Bisa dibuka di Excel atau Google Sheets.
+                  </ThemedText>
+                </View>
+                <Pressable
+                  disabled={exporting}
+                  onPress={exportCsv}
+                  style={({ pressed }) => [
+                    styles.button,
+                    { backgroundColor: theme.backgroundSelected },
+                    (pressed || exporting) && styles.pressed,
+                  ]}>
+                  {exporting ? (
+                    <ActivityIndicator color={theme.text} />
+                  ) : (
+                    <ThemedText type="smallBold">Ekspor CSV</ThemedText>
+                  )}
+                </Pressable>
+                {exportMessage && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {exportMessage}
+                  </ThemedText>
+                )}
               </ThemedView>
             </View>
 
