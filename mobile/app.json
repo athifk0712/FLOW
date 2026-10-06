@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {},
     "android": {
+      "package": "com.athif00.flowku",
       "adaptiveIcon": {
         "backgroundColor": "#0F5C55",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
