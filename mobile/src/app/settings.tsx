@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
+import { displayName, initials } from '@/lib/display-name';
 import { useLockSettings } from '@/lib/app-lock';
 import { APPEARANCE_OPTIONS, useAppearance } from '@/lib/appearance';
 import { useCurrency } from '@/lib/money';
@@ -35,8 +36,7 @@ export default function SettingsScreen() {
   const { day } = useCycleDay();
   const user = session?.user;
   const guest = !user || user.is_anonymous;
-  const name = guest ? 'Tamu Flowku' : (user.email?.split('@')[0] ?? 'Pengguna Flowku');
-  const initials = guest ? 'TF' : name.slice(0, 2).toUpperCase();
+  const name = displayName(user);
 
   const sections: { title: string; rows: Row[] }[] = [
     {
@@ -98,7 +98,7 @@ export default function SettingsScreen() {
             <ThemedView type="backgroundElement" style={styles.profile}>
               <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
                 <ThemedText type="smallBold" style={[styles.avatarText, { color: theme.onPrimary }]}>
-                  {initials}
+                  {initials(name)}
                 </ThemedText>
               </View>
               <View style={styles.flex}>
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
                   {name}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  {guest ? 'Mode tamu · belum tertaut email' : user.email}
+                  {guest ? 'Mode tamu · ketuk untuk ubah nama' : user.email}
                 </ThemedText>
               </View>
               <AppSymbol material="edit" sf="pencil" size={22} color={theme.text} />

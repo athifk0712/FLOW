@@ -8,9 +8,12 @@ import { supabase } from '@/lib/supabase';
 
 export type ChatMessage = { role: 'user' | 'assistant'; text: string };
 
+export type CoachMode = 'chat' | 'check';
+
 export type CoachTurn = {
   message: string;
   options: string[];
+  category_changes?: { transaction_id: string; category_id: string }[];
   done: boolean;
   summary: string;
   tags: { transaction_id: string; necessity: Necessity }[];
@@ -36,7 +39,12 @@ const LOCAL_LIMIT = 10;
  * Asks the AI coach for its next turn. Throws CoachUnavailable when the AI can't be used right now
  * (not configured yet, offline), so the caller can switch to the local script.
  */
-export async function askCoach(messages: ChatMessage[], safeDaily: number | null): Promise<CoachTurn> {
+export async function askCoach(
+  messages: ChatMessage[],
+  safeDaily: number | null,
+  mode: CoachMode = 'check',
+  userName: string | null = null,
+): Promise<CoachTurn> {
   const { start, end } = todayRange();
   const { data, error } = await supabase.functions.invoke<CoachTurn & { error?: string }>('daily-coach', {
     body: {
@@ -45,6 +53,8 @@ export async function askCoach(messages: ChatMessage[], safeDaily: number | null
       day_end: end.toISOString(),
       time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       safe_daily: safeDaily,
+      mode,
+      user_name: userName,
     },
   });
   if (error) {

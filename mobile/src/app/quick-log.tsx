@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useEffectEvent, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { CategoryIcon } from '@/components/category-icon';
 import { DateTimeField } from '@/components/date-time-field';
+import { IconPicker } from '@/components/icon-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { guessIcon } from '@/constants/category-icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
@@ -54,6 +56,8 @@ const keyDigits = (key: (typeof KEYS)[number]) => (key === '000' && getCurrency(
 
 // Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly chat.
 // Income and transfers use the same screen; only expenses go to the nightly chat.
+// A category is required (nothing is saved "somewhere"); "Lainnya" also needs a note saying what it was,
+// and a missing category can be created right here with its own icon.
 export default function QuickLogScreen() {
   const theme = useTheme();
   const [mode, setMode] = useState<Mode>('EXPENSE');
@@ -71,6 +75,15 @@ export default function QuickLogScreen() {
   // null = "now"; set when logging something from earlier (e.g. yesterday's lunch).
   const [occurredAt, setOccurredAt] = useState<Date | null>(null);
   const [pickingDate, setPickingDate] = useState(false);
+  const [note, setNote] = useState('');
+  // Inline "new category" form.
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newIcon, setNewIcon] = useState('dots');
+  const [iconTouched, setIconTouched] = useState(false);
+  const [pickingIcon, setPickingIcon] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [typingNote, setTypingNote] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -121,8 +134,19 @@ export default function QuickLogScreen() {
   const amount = Number(digits || '0');
   const isTransfer = mode === 'TRANSFER';
   const accountsValid = isTransfer ? !!accountId && !!toAccountId && accountId !== toAccountId : !!accountId;
-  const canSave = amount > 0 && accountsValid && !saving;
-  const visibleCategories = categories.filter((c) => c.kind === (mode === 'INCOME' ? 'INCOME' : 'EXPENSE'));
+  const kind = mode === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  const visibleCategories = categories.filter((c) => c.kind === kind);
+  const selected = visibleCategories.find((c) => c.id === categoryId);
+  const isOther = selected?.name.trim().toLowerCase() === 'lainnya';
+  const missing =
+    amount <= 0
+      ? null
+      : !isTransfer && !selected
+        ? 'Pilih kategori dulu, supaya jelas uang ini untuk apa.'
+        : !isTransfer && isOther && !note.trim()
+          ? '"Lainnya" untuk apa? Tulis di catatan, atau buat kategori baru.'
+          : null;
+  const canSave = amount > 0 && accountsValid && !missing && !saving;
   const guessed = mode === 'EXPENSE' && !!guess && categoryId === guess;
   const budgetNote = mode === 'EXPENSE' ? describeBudget(budgets, categories, categoryId, amount) : null;
 
@@ -147,6 +171,40 @@ export default function QuickLogScreen() {
     });
   }
 
+  function openNewCategory() {
+    setAdding(true);
+    setNewName('');
+    setNewIcon('dots');
+    setIconTouched(false);
+    setPickingIcon(false);
+  }
+
+  async function createCategory() {
+    const name = newName.trim();
+    if (!name || creating) return;
+    setCreating(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ name, kind, icon: newIcon })
+      .select('id, name, kind, icon')
+      .single();
+    setCreating(false);
+    if (error) {
+      // 23505 = unique (user, kind, name): it already exists, so just pick it.
+      const existing = visibleCategories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (error.code === '23505' && existing) {
+        setCategoryId(existing.id);
+        setAdding(false);
+        return;
+      }
+      return setError(error.message);
+    }
+    setCategories((list) => [...list, data]);
+    setCategoryId(data.id);
+    setAdding(false);
+  }
+
   async function save() {
     if (!canSave) return;
     setSaving(true);
@@ -158,6 +216,7 @@ export default function QuickLogScreen() {
           ? { type: mode, amount, to_account_id: accountId, category_id: categoryId }
           : { type: mode, amount, from_account_id: accountId, to_account_id: toAccountId };
     if (occurredAt) row.occurred_at = occurredAt.toISOString();
+    if (note.trim()) row.description = note.trim();
     const { error } = await supabase.from('transactions').insert(row);
     setSaving(false);
     if (error) return setError(error.message);
@@ -294,7 +353,10 @@ export default function QuickLogScreen() {
               {visibleCategories.map((c) => (
                 <Pressable
                   key={c.id}
-                  onPress={() => setCategoryId(c.id === categoryId ? null : c.id)}
+                  onPress={() => {
+                    setCategoryId(c.id === categoryId ? null : c.id);
+                    setAdding(false);
+                  }}
                   style={[chip(c.id === categoryId), styles.iconChip]}>
                   <CategoryIcon icon={c.icon} size={24} />
                   <ThemedText type="small" style={chipText(c.id === categoryId)}>
@@ -302,9 +364,85 @@ export default function QuickLogScreen() {
                   </ThemedText>
                 </Pressable>
               ))}
+              {!adding && (
+                <Pressable
+                  onPress={openNewCategory}
+                  style={[styles.chip, styles.iconChip, styles.newChip, { borderColor: theme.primary }]}>
+                  <AppSymbol material="add" sf="plus" size={20} color={theme.primary} />
+                  <ThemedText type="small" themeColor="primary">
+                    Kategori baru
+                  </ThemedText>
+                </Pressable>
+              )}
             </View>
+            {adding && (
+              <ThemedView type="backgroundElement" style={styles.newForm}>
+                <View style={styles.newRow}>
+                  <Pressable
+                    onPress={() => setPickingIcon((p) => !p)}
+                    accessibilityLabel="Pilih ikon"
+                    style={({ pressed }) => pressed && styles.pressed}>
+                    <CategoryIcon icon={newIcon} size={40} />
+                  </Pressable>
+                  <TextInput
+                    value={newName}
+                    onChangeText={(text) => {
+                      setNewName(text);
+                      if (!iconTouched) setNewIcon(guessIcon(text));
+                    }}
+                    onSubmitEditing={createCategory}
+                    placeholder="Nama kategori, mis. Skincare"
+                    placeholderTextColor={theme.textSecondary}
+                    maxLength={30}
+                    autoFocus
+                    style={[styles.input, styles.flex, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
+                  />
+                </View>
+                {pickingIcon && (
+                  <IconPicker
+                    value={newIcon}
+                    onChange={(key) => {
+                      setNewIcon(key);
+                      setIconTouched(true);
+                      setPickingIcon(false);
+                    }}
+                  />
+                )}
+                <View style={styles.newRow}>
+                  <Pressable onPress={() => setPickingIcon((p) => !p)} hitSlop={8} style={styles.flex}>
+                    <ThemedText type="small" themeColor="primary">
+                      {pickingIcon ? 'Tutup ikon' : 'Ganti ikon'}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable onPress={() => setAdding(false)} hitSlop={8}>
+                    <ThemedText type="smallBold" themeColor="textSecondary">
+                      Batal
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={createCategory}
+                    disabled={!newName.trim() || creating}
+                    style={[styles.addButton, { backgroundColor: theme.primary }, (!newName.trim() || creating) && styles.disabled]}>
+                    <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                      {creating ? 'Menyimpan…' : 'Tambah'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </ThemedView>
+            )}
           </>
         )}
+
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          onFocus={() => setTypingNote(true)}
+          onBlur={() => setTypingNote(false)}
+          placeholder={isOther ? 'Lainnya untuk apa? mis. kado ulang tahun teman' : 'Catatan: beli apa, di mana (opsional)'}
+          placeholderTextColor={theme.textSecondary}
+          maxLength={120}
+          style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+        />
 
         {budgetNote && (
           <ThemedText
@@ -314,11 +452,16 @@ export default function QuickLogScreen() {
           </ThemedText>
         )}
 
+        {missing && (
+          <ThemedText type="small" themeColor="warning">
+            {missing}
+          </ThemedText>
+        )}
         {error && <ThemedText themeColor="danger">{error}</ThemedText>}
         </ScrollView>
 
-        {/* While the calendar is open it takes the keypad's place, so everything fits on a phone. */}
-        <View style={[styles.keypad, pickingDate && styles.hidden]}>
+        {/* While the calendar or a text field is open it takes the keypad's place, so everything fits on a phone. */}
+        <View style={[styles.keypad, (pickingDate || adding || typingNote) && styles.hidden]}>
           {KEYS.map((key) => (
             <Pressable
               key={key}
@@ -384,6 +527,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.five,
+  },
+  newChip: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    paddingVertical: Spacing.two - 1.5,
+  },
+  newForm: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  newRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  addButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
+  },
+  input: {
+    fontSize: 16,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    borderRadius: Spacing.three,
+  },
+  flex: {
+    flex: 1,
   },
   iconChip: {
     flexDirection: 'row',

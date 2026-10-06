@@ -1,7 +1,7 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // Categorical slots from the dataviz reference palette, in fixed order, validated (scripts/validate_palette.js)
-// against Flowku's card surfaces: light #FFFCF6, dark #182624. Light slots 3–5 sit under 3:1 on the card,
+// against Flowku's card surfaces: light #FFFCF6, dark #182624 (the dark card is now #22332F). Light slots 3–5 sit under 3:1 on the card,
 // so every chart that uses them also lists the values as text (legend rows with amounts).
 const SERIES = {
   light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'],

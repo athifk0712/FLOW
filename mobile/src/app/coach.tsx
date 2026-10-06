@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,23 +21,32 @@ import {
   applyTags,
   askCoach,
   type ChatMessage,
+  type CoachMode,
   CoachUnavailable,
   loadTodaySession,
   loadUnlabeled,
   saveSession,
 } from '@/lib/coach';
 import { answerLocal, type LocalState, startLocal } from '@/lib/coach-local';
+import { displayName } from '@/lib/display-name';
 import { closeModal } from '@/lib/navigation';
+import { useSession } from '@/providers/session-provider';
 
 type Mode = 'ai' | 'local';
 type Bubble = { role: 'user' | 'assistant'; text: string };
 
 const FORGOT = 'Ada, tapi lupa dicatat';
 
-// "Cek harian": every evening Flowku talks through the day's spending, one question at a time, labels
-// each expense from the answers, and closes with a takeaway. AI when available, a scripted chat otherwise.
+// Two ways in: the companion on Beranda opens a free chat (?mode=chat) where Flowku answers whatever the user asks
+// (and can move an expense to another category); "Cek harian" walks through the day's spending and labels it.
+// AI when available; without it, the scripted daily check is the fallback for both.
 export default function CoachScreen() {
   const theme = useTheme();
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const coachMode: CoachMode = params.mode === 'chat' ? 'chat' : 'check';
+  const { session } = useSession();
+  const name = displayName(session?.user);
+  const userName = name === 'Tamu Flowku' ? null : name;
   const scroll = useRef<ScrollView>(null);
   const [mode, setMode] = useState<Mode | null>(null);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
@@ -53,20 +62,6 @@ export default function CoachScreen() {
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [forgot, setForgot] = useState(false);
 
-  useEffect(() => {
-    loadTodaySession().then((session) => {
-      if (session?.summary) {
-        setMode(session.mode);
-        setBubbles(session.messages);
-        setDone(true);
-        setFinishedEarlier(true);
-        setBusy(false);
-      } else {
-        start();
-      }
-    });
-  }, []);
-
   async function start() {
     setBusy(true);
     setError(null);
@@ -76,7 +71,7 @@ export default function CoachScreen() {
     setFinishedEarlier(false);
     setForgot(false);
     try {
-      const turn = await askCoach([], null);
+      const turn = await askCoach([], null, coachMode, userName);
       setMode('ai');
       setHistory([{ role: 'assistant', text: JSON.stringify(turn) }]);
       setBubbles([{ role: 'assistant', text: turn.message }]);
@@ -98,6 +93,23 @@ export default function CoachScreen() {
     setBusy(false);
   }
 
+  useEffect(() => {
+    // A chat always starts fresh; the daily check shows today's record once it is done.
+    (coachMode === 'chat' ? Promise.resolve(null) : loadTodaySession()).then((session) => {
+      if (session?.summary) {
+        setMode(session.mode);
+        setBubbles(session.messages);
+        setDone(true);
+        setFinishedEarlier(true);
+        setBusy(false);
+      } else {
+        start();
+      }
+    });
+    // Once, on open: the mode comes from the route and doesn't change while this screen is up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function reply(text: string) {
     const answer = text.trim();
     if (!answer || busy || done) return;
@@ -110,14 +122,15 @@ export default function CoachScreen() {
     try {
       if (mode === 'ai') {
         const asked = [...history, { role: 'user' as const, text: answer }];
-        const turn = await askCoach(asked, null);
+        const turn = await askCoach(asked, null, coachMode, userName);
         const all = [...withUser, { role: 'assistant' as const, text: turn.message }];
         setHistory([...asked, { role: 'assistant', text: JSON.stringify(turn) }]);
         setBubbles(all);
         setOptions(turn.options);
         if (turn.done) {
           setDone(true);
-          await saveSession('ai', all, turn.summary || turn.message);
+          // Only the daily check is kept as today's record; a chat is just a chat.
+          if (coachMode === 'check') await saveSession('ai', all, turn.summary || turn.message);
         }
       } else if (local) {
         const before = local.tags.length;
@@ -149,12 +162,25 @@ export default function CoachScreen() {
           <View style={styles.header}>
             <View style={styles.headerTitle}>
               <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                <AppSymbol material="checklist" sf="checklist" size={18} color={theme.onPrimary} />
+                {coachMode === 'chat' ? (
+                  <View style={styles.face}>
+                    <View style={[styles.eye, { backgroundColor: theme.onPrimary }]} />
+                    <View style={[styles.eye, { backgroundColor: theme.onPrimary }]} />
+                  </View>
+                ) : (
+                  <AppSymbol material="checklist" sf="checklist" size={18} color={theme.onPrimary} />
+                )}
               </View>
               <View>
-                <ThemedText type="smallBold">Cek harian</ThemedText>
+                <ThemedText type="smallBold">{coachMode === 'chat' ? 'Flowku' : 'Cek harian'}</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {mode ? 'Tandai pengeluaranmu' : 'Menyiapkan…'}
+                  {!mode
+                    ? 'Menyiapkan…'
+                    : coachMode === 'chat'
+                      ? mode === 'ai'
+                        ? 'Teman ngobrol soal uangmu'
+                        : 'AI lagi istirahat, pakai cek cepat'
+                      : 'Tandai pengeluaranmu'}
                 </ThemedText>
               </View>
             </View>
@@ -227,7 +253,7 @@ export default function CoachScreen() {
                 value={draft}
                 onChangeText={setDraft}
                 onSubmitEditing={() => reply(draft)}
-                placeholder="Atau ketik jawabanmu…"
+                placeholder={coachMode === 'chat' ? 'Tanya apa aja soal uangmu…' : 'Atau ketik jawabanmu…'}
                 placeholderTextColor={theme.textSecondary}
                 maxLength={500}
                 editable={!busy}
@@ -305,6 +331,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  face: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  eye: {
+    width: 5,
+    height: 8,
+    borderRadius: 3,
   },
   avatar: {
     width: 36,

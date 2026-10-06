@@ -29,19 +29,20 @@ export const Colors = {
   },
   dark: {
     text: '#F2EDE3',
-    background: '#0E1716',
-    backgroundElement: '#182624',
-    backgroundSelected: '#243532',
-    textSecondary: '#A3B3AF',
+    // Lifted from #0E1716 / #182624: the first night set read as near-black on phones.
+    background: '#172422',
+    backgroundElement: '#22332F',
+    backgroundSelected: '#30443F',
+    textSecondary: '#B3C1BD',
     primary: '#4FB3A5',
-    onPrimary: '#0E1716',
+    onPrimary: '#0F1A19',
     accent: '#F0B454',
-    onAccent: '#0E1716',
+    onAccent: '#0F1A19',
     warning: '#F0B454',
     danger: '#EF8A82', // 6.4:1 on dark cards; #B83A36 was 2.8:1
     positive: '#7FD3A8',
-    positiveSoft: '#173A2D',
-    negativeSoft: '#3E2220',
+    positiveSoft: '#1E4636',
+    negativeSoft: '#4A2B28',
   },
 } as const;
 
