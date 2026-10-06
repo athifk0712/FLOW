@@ -46,7 +46,9 @@ function readParams(url: string) {
  */
 export async function continueWithGoogle(mode: OAuthMode): Promise<string | null> {
   const isWeb = Platform.OS === 'web';
-  const redirectTo = isWeb ? window.location.origin : Linking.createURL('/');
+  // The trailing slash matters: Supabase's allow list has "https://flowku.expo.app/**", which the bare origin
+  // doesn't match, and an unlisted redirect silently falls back to the Site URL.
+  const redirectTo = isWeb ? `${window.location.origin}/` : Linking.createURL('/');
   const options = { redirectTo, skipBrowserRedirect: !isWeb };
 
   const { data, error } =
