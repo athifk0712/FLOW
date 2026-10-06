@@ -1,10 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
-import { Companion } from '@/components/companion';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
 import { MenuGrid, type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
@@ -181,7 +180,6 @@ export default function HomeScreen() {
     cycleEnd,
   });
   const overdueDebts = openDebts.filter((d) => dueStatus(d)?.overdue).length;
-  const companionLine = companionSays(name, unreviewed.length, balances.length > 0 ? safe.leftToday : null);
 
   const menu: MenuItem[] = [
     { label: 'Akun & dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
@@ -353,12 +351,6 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <Companion
-        line={companionLine}
-        onPress={() => router.push({ pathname: '/coach', params: { mode: 'chat' } })}
-        style={wide ? styles.companionWide : styles.companion}
-      />
-
       {/* On a laptop the sidebar has the Catat button. */}
       {!wide && (
         <Pressable
@@ -371,17 +363,6 @@ export default function HomeScreen() {
       )}
     </ThemedView>
   );
-}
-
-/** The one line the companion says on Beranda: a nudge when there is something to do, otherwise an invitation. */
-function companionSays(name: string, unlabeled: number, leftToday: number | null, now = new Date()) {
-  const first = name === 'Tamu Flowku' ? '' : ` ${name.split(' ')[0]}`;
-  if (unlabeled > 0) return `Ada ${unlabeled} pengeluaran yang belum kita bahas. Ngobrol bentar?`;
-  const hour = now.getHours();
-  if (hour >= 19) return `Malam${first}! Gimana belanja hari ini? Cerita aja.`;
-  if (leftToday !== null && leftToday <= 0) return 'Hari ini agak ketat ya. Mau aku bantu atur?';
-  if (hour < 11) return `Pagi${first}! Ada yang mau ditanya soal uangmu?`;
-  return `Hai${first}! Lupa catat atau lupa kategorinya? Tanya aku aja.`;
 }
 
 function greeting(now = new Date()) {
@@ -594,18 +575,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
-  companion: {
-    right: Spacing.three,
-    bottom: BottomTabInset + Spacing.three,
-  },
-  companionWide: {
-    right: Spacing.five,
-    bottom: Spacing.five,
-  },
   fab: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: BottomTabInset + Spacing.three,
+    // Just above the tab bar. Only iOS draws its native tab bar over the screen; on Android and web the screen
+    // already ends above it, so adding the bar's height there lifted the button into the content.
+    bottom: (Platform.OS === 'ios' ? BottomTabInset : 0) + Spacing.three,
     paddingHorizontal: Spacing.five,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.five,

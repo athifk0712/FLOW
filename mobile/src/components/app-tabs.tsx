@@ -23,6 +23,14 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="clock" md="history" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="flowku">
+        <NativeTabs.Trigger.Label>Flowku</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }}
+          md="forum"
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="calendar">
         <NativeTabs.Trigger.Label>Kalender</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="calendar" md="calendar_month" />

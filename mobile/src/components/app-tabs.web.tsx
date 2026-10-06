@@ -17,6 +17,7 @@ const WideContext = createContext(false);
 const TABS = [
   { name: 'home', href: '/', label: 'Beranda', icon: 'home' },
   { name: 'history', href: '/history', label: 'Riwayat', icon: 'history' },
+  { name: 'flowku', href: '/flowku', label: 'Flowku', icon: 'forum' },
   { name: 'calendar', href: '/calendar', label: 'Kalender', icon: 'calendar_month' },
   { name: 'charts', href: '/charts', label: 'Diagram', icon: 'pie_chart' },
 ] as const;

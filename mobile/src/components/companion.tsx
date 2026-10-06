@@ -10,14 +10,14 @@ const SIZE = 60;
 const BUBBLE_MS = 6000;
 
 type Props = {
-  /** What Flowku says in its bubble; a new line pops the bubble up again. */
-  line: string;
-  onPress: () => void;
+  /** What Flowku says in its bubble; a new line pops the bubble up again. No bubble without one. */
+  line?: string;
+  onPress?: () => void;
   style?: object;
 };
 
-// Flowku's companion: a small round teal friend that floats on Beranda, breathes, blinks, and says one short
-// line. Tapping it opens the chat. Built from plain Views and the core Animated API, so it runs in Expo Go and on web.
+// Flowku's companion: a small round teal friend that floats, breathes, blinks, and can say one short line.
+// It heads the Flowku tab. Built from plain Views and the core Animated API, so it runs in Expo Go and on web.
 export function Companion({ line, onPress, style }: Props) {
   const theme = useTheme();
   const [float] = useState(() => new Animated.Value(0));
@@ -26,7 +26,7 @@ export function Companion({ line, onPress, style }: Props) {
   const [press] = useState(() => new Animated.Value(1));
   // The line whose bubble has timed out; a different line shows the bubble again.
   const [hiddenLine, setHiddenLine] = useState<string | null>(null);
-  const showBubble = hiddenLine !== line;
+  const showBubble = !!line && hiddenLine !== line;
 
   // Gentle up-and-down float, forever.
   useEffect(() => {
@@ -65,7 +65,7 @@ export function Companion({ line, onPress, style }: Props) {
     pop.setValue(0);
     Animated.spring(pop, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }).start();
     const timer = setTimeout(() => {
-      Animated.timing(pop, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setHiddenLine(line));
+      Animated.timing(pop, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setHiddenLine(line ?? null));
     }, BUBBLE_MS);
     return () => clearTimeout(timer);
   }, [line, pop]);
@@ -96,8 +96,9 @@ export function Companion({ line, onPress, style }: Props) {
         onPress={onPress}
         onPressIn={() => squish(0.9)}
         onPressOut={() => squish(1)}
-        accessibilityRole="button"
-        accessibilityLabel="Ngobrol dengan Flowku">
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : 'image'}
+        accessibilityLabel="Flowku">
         <Animated.View style={{ transform: [{ translateY }, { scale: press }] }}>
           {/* Honey sun peeking over the head, from the Flowku mark. */}
           <View style={[styles.sun, { backgroundColor: theme.accent }]} />
