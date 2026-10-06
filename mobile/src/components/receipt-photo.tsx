@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, useCurrency } from '@/lib/money';
 import { isScanResult, type ScanResult, scanReceipt } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -197,6 +197,7 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange, onApplyScan }
 
 function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) {
   const theme = useTheme();
+  const currency = useCurrency();
   if (!scan.is_receipt) {
     return (
       <ThemedText type="small" themeColor="textSecondary">
@@ -204,7 +205,7 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
       </ThemedText>
     );
   }
-  const date = /^(d{4})-(d{2})-(d{2})$/.exec(scan.date);
+  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(scan.date);
   const parts = [
     scan.merchant,
     scan.total > 0 && formatMoney(scan.total),
@@ -212,6 +213,8 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
     scan.time,
     scan.category,
   ].filter(Boolean);
+  // The server leaves the total at 0 when the receipt is in a currency other than the user's.
+  const otherCurrency = scan.total === 0 && !!scan.currency && scan.currency !== currency.code;
   return (
     <ThemedView type="backgroundElement" style={styles.scanCard}>
       <View style={styles.flex}>
@@ -219,6 +222,11 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
           Terbaca dari struk
         </ThemedText>
         <ThemedText type="smallBold">{parts.length > 0 ? parts.join(' · ') : 'Tidak ada yang terbaca'}</ThemedText>
+        {otherCurrency && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Struk ini dalam {scan.currency}, jadi nominalnya isi sendiri ya.
+          </ThemedText>
+        )}
       </View>
       {parts.length > 0 && (
         <Pressable onPress={onApply} style={({ pressed }) => [styles.apply, { backgroundColor: theme.primary }, pressed && styles.pressed]}>

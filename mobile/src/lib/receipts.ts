@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabase';
 export type ScanResult = {
   is_receipt: boolean;
   merchant: string;
+  /** In the user's currency's smallest unit (like stored amounts); 0 when unread or printed in another currency. */
   total: number;
+  currency?: string; // as printed, e.g. "IDR"
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   category: string;
