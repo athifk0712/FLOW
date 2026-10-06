@@ -65,6 +65,12 @@
         "projectId": "d390feda-59e6-4aac-ade2-4a051ff79bd5"
       }
     },
-    "owner": "athif00"
+    "owner": "athif00",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d390feda-59e6-4aac-ade2-4a051ff79bd5"
+    }
   }
 }
