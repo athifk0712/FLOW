@@ -97,8 +97,8 @@ export function AccountSection() {
       )}
 
       <Pressable onPress={() => setPanel(panel === 'signin' ? 'link' : 'signin')} hitSlop={8}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {panel === 'signin' ? '← Simpan akun tamu ini saja' : 'Sudah punya akun? Masuk'}
+        <ThemedText type="smallBold" themeColor={panel === 'signin' ? 'textSecondary' : 'primary'}>
+          {panel === 'signin' ? '← Simpan akun tamu ini saja' : 'Sudah pernah pakai Flowku di HP lain? Masuk di sini'}
         </ThemedText>
       </Pressable>
     </ThemedView>
