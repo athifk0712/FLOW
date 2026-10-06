@@ -52,6 +52,8 @@ export default function AccountsScreen() {
   // A new account starts at the bank / e-wallet picker; the form follows once one is chosen.
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown above the list after an action that also changed something elsewhere.
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [accs, bals] = await Promise.all([
@@ -101,6 +103,7 @@ export default function AccountsScreen() {
   async function run(action: () => PromiseLike<{ error: { message: string; code?: string } | null }>) {
     setSaving(true);
     setError(null);
+    setNotice(null);
     const { error } = await action();
     setSaving(false);
     if (error) {
@@ -123,12 +126,27 @@ export default function AccountsScreen() {
   }
 
   function toggleArchive(account: Account) {
-    run(() =>
-      supabase
+    const archiving = !account.archived_at;
+    run(async () => {
+      const result = await supabase
         .from('accounts')
-        .update({ archived_at: account.archived_at ? null : new Date().toISOString() })
-        .eq('id', account.id),
-    );
+        .update({ archived_at: archiving ? new Date().toISOString() : null })
+        .eq('id', account.id);
+      if (result.error || !archiving) return result;
+      // An archived account is left out of the totals, so recurring bills or income must not keep landing in it.
+      const paused = await supabase
+        .from('recurring_transactions')
+        .update({ active: false })
+        .eq('account_id', account.id)
+        .eq('active', true)
+        .select('id');
+      if (paused.error) return paused;
+      const count = paused.data?.length ?? 0;
+      if (count > 0) {
+        setNotice(`${count} transaksi rutin yang memakai ${account.name} dijeda. Pindahkan ke akun lain di Transaksi rutin.`);
+      }
+      return { error: null };
+    });
   }
 
   function remove(account: Account) {
@@ -294,6 +312,12 @@ export default function AccountsScreen() {
               </ThemedText>
             </Pressable>
           </View>
+
+          {notice && (
+            <ThemedText type="small" themeColor="warning">
+              {notice}
+            </ThemedText>
+          )}
 
           {accounts === null ? (
             error ? (

@@ -110,8 +110,10 @@ export default function QuickLogScreen() {
       setBudgets(buds.data ?? []);
       setLoaded(true);
 
-      // Default account: the one used last, else the first one.
-      const defaultAccount = recentRows[0]?.from_account_id ?? accountRows[0]?.id ?? null;
+      // Default account: the one used last, else the first one. The last one may since have been archived,
+      // and then it isn't in the list (and shouldn't get new transactions).
+      const lastUsed = recentRows[0]?.from_account_id;
+      const defaultAccount = accountRows.find((a) => a.id === lastUsed)?.id ?? accountRows[0]?.id ?? null;
       setAccountId(defaultAccount);
       setToAccountId(accountRows.find((a) => a.id !== defaultAccount)?.id ?? null);
 

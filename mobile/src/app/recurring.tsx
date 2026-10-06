@@ -97,7 +97,8 @@ export default function RecurringScreen() {
     setKind(rule?.type === "INCOME" ? "INCOME" : "EXPENSE");
     setName(rule?.name ?? "");
     setDigits(rule ? String(rule.amount) : "");
-    setAccountId(rule?.account_id ?? accounts[0]?.id ?? null);
+    // The rule's account may have been archived since (it isn't listed then): fall back to an active one.
+    setAccountId(accounts.find((a) => a.id === rule?.account_id)?.id ?? accounts[0]?.id ?? null);
     setCategoryId(rule?.category_id ?? null);
     setNecessity(rule?.necessity ?? null);
     setDay(rule ? String(rule.day_of_month) : String(new Date().getDate()));
