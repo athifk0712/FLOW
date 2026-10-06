@@ -17,6 +17,8 @@ export type CoachTurn = {
   done: boolean;
   summary: string;
   tags: { transaction_id: string; necessity: Necessity }[];
+  /** Set by the server when this turn cleared a to-do list, e.g. "Semua pengeluaran sudah punya kategori." */
+  notice?: string | null;
 };
 
 /** Local [start, end) of today, as the device sees it. */

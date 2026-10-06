@@ -33,7 +33,10 @@ import { closeModal } from '@/lib/navigation';
 import { useSession } from '@/providers/session-provider';
 
 type Mode = 'ai' | 'local';
-type Bubble = { role: 'user' | 'assistant'; text: string };
+// "notice" is the app's own "it's all done" line under a reply; it isn't sent back to the AI.
+type Bubble = { role: 'user' | 'assistant' | 'notice'; text: string };
+
+const spoken = (all: Bubble[]) => all.filter((b): b is ChatMessage => b.role !== 'notice');
 
 const FORGOT = 'Ada, tapi lupa dicatat';
 
@@ -123,27 +126,28 @@ export default function CoachScreen() {
       if (mode === 'ai') {
         const asked = [...history, { role: 'user' as const, text: answer }];
         const turn = await askCoach(asked, null, coachMode, userName);
-        const all = [...withUser, { role: 'assistant' as const, text: turn.message }];
+        const all: Bubble[] = [...withUser, { role: 'assistant', text: turn.message }];
+        if (turn.notice) all.push({ role: 'notice', text: turn.notice });
         setHistory([...asked, { role: 'assistant', text: JSON.stringify(turn) }]);
         setBubbles(all);
         setOptions(turn.options);
         if (turn.done) {
           setDone(true);
           // Only the daily check is kept as today's record; a chat is just a chat.
-          if (coachMode === 'check') await saveSession('ai', all, turn.summary || turn.message);
+          if (coachMode === 'check') await saveSession('ai', spoken(all), turn.summary || turn.message);
         }
       } else if (local) {
         const before = local.tags.length;
         const { state, turn } = answerLocal(local, answer);
         await applyTags(state.tags.slice(before));
-        const all = [...withUser, { role: 'assistant' as const, text: turn.message }];
+        const all: Bubble[] = [...withUser, { role: 'assistant', text: turn.message }];
         setLocal(state);
         setBubbles(all);
         setOptions(turn.options);
         if (answer === FORGOT) setForgot(true);
         if (turn.done) {
           setDone(true);
-          await saveSession('local', all, turn.summary ?? turn.message);
+          await saveSession('local', spoken(all), turn.summary ?? turn.message);
         }
       }
     } catch (e) {
@@ -207,18 +211,27 @@ export default function CoachScreen() {
                 Cek harian hari ini sudah selesai. Ini catatannya.
               </ThemedText>
             )}
-            {bubbles.map((b, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.bubble,
-                  b.role === 'user'
-                    ? [styles.userBubble, { backgroundColor: theme.primary }]
-                    : [styles.botBubble, { backgroundColor: theme.backgroundElement }],
-                ]}>
-                <ThemedText style={b.role === 'user' ? { color: theme.onPrimary } : undefined}>{b.text}</ThemedText>
-              </View>
-            ))}
+            {bubbles.map((b, i) =>
+              b.role === 'notice' ? (
+                <View key={i} style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
+                  <AppSymbol material="check_circle" sf="checkmark.circle.fill" size={16} color={theme.primary} />
+                  <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                    {b.text}
+                  </ThemedText>
+                </View>
+              ) : (
+                <View
+                  key={i}
+                  style={[
+                    styles.bubble,
+                    b.role === 'user'
+                      ? [styles.userBubble, { backgroundColor: theme.primary }]
+                      : [styles.botBubble, { backgroundColor: theme.backgroundElement }],
+                  ]}>
+                  <ThemedText style={b.role === 'user' ? { color: theme.onPrimary } : undefined}>{b.text}</ThemedText>
+                </View>
+              ),
+            )}
             {busy && (
               <View style={[styles.bubble, styles.botBubble, { backgroundColor: theme.backgroundElement }]}>
                 <ActivityIndicator color={theme.textSecondary} />
@@ -355,6 +368,15 @@ const styles = StyleSheet.create({
   note: {
     textAlign: 'center',
     paddingHorizontal: Spacing.three,
+  },
+  notice: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + 2,
+    borderRadius: Spacing.five,
   },
   bubble: {
     maxWidth: '85%',

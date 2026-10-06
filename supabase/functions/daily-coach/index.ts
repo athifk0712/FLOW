@@ -91,6 +91,11 @@ Ground rules:
   the user's latest answer makes it clear, with the exact transaction ids given.
 - Keep messages short: usually 1-3 sentences. Use options for easy tap replies (2-4, max ~4 words each), or [] when a
   free answer fits better.
+- Tidy-up tasks (sorting uncategorized expenses, labeling): "uncategorized_expenses" and the UNLABELED rows are the
+  to-do list, re-read on every turn. When your latest category_changes/tags handle the LAST item of that list, say
+  clearly that it is all done (e.g. "Beres! Semua pengeluaran sudah punya kategori.") with a one-line recap, and offer
+  options like "Udahan dulu" / "Tanya hal lain" instead of vaguely asking "ada lagi?". Never claim something is done
+  that isn't in your category_changes/tags.
 - This is not professional financial advice; don't recommend specific investments or loans. If the user wants to
   stop, close warmly right away.`;
 
@@ -212,6 +217,8 @@ Deno.serve(async (req) => {
     note: t.description,
   }));
 
+  const uncategorizedRows = recentRows.filter((t) => t.type === 'EXPENSE' && !t.category);
+
   // The data block comes first and stays identical for the whole conversation.
   const context = JSON.stringify({
     user_name: userName,
@@ -219,6 +226,7 @@ Deno.serve(async (req) => {
     currency,
     categories: categoryRows,
     recent_transactions_last_35_days: recentRows,
+    uncategorized_expenses: uncategorizedRows,
     today_transactions: todayRows,
     unlabeled_from_last_7_days: olderRows,
     budgets_this_period: budgetRows,
@@ -273,5 +281,27 @@ Deno.serve(async (req) => {
     await supabase.from('transactions').update({ category_id: c.category_id }).eq('id', c.transaction_id);
   }
 
-  return json({ ...turn, options: (turn.options ?? []).slice(0, 4), category_changes: moves, tags });
+  // A plain "it's all done" line the app shows under the reply when this turn cleared a to-do list, so the user
+  // always hears it even if the model forgets to say so.
+  const moved = new Set(moves.map((c) => c.transaction_id));
+  const tagged = new Set(tags.map((t) => t.transaction_id));
+  const unlabeledIds = [
+    ...todayRows.filter((t) => t.necessity === 'UNLABELED').map((t) => t.id),
+    ...olderRows.map((t) => t.id),
+  ];
+  const notices: string[] = [];
+  if (moves.length > 0 && uncategorizedRows.length > 0 && uncategorizedRows.every((t) => moved.has(t.id))) {
+    notices.push('Semua pengeluaran sudah punya kategori.');
+  }
+  if (tags.length > 0 && unlabeledIds.length > 0 && unlabeledIds.every((id) => tagged.has(id))) {
+    notices.push('Semua pengeluaran sudah dilabeli.');
+  }
+
+  return json({
+    ...turn,
+    options: (turn.options ?? []).slice(0, 4),
+    category_changes: moves,
+    tags,
+    notice: notices.length ? notices.join(' ') : null,
+  });
 });
