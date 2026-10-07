@@ -31,10 +31,6 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="calendar">
-        <NativeTabs.Trigger.Label>Kalender</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="calendar" md="calendar_month" />
-      </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="charts">
         <NativeTabs.Trigger.Label>Diagram</NativeTabs.Trigger.Label>

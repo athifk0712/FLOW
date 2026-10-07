@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { CategoryIcon } from '@/components/category-icon';
+import { HistoryCalendar } from '@/components/history-calendar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TransactionItem } from '@/components/transaction-item';
@@ -44,9 +46,56 @@ function dayKey(iso: string) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-// Every transaction, newest first, grouped by local day. Search and filters narrow the list;
-// tap a row to edit or delete it.
+type Mode = 'calendar' | 'search';
+
+// Riwayat: a calendar of the month with the picked day's transactions (default), or every transaction with search
+// and filters. Tap a row to edit or delete it.
 export default function HistoryScreen() {
+  const theme = useTheme();
+  const [mode, setMode] = useState<Mode>('calendar');
+
+  const header = (
+    <View style={styles.titleRow}>
+      <ThemedText type="subtitle" style={styles.flex}>
+        Riwayat
+      </ThemedText>
+      <View style={[styles.segment, { backgroundColor: theme.backgroundElement }]}>
+        {(
+          [
+            { value: 'calendar', label: 'Kalender', icon: 'calendar_month', sf: 'calendar' },
+            { value: 'search', label: 'Cari', icon: 'search', sf: 'magnifyingglass' },
+          ] as const
+        ).map((o) => {
+          const on = mode === o.value;
+          return (
+            <Pressable
+              key={o.value}
+              onPress={() => setMode(o.value)}
+              style={[styles.segmentItem, on && { backgroundColor: theme.primary }]}
+              accessibilityState={{ selected: on }}
+            >
+              <AppSymbol material={o.icon} sf={o.sf} size={16} color={on ? theme.onPrimary : theme.textSecondary} />
+              <ThemedText type="smallBold" style={{ color: on ? theme.onPrimary : theme.textSecondary }}>
+                {o.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {mode === 'calendar' ? <HistoryCalendar header={header} /> : <SearchList header={header} />}
+      </SafeAreaView>
+    </ThemedView>
+  );
+}
+
+/** Every transaction, newest first, grouped by local day. Search and filters narrow the list. */
+function SearchList({ header }: { header: React.ReactElement }) {
   const theme = useTheme();
   const [filters, setFilters] = useState<HistoryFilters>(EMPTY_FILTERS);
   const [searchText, setSearchText] = useState('');
@@ -198,127 +247,124 @@ export default function HistoryScreen() {
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.top}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            RIWAYAT
-          </ThemedText>
+    <>
+      <View style={styles.top}>
+        {header}
 
-          <View style={styles.searchRow}>
-            <TextInput
-              style={[styles.search, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholder="Cari toko, catatan, atau kategori"
-              placeholderTextColor={theme.textSecondary}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-            />
-            <Pressable
-              onPress={() => setShowFilters((s) => !s)}
-              style={[
-                styles.filterButton,
-                { backgroundColor: showFilters || extraFilters ? theme.primary : theme.backgroundElement },
-              ]}>
-              <ThemedText type="smallBold" style={chipText(showFilters || extraFilters > 0)}>
-                Filter{extraFilters ? ` (${extraFilters})` : ''}
+        <View style={styles.searchRow}>
+          <TextInput
+            style={[styles.search, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Cari toko, catatan, atau kategori"
+            placeholderTextColor={theme.textSecondary}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          <Pressable
+            onPress={() => setShowFilters((s) => !s)}
+            style={[
+              styles.filterButton,
+              { backgroundColor: showFilters || extraFilters ? theme.primary : theme.backgroundElement },
+            ]}
+          >
+            <ThemedText type="smallBold" style={chipText(showFilters || extraFilters > 0)}>
+              Filter{extraFilters ? ` (${extraFilters})` : ''}
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        <View style={styles.chips}>
+          {TYPES.map((t) => choice(t.label, t.value === filters.type, () => update({ type: t.value }), false))}
+        </View>
+
+        {showFilters && (
+          <ThemedView type="backgroundElement" style={styles.panel}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Periode
+            </ThemedText>
+            <View style={styles.chips}>
+              {PERIODS.map((p) => choice(p.label, p.value === filters.period, () => update({ period: p.value })))}
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              Kategori
+            </ThemedText>
+            <View style={styles.chips}>
+              {categories
+                .filter((c) => filters.type === 'ALL' || c.kind === filters.type)
+                .map((c) =>
+                  choice(
+                    c.kind === 'INCOME' ? `${c.name} (masuk)` : c.name,
+                    c.id === filters.categoryId,
+                    () => update({ categoryId: c.id === filters.categoryId ? null : c.id }),
+                    true,
+                    c.icon,
+                  ),
+                )}
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              Akun
+            </ThemedText>
+            <View style={styles.chips}>
+              {accounts.map((a) =>
+                choice(a.name, a.id === filters.accountId, () =>
+                  update({ accountId: a.id === filters.accountId ? null : a.id }),
+                ),
+              )}
+            </View>
+          </ThemedView>
+        )}
+
+        {narrowed && summary && (
+          <View style={styles.summary}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
+              {summary.count} transaksi
+              {summary.out > 0 ? ` · keluar ${formatMoney(summary.out)}` : ''}
+              {summary.in > 0 ? ` · masuk ${formatMoney(summary.in)}` : ''}
+            </ThemedText>
+            <Pressable onPress={reset} hitSlop={8}>
+              <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                Reset
               </ThemedText>
             </Pressable>
           </View>
+        )}
+        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+      </View>
 
-          <View style={styles.chips}>
-            {TYPES.map((t) => choice(t.label, t.value === filters.type, () => update({ type: t.value }), false))}
-          </View>
-
-          {showFilters && (
-            <ThemedView type="backgroundElement" style={styles.panel}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Periode
+      {rows === null && !error ? (
+        <ActivityIndicator style={styles.center} />
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                {section.title}
               </ThemedText>
-              <View style={styles.chips}>
-                {PERIODS.map((p) => choice(p.label, p.value === filters.period, () => update({ period: p.value })))}
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                Kategori
-              </ThemedText>
-              <View style={styles.chips}>
-                {categories
-                  .filter((c) => filters.type === 'ALL' || c.kind === filters.type)
-                  .map((c) =>
-                    choice(
-                      c.kind === 'INCOME' ? `${c.name} (masuk)` : c.name,
-                      c.id === filters.categoryId,
-                      () => update({ categoryId: c.id === filters.categoryId ? null : c.id }),
-                      true,
-                      c.icon,
-                    ),
-                  )}
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                Akun
-              </ThemedText>
-              <View style={styles.chips}>
-                {accounts.map((a) =>
-                  choice(a.name, a.id === filters.accountId, () =>
-                    update({ accountId: a.id === filters.accountId ? null : a.id }),
-                  ),
-                )}
-              </View>
-            </ThemedView>
-          )}
-
-          {narrowed && summary && (
-            <View style={styles.summary}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
-                {summary.count} transaksi
-                {summary.out > 0 ? ` · keluar ${formatMoney(summary.out)}` : ''}
-                {summary.in > 0 ? ` · masuk ${formatMoney(summary.in)}` : ''}
-              </ThemedText>
-              <Pressable onPress={reset} hitSlop={8}>
-                <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                  Reset
+              {section.total > 0 && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  -{formatMoney(section.total)}
                 </ThemedText>
-              </Pressable>
+              )}
             </View>
           )}
-          {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-        </View>
-
-        {rows === null && !error ? (
-          <ActivityIndicator style={styles.center} />
-        ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            stickySectionHeadersEnabled={false}
-            keyboardShouldPersistTaps="handled"
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            renderSectionHeader={({ section }) => (
-              <View style={styles.sectionHeader}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  {section.title}
-                </ThemedText>
-                {section.total > 0 && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    -{formatMoney(section.total)}
-                  </ThemedText>
-                )}
-              </View>
-            )}
-            renderItem={({ item }) => <TransactionItem item={item} />}
-            ListEmptyComponent={
-              <ThemedText themeColor="textSecondary" style={styles.empty}>
-                {narrowed ? 'Tidak ada transaksi yang cocok.' : 'Belum ada transaksi.'}
-              </ThemedText>
-            }
-            ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} /> : null}
-          />
-        )}
-      </SafeAreaView>
-    </ThemedView>
+          renderItem={({ item }) => <TransactionItem item={item} />}
+          ListEmptyComponent={
+            <ThemedText themeColor="textSecondary" style={styles.empty}>
+              {narrowed ? 'Tidak ada transaksi yang cocok.' : 'Belum ada transaksi.'}
+            </ThemedText>
+          }
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} /> : null}
+        />
+      )}
+    </>
   );
 }
 
@@ -331,6 +377,24 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     maxWidth: MaxContentWidth,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  segment: {
+    flexDirection: 'row',
+    padding: Spacing.half + 1,
+    borderRadius: Spacing.three,
+  },
+  segmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Spacing.two + Spacing.one,
   },
   top: {
     gap: Spacing.two,

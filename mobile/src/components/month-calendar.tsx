@@ -14,14 +14,16 @@ type Props = {
   onMonthChange: (month: Date) => void;
   selected?: Date | null;
   onSelect?: (day: Date) => void;
-  /** Per-day income/spending; when given, each day shows its net, tinted green or red. */
+  /** Per-day income/spending; when given, each day shows its spending in red and a green dot when money came in. */
   totals?: Map<string, DayTotals>;
   /** Days after this can't be picked, and months after it can't be opened. */
   maxDate?: Date;
+  /** False when the screen draws its own month switcher. */
+  showHeader?: boolean;
 };
 
 /** Month grid, Monday first. Used as the Kalender tab's main view and as a compact date picker. */
-export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals, maxDate }: Props) {
+export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals, maxDate, showHeader = true }: Props) {
   const theme = useTheme();
   const today = new Date();
   const decimals = getCurrency().decimals;
@@ -29,22 +31,30 @@ export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => onMonthChange(addMonths(month, -1))} hitSlop={12} style={styles.arrow} accessibilityLabel="Bulan sebelumnya">
-          <AppSymbol material="chevron_left" sf="chevron.left" size={24} color={theme.text} />
-        </Pressable>
-        <ThemedText type="smallBold" style={styles.title}>
-          {monthFormat.format(month)}
-        </ThemedText>
-        <Pressable
-          onPress={() => onMonthChange(addMonths(month, 1))}
-          disabled={!canGoNext}
-          hitSlop={12}
-          style={[styles.arrow, !canGoNext && styles.disabled]}
-          accessibilityLabel="Bulan berikutnya">
-          <AppSymbol material="chevron_right" sf="chevron.right" size={24} color={theme.text} />
-        </Pressable>
-      </View>
+      {showHeader && (
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => onMonthChange(addMonths(month, -1))}
+            hitSlop={12}
+            style={styles.arrow}
+            accessibilityLabel="Bulan sebelumnya"
+          >
+            <AppSymbol material="chevron_left" sf="chevron.left" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText type="smallBold" style={styles.title}>
+            {monthFormat.format(month)}
+          </ThemedText>
+          <Pressable
+            onPress={() => onMonthChange(addMonths(month, 1))}
+            disabled={!canGoNext}
+            hitSlop={12}
+            style={[styles.arrow, !canGoNext && styles.disabled]}
+            accessibilityLabel="Bulan berikutnya"
+          >
+            <AppSymbol material="chevron_right" sf="chevron.right" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+      )}
 
       <View style={styles.week}>
         {WEEKDAYS.map((d) => (
@@ -59,18 +69,9 @@ export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals
           {week.map((day, j) => {
             if (!day) return <View key={j} style={styles.cell} />;
             const t = totals?.get(dateKey(day));
-            const net = t ? t.in - t.out : 0;
             const isSelected = !!selected && sameDay(day, selected);
             const isToday = sameDay(day, today);
             const disabled = !!maxDate && day > maxDate;
-            const background = isSelected
-              ? theme.primary
-              : t && net > 0
-                ? theme.positiveSoft
-                : t && net < 0
-                  ? theme.negativeSoft
-                  : theme.backgroundElement;
-            const ink = isSelected ? theme.onPrimary : net > 0 ? theme.positive : net < 0 ? theme.danger : theme.text;
             return (
               <Pressable
                 key={j}
@@ -80,18 +81,38 @@ export function MonthCalendar({ month, onMonthChange, selected, onSelect, totals
                   styles.cell,
                   styles.day,
                   totals ? styles.tall : styles.short,
-                  { backgroundColor: background },
+                  { backgroundColor: isSelected ? theme.primary : totals ? theme.background : theme.backgroundElement },
                   isToday && !isSelected && { borderColor: theme.primary, borderWidth: 1.5 },
                   disabled && styles.disabled,
                   pressed && styles.pressed,
-                ]}>
-                <ThemedText type={isToday ? 'smallBold' : 'small'} style={{ color: isSelected ? theme.onPrimary : theme.text }}>
+                ]}
+              >
+                <ThemedText
+                  type={isToday || isSelected ? 'smallBold' : 'small'}
+                  style={{ color: isSelected ? theme.onPrimary : theme.text }}
+                >
                   {day.getDate()}
                 </ThemedText>
                 {totals && (
-                  <ThemedText type="smallBold" numberOfLines={1} adjustsFontSizeToFit style={[styles.value, { color: ink }]}>
-                    {t && net !== 0 ? shortAmount(net / 10 ** decimals) : '—'}
-                  </ThemedText>
+                  <>
+                    <ThemedText
+                      type="smallBold"
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      style={[styles.value, { color: isSelected ? theme.onPrimary : theme.danger }]}
+                    >
+                      {t && t.out > 0 ? shortAmount(t.out / 10 ** decimals).slice(1) : ' '}
+                    </ThemedText>
+                    <View
+                      style={[
+                        styles.incomeDot,
+                        {
+                          backgroundColor:
+                            t && t.in > 0 ? (isSelected ? theme.onPrimary : theme.positive) : 'transparent',
+                        },
+                      ]}
+                    />
+                  </>
                 )}
               </Pressable>
             );
@@ -143,7 +164,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     gap: Spacing.half,
   },
-  // Sized so "−127rb" fits a 360px-wide phone's cell (adjustsFontSizeToFit does nothing on web).
+  incomeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  // Sized so "127rb" fits a 360px-wide phone's cell (adjustsFontSizeToFit does nothing on web).
   value: {
     fontSize: 10,
     lineHeight: 13,

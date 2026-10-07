@@ -44,7 +44,7 @@ type Unreviewed = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at'> 
 const QUICK_ACTIONS: MenuItem[] = [
   { label: 'Catat', href: '/quick-log', material: 'add', sf: 'plus' },
   { label: 'Riwayat', href: '/history', material: 'receipt_long', sf: 'list.bullet.rectangle' },
-  { label: 'Kalender', href: '/calendar', material: 'calendar_month', sf: 'calendar' },
+  { label: 'Diagram', href: '/charts', material: 'pie_chart', sf: 'chart.pie' },
   { label: 'Laporan', href: '/report', material: 'bar_chart', sf: 'chart.bar' },
 ];
 
