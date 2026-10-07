@@ -391,6 +391,7 @@ export type Database = {
           created_at: string
           day_of_month: number
           id: string
+          is_admin_fee: boolean
           name: string
           necessity: Database["public"]["Enums"]["necessity_level"] | null
           next_due: string
@@ -405,6 +406,7 @@ export type Database = {
           created_at?: string
           day_of_month: number
           id?: string
+          is_admin_fee?: boolean
           name: string
           necessity?: Database["public"]["Enums"]["necessity_level"] | null
           next_due?: string
@@ -419,6 +421,7 @@ export type Database = {
           created_at?: string
           day_of_month?: number
           id?: string
+          is_admin_fee?: boolean
           name?: string
           necessity?: Database["public"]["Enums"]["necessity_level"] | null
           next_due?: string
@@ -753,6 +756,17 @@ export type Database = {
         Returns: string
       }
       post_due_recurring: { Args: never; Returns: number }
+      post_due_recurring_details: {
+        Args: never
+        Returns: {
+          account_name: string
+          amount: number
+          is_admin_fee: boolean
+          name: string
+          posted: number
+          rule_id: string
+        }[]
+      }
       safe_to_spend: {
         Args: { p_user_id: string }
         Returns: { daily_limit: number; days_left: number; safe: number }[]

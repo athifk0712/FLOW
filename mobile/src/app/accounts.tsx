@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
@@ -19,6 +20,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
+import { type AdminFee, adminFeeProblem, loadAdminFees, saveAdminFee } from '@/lib/admin-fee';
 import type { Enums, Tables } from '@/lib/database.types';
 import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
@@ -54,14 +56,21 @@ export default function AccountsScreen() {
   const [error, setError] = useState<string | null>(null);
   // Shown above the list after an action that also changed something elsewhere.
   const [notice, setNotice] = useState<string | null>(null);
+  // Monthly admin fee per account, and the form's fields for it.
+  const [fees, setFees] = useState<Map<string, AdminFee>>(new Map());
+  const [feeOn, setFeeOn] = useState(false);
+  const [feeAmount, setFeeAmount] = useState('');
+  const [feeDay, setFeeDay] = useState('');
 
   const load = useCallback(async () => {
-    const [accs, bals] = await Promise.all([
+    const [accs, bals, feeRules] = await Promise.all([
       supabase.from('accounts').select('id, name, type, opening_balance, archived_at').order('created_at'),
       supabase.from('v_account_balances').select('account_id, current_balance'),
+      loadAdminFees().catch((e: Error) => e),
     ]);
-    const failed = accs.error ?? bals.error;
+    const failed = accs.error ?? bals.error ?? (feeRules instanceof Error ? feeRules : null);
     if (failed) return setError(failed.message);
+    if (!(feeRules instanceof Error)) setFees(feeRules);
     const balance = new Map((bals.data ?? []).map((b) => [b.account_id, b.current_balance ?? 0]));
     const rows = accs.data ?? [];
     setAccounts(rows.map((a) => ({ ...a, balance: balance.get(a.id) ?? a.opening_balance })));
@@ -84,6 +93,10 @@ export default function AccountsScreen() {
     setName(account?.name ?? '');
     setType(account?.type ?? 'BANK');
     setOpening(account ? String(account.opening_balance) : '');
+    const fee = account ? fees.get(account.id) : undefined;
+    setFeeOn(!!fee);
+    setFeeAmount(fee ? String(fee.amount) : '');
+    setFeeDay(fee ? String(fee.day_of_month) : '');
     setConfirmDelete(false);
     setPicking(target === 'new');
     setError(null);
@@ -118,11 +131,20 @@ export default function AccountsScreen() {
 
   function save() {
     const values = { name: name.trim(), type, opening_balance: Number(opening || '0') };
-    run(() =>
-      editing === 'new'
-        ? supabase.from('accounts').insert(values)
-        : supabase.from('accounts').update(values).eq('id', editing!),
-    );
+    const fee = { enabled: feeOn && type !== 'CASH', amount: Number(feeAmount || '0'), day: Number(feeDay || '0') };
+    run(async () => {
+      const saved =
+        editing === 'new'
+          ? await supabase.from('accounts').insert(values).select('id').single()
+          : await supabase.from('accounts').update(values).eq('id', editing!).select('id').single();
+      if (saved.error) return saved;
+      try {
+        await saveAdminFee(saved.data.id, values.name, fees.get(saved.data.id), fee);
+      } catch (e) {
+        return { error: { message: e instanceof Error ? e.message : 'Gagal menyimpan biaya admin.' } };
+      }
+      return { error: null };
+    });
   }
 
   function toggleArchive(account: Account) {
@@ -155,7 +177,11 @@ export default function AccountsScreen() {
   }
 
   const editingAccount = accounts?.find((a) => a.id === editing);
-  const canSave = name.trim().length > 0 && !saving;
+  const feeIssue =
+    type === 'CASH'
+      ? null
+      : adminFeeProblem({ enabled: feeOn, amount: Number(feeAmount || '0'), day: Number(feeDay || '0') });
+  const canSave = name.trim().length > 0 && !feeIssue && !saving;
   const inputStyle = [styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }];
   const active = accounts?.filter((a) => !a.archived_at) ?? [];
   const archived = accounts?.filter((a) => a.archived_at) ?? [];
@@ -231,6 +257,70 @@ export default function AccountsScreen() {
         </View>
       </View>
 
+      {type !== 'CASH' && (
+        <View style={[styles.feeBox, { backgroundColor: theme.backgroundSelected }]}>
+          <View style={styles.feeHeader}>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold">Potong biaya admin bulanan otomatis</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Dicatat sebagai pengeluaran &quot;Biaya Admin Bank&quot; tiap bulan, supaya saldo tetap cocok.
+              </ThemedText>
+            </View>
+            <Switch
+              value={feeOn}
+              onValueChange={setFeeOn}
+              trackColor={{ true: theme.primary, false: theme.backgroundElement }}
+              accessibilityLabel="Potong biaya admin bulanan otomatis"
+            />
+          </View>
+          {feeOn && (
+            <View style={styles.feeFields}>
+              <View style={styles.feeAmount}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Nominal
+                </ThemedText>
+                <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
+                  <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
+                  <TextInput
+                    style={[styles.priceInput, { color: theme.text }]}
+                    value={formatDigits(feeAmount)}
+                    onChangeText={(t) => setFeeAmount(toDigits(t))}
+                    placeholder="15.000"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+              <View style={styles.feeDay}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Tanggal
+                </ThemedText>
+                <TextInput
+                  style={[styles.priceInput, styles.dayInput, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+                  value={feeDay}
+                  onChangeText={(t) => setFeeDay(t.replace(/\D/g, '').slice(0, 2))}
+                  placeholder="25"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+              </View>
+            </View>
+          )}
+          {feeOn && !fees.get(editing ?? '') && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Potongan pertama di tanggal itu berikutnya (hari ini atau bulan depan), jadi saldo yang sudah kamu isi
+              tidak terpotong dua kali.
+            </ThemedText>
+          )}
+          {feeIssue && (feeAmount !== '' || feeDay !== '') && (
+            <ThemedText type="small" themeColor="warning">
+              {feeIssue}
+            </ThemedText>
+          )}
+        </View>
+      )}
+
       {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
       <View style={styles.actions}>
@@ -279,6 +369,7 @@ export default function AccountsScreen() {
 
   function renderAccount(account: Account) {
     if (editing === account.id) return <View key={account.id}>{form}</View>;
+    const fee = fees.get(account.id);
     return (
       <Pressable
         key={account.id}
@@ -290,6 +381,7 @@ export default function AccountsScreen() {
             <ThemedText>{account.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {TYPE_LABEL[account.type]}
+              {fee ? ` · admin ${formatMoney(fee.amount)} tiap tgl ${fee.day_of_month}` : ''}
             </ThemedText>
           </View>
           <ThemedText type="smallBold">{formatMoney(account.balance)}</ThemedText>
@@ -427,6 +519,32 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.two,
+  },
+  feeBox: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  feeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  feeFields: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  feeAmount: {
+    flex: 1,
+  },
+  feeDay: {
+    width: 84,
+  },
+  dayInput: {
+    flex: 0,
+    marginTop: Spacing.one,
+    borderRadius: Spacing.two,
+    textAlign: 'center',
   },
   actions: {
     flexDirection: 'row',

@@ -14,10 +14,12 @@ import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Toast } from '@/components/toast';
 import { BottomTabInset, MaxContentWidth, Spacing, WideContentWidth } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { useWide } from '@/hooks/use-wide';
+import { adminFeeMessages } from '@/lib/admin-fee';
 import { cycleKey, cycleRange, untilLabel } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
@@ -75,6 +77,9 @@ export default function HomeScreen() {
   const [spentToday, setSpentToday] = useState(0);
   const [timeInsight, setTimeInsight] = useState<TimeInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Admin fees charged on this open, shown one after another.
+  const [toasts, setToasts] = useState<string[]>([]);
+  const hideToast = useCallback(() => setToasts((list) => list.slice(1)), []);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
   useFocusEffect(
@@ -124,8 +129,10 @@ export default function HomeScreen() {
       // Habits are a nice-to-have: failures just leave the card hidden.
       const loadHabits = () => fetchHabits().then(setHabits, () => {});
       supabase
-        .rpc('post_due_recurring')
-        .then(() => {
+        .rpc('post_due_recurring_details')
+        .then(({ data }) => {
+          const messages = adminFeeMessages(data ?? []);
+          if (messages.length > 0) setToasts((list) => [...list, ...messages]);
           loadHabits();
           syncDueReminders(); // next_due may have moved on
           return load();
@@ -361,6 +368,7 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       )}
+      <Toast message={toasts[0] ?? null} onHide={hideToast} />
     </ThemedView>
   );
 }
