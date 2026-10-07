@@ -8,10 +8,14 @@ import { ThemedView } from '@/components/themed-view';
 import { DANGER_COLOR, NECESSITY } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { storagePersists } from '@/lib/safe-storage';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
 type Panel = 'none' | 'link' | 'signin';
+
+// Checked once: whether this browser keeps the guest's login after the page closes.
+const PERSISTS = storagePersists();
 
 /** Guest: save the account with Google or email, or open an existing one. Signed-in user: show it, allow signing out. */
 export function AccountSection() {
@@ -70,6 +74,12 @@ export function AccountSection() {
         Datamu tersimpan, tapi hanya bisa dibuka dari perangkat ini. Simpan dengan Google atau email supaya aman dan
         bisa dibuka di HP maupun laptop.
       </ThemedText>
+      {!PERSISTS && (
+        <ThemedText type="small" style={styles.warning}>
+          Browser ini tidak menyimpan data (mode privat atau cookie diblokir). Catatan tamu akan hilang saat halaman
+          ditutup. Buka Flowku di Safari/Chrome biasa supaya tersimpan.
+        </ThemedText>
+      )}
 
       {panel === 'signin' ? (
         <>

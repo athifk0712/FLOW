@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
+import { safeStorage, storagePersists } from '@/lib/safe-storage';
 import { supabase } from '@/lib/supabase';
 
 // Closes the auth popup on web if this page was opened as one.
@@ -29,6 +30,14 @@ function isTaken(code: string | undefined, message: string) {
 function describeError(code: string | undefined, message: string): GoogleResult {
   if (isTaken(code, message)) return { kind: 'taken' };
   const text = message.toLowerCase();
+  if (code === 'no_authorization' || text.includes('bearer token')) {
+    return {
+      kind: 'error',
+      message: storagePersists()
+        ? 'Sesi tamu hilang. Muat ulang halaman, lalu coba lagi.'
+        : 'Browser ini tidak menyimpan data login (mode privat atau cookie diblokir). Buka Flowku di Safari/Chrome biasa, lalu coba lagi.',
+    };
+  }
   if (code === 'manual_linking_disabled' || text.includes('manual linking')) {
     return { kind: 'error', message: 'Menautkan Google belum diaktifkan di Supabase (Allow manual linking).' };
   }
@@ -68,13 +77,13 @@ export async function continueWithGoogle(mode: OAuthMode): Promise<GoogleResult>
     : Linking.createURL('/');
   const options = { redirectTo, skipBrowserRedirect: !isWeb };
 
-  if (isWeb && mode === 'link') localStorage.setItem(WEB_LINK_KEY, String(Date.now()));
+  if (isWeb && mode === 'link') safeStorage.setItem(WEB_LINK_KEY, String(Date.now()));
   const { data, error } =
     mode === 'link'
       ? await supabase.auth.linkIdentity({ provider: 'google', options })
       : await supabase.auth.signInWithOAuth({ provider: 'google', options });
   if (error) {
-    if (isWeb) localStorage.removeItem(WEB_LINK_KEY);
+    if (isWeb) safeStorage.removeItem(WEB_LINK_KEY);
     return describeError((error as AuthError).code, error.message);
   }
   if (isWeb) return { kind: 'ok' }; // the page is leaving for Google
@@ -99,9 +108,9 @@ export async function continueWithGoogle(mode: OAuthMode): Promise<GoogleResult>
  */
 export async function takeWebLinkResult(): Promise<GoogleResult | null> {
   if (Platform.OS !== 'web') return null;
-  const startedAt = Number(localStorage.getItem(WEB_LINK_KEY));
+  const startedAt = Number(safeStorage.getItem(WEB_LINK_KEY));
   if (!startedAt) return null;
-  localStorage.removeItem(WEB_LINK_KEY);
+  safeStorage.removeItem(WEB_LINK_KEY);
   if (Date.now() - startedAt > WEB_LINK_TTL_MS) return null;
 
   await supabase.auth.getSession();

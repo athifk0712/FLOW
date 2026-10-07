@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
 import type { Database } from '@/lib/database.types';
+import { safeStorage } from '@/lib/safe-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -30,7 +31,7 @@ async function fetchWithSkewRetry(input: RequestInfo | URL, init?: RequestInit):
 export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   global: { fetch: fetchWithSkewRetry },
   auth: {
-    storage: localStorage,
+    storage: safeStorage,
     autoRefreshToken: true,
     persistSession: true,
     // PKCE so Google login returns a one-time ?code= (lib/oauth.ts). On web the page itself comes back from Google
