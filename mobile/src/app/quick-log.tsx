@@ -1,6 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useEffectEvent, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
@@ -13,7 +22,7 @@ import { guessIcon } from '@/constants/category-icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesInsert } from '@/lib/database.types';
-import { formatMoney, getCurrency } from '@/lib/money';
+import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -27,8 +36,8 @@ const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
 const LOW_BUDGET_SHARE = 0.2;
 
 const MODES: { value: Mode; label: string }[] = [
-  { value: 'EXPENSE', label: 'Keluar' },
-  { value: 'INCOME', label: 'Masuk' },
+  { value: 'EXPENSE', label: 'Pengeluaran' },
+  { value: 'INCOME', label: 'Pemasukan' },
   { value: 'TRANSFER', label: 'Transfer' },
 ];
 
@@ -39,29 +48,29 @@ const SAVE_LABEL: Record<Mode, string> = {
 };
 
 const FROM_LABEL: Record<Mode, string> = {
-  EXPENSE: 'Akun bayar',
-  INCOME: 'Masuk ke akun',
+  EXPENSE: 'Bayar pakai',
+  INCOME: 'Masuk ke',
   TRANSFER: 'Dari akun',
 };
 
 const whenFormat = new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const QUICK_LOG_WIDTH = 520;
-
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'del'] as const;
 const MAX_DIGITS = 12;
 
-// With cents, "000" would jump from $1 to $1000; "00" closes a whole amount instead.
-const keyDigits = (key: (typeof KEYS)[number]) => (key === '000' && getCurrency().decimals > 0 ? '00' : key);
+const isOtherName = (name: string) => name.trim().toLowerCase() === 'lainnya';
 
-// Two-tap quick log: amount -> category -> save. Necessity is left NULL for the nightly chat.
-// Income and transfers use the same screen; only expenses go to the nightly chat.
+// Quick entry that fits one phone screen: type, amount (the keyboard opens straight away), category, account, and a
+// save button that stays above the keyboard. Date and note are folded under "Opsi tambahan".
+// Necessity is left NULL for the nightly check; only expenses go there.
 // A category is required (nothing is saved "somewhere"); "Lainnya" also needs a note saying what it was,
 // and a missing category can be created right here with its own icon.
 export default function QuickLogScreen() {
   const theme = useTheme();
+  const currency = useCurrency();
   const [mode, setMode] = useState<Mode>('EXPENSE');
   const [digits, setDigits] = useState('');
+  const [amountFocused, setAmountFocused] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -72,6 +81,7 @@ export default function QuickLogScreen() {
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showExtras, setShowExtras] = useState(false);
   // null = "now"; set when logging something from earlier (e.g. yesterday's lunch).
   const [occurredAt, setOccurredAt] = useState<Date | null>(null);
   const [pickingDate, setPickingDate] = useState(false);
@@ -83,7 +93,6 @@ export default function QuickLogScreen() {
   const [iconTouched, setIconTouched] = useState(false);
   const [pickingIcon, setPickingIcon] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [typingNote, setTypingNote] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -139,18 +148,22 @@ export default function QuickLogScreen() {
   const kind = mode === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const visibleCategories = categories.filter((c) => c.kind === kind);
   const selected = visibleCategories.find((c) => c.id === categoryId);
-  const isOther = selected?.name.trim().toLowerCase() === 'lainnya';
+  const isOther = !!selected && isOtherName(selected.name);
   const missing =
     amount <= 0
       ? null
       : !isTransfer && !selected
         ? 'Pilih kategori dulu, supaya jelas uang ini untuk apa.'
         : !isTransfer && isOther && !note.trim()
-          ? '"Lainnya" untuk apa? Tulis di catatan, atau buat kategori baru.'
+          ? '"Lainnya" untuk apa? Tulis di catatan (Opsi tambahan), atau buat kategori baru.'
           : null;
   const canSave = amount > 0 && accountsValid && !missing && !saving;
   const guessed = mode === 'EXPENSE' && !!guess && categoryId === guess;
   const budgetNote = mode === 'EXPENSE' ? describeBudget(budgets, categories, categoryId, amount) : null;
+
+  // Categories in columns of two, so the grid scrolls sideways in two compact rows.
+  const columns: Category[][] = [];
+  for (let i = 0; i < visibleCategories.length; i += 2) columns.push(visibleCategories.slice(i, i + 2));
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -165,12 +178,12 @@ export default function QuickLogScreen() {
     if (id === toAccountId) setToAccountId(accounts.find((a) => a.id !== id)?.id ?? null);
   }
 
-  function press(key: (typeof KEYS)[number]) {
-    if (key === 'del') return setDigits((d) => d.slice(0, -1));
-    setDigits((d) => {
-      const next = (d + keyDigits(key)).replace(/^0+/, '');
-      return next.length > MAX_DIGITS ? d : next;
-    });
+  function pickCategory(c: Category) {
+    const on = c.id === categoryId;
+    setCategoryId(on ? null : c.id);
+    setAdding(false);
+    // "Lainnya" needs a note, so open the section where the note lives.
+    if (!on && isOtherName(c.name)) setShowExtras(true);
   }
 
   function openNewCategory() {
@@ -225,15 +238,10 @@ export default function QuickLogScreen() {
     closeModal();
   }
 
-  // On a laptop: type the amount, Backspace to correct, Enter to save. Ignored while typing in a text field.
+  // On a laptop: Enter saves (also from the amount field) and Escape closes.
   const onKey = useEffectEvent((e: KeyboardEvent) => {
-    const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (/^[0-9]$/.test(e.key)) press(e.key as (typeof KEYS)[number]);
-    else if (e.key === 'Backspace') press('del');
-    else if (e.key === 'Enter') save();
-    else if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') closeModal();
+    else if (e.key === 'Enter' && !adding) save();
     else return;
     e.preventDefault();
   });
@@ -244,259 +252,301 @@ export default function QuickLogScreen() {
     return () => window.removeEventListener('keydown', listener);
   }, []);
 
-  const chip = (selected: boolean) => [
-    styles.chip,
-    { backgroundColor: selected ? theme.primary : theme.backgroundElement },
-  ];
-  const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
+  const chip = (on: boolean) => [styles.chip, { backgroundColor: on ? theme.primary : theme.backgroundElement }];
+  const chipText = (on: boolean) => ({ color: on ? theme.onPrimary : theme.text });
+  const accountChips = (list: Account[], current: string | null, onPick: (id: string) => void) => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.chipRow}
+      contentContainerStyle={styles.chips}>
+      {list.map((a) => (
+        <Pressable key={a.id} onPress={() => onPick(a.id)} style={chip(a.id === current)}>
+          <ThemedText type="small" style={chipText(a.id === current)}>
+            {a.name}
+          </ThemedText>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-        <View style={styles.header}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            QUICK LOG
-          </ThemedText>
-          <Pressable onPress={closeModal} hitSlop={12}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+          <View style={styles.header}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              Batal
+              CATAT
             </ThemedText>
-          </Pressable>
-        </View>
-
-        <View style={[styles.modes, { backgroundColor: theme.backgroundElement }]}>
-          {MODES.map((m) => (
-            <Pressable
-              key={m.value}
-              onPress={() => switchMode(m.value)}
-              style={[styles.mode, m.value === mode && { backgroundColor: theme.primary }]}>
-              <ThemedText type="smallBold" style={chipText(m.value === mode)}>
-                {m.label}
+            <Pressable onPress={closeModal} hitSlop={12}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                Batal
               </ThemedText>
             </Pressable>
-          ))}
-        </View>
+          </View>
 
-        {/* Scrolls when the date calendar is open on a short phone screen; keypad and save stay put. */}
-        <ScrollView style={styles.middle} contentContainerStyle={styles.middleContent} keyboardShouldPersistTaps="handled">
-        <ThemedText style={styles.amount} numberOfLines={1} adjustsFontSizeToFit>
-          {formatMoney(amount)}
-        </ThemedText>
+          <View style={[styles.modes, { backgroundColor: theme.backgroundElement }]}>
+            {MODES.map((m) => (
+              <Pressable
+                key={m.value}
+                onPress={() => switchMode(m.value)}
+                style={[styles.mode, m.value === mode && { backgroundColor: theme.primary }]}>
+                <ThemedText type="smallBold" style={chipText(m.value === mode)}>
+                  {m.label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
 
-        <Pressable
-          onPress={() => setPickingDate((p) => !p)}
-          style={({ pressed }) => [styles.when, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Ubah tanggal transaksi">
-          <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
-          <ThemedText type="small">{occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}</ThemedText>
-          <ThemedText type="smallBold" themeColor="primary">
-            {pickingDate ? 'Selesai' : 'Ubah'}
-          </ThemedText>
-        </Pressable>
-        {pickingDate && <DateTimeField value={occurredAt ?? new Date()} onChange={setOccurredAt} />}
-
-        <ThemedText type="small" themeColor="textSecondary">
-          {FROM_LABEL[mode]}
-          {mode === 'EXPENSE' && accounts.length > 1 ? ' (otomatis: terakhir dipakai)' : ''}
-        </ThemedText>
-        {loaded && accounts.length === 0 && (
-          <Pressable onPress={() => router.replace('/accounts')} style={chip(false)}>
-            <ThemedText type="small">Belum ada akun. Tambahkan dulu →</ThemedText>
-          </Pressable>
-        )}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipRow}
-          contentContainerStyle={styles.chips}>
-          {accounts.map((a) => (
-            <Pressable key={a.id} onPress={() => pickFrom(a.id)} style={chip(a.id === accountId)}>
-              <ThemedText type="small" style={chipText(a.id === accountId)}>
-                {a.name}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {isTransfer ? (
-          <>
-            <ThemedText type="small" themeColor="textSecondary">
-              Ke akun
-            </ThemedText>
-            {accounts.length < 2 ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Butuh minimal dua akun untuk transfer.
-              </ThemedText>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.chipRow}
-                contentContainerStyle={styles.chips}>
-                {accounts
-                  .filter((a) => a.id !== accountId)
-                  .map((a) => (
-                    <Pressable key={a.id} onPress={() => setToAccountId(a.id)} style={chip(a.id === toAccountId)}>
-                      <ThemedText type="small" style={chipText(a.id === toAccountId)}>
-                        {a.name}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-              </ScrollView>
-            )}
-          </>
-        ) : (
-          <>
-            <ThemedText type="small" themeColor="textSecondary">
-              Kategori{guessed ? ' (tebakan dari jam ini)' : ''}
-            </ThemedText>
-            <View style={styles.chipsWrap}>
-              {visibleCategories.map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => {
-                    setCategoryId(c.id === categoryId ? null : c.id);
-                    setAdding(false);
-                  }}
-                  style={[chip(c.id === categoryId), styles.iconChip]}>
-                  <CategoryIcon icon={c.icon} size={24} />
-                  <ThemedText type="small" style={chipText(c.id === categoryId)}>
-                    {c.name}
-                  </ThemedText>
-                </Pressable>
-              ))}
-              {!adding && (
-                <Pressable
-                  onPress={openNewCategory}
-                  style={[styles.chip, styles.iconChip, styles.newChip, { borderColor: theme.primary }]}>
-                  <AppSymbol material="add" sf="plus" size={20} color={theme.primary} />
-                  <ThemedText type="small" themeColor="primary">
-                    Kategori baru
-                  </ThemedText>
-                </Pressable>
-              )}
+          {/* The main fields fit a phone screen; opened extras or a new category scroll, the save button stays. */}
+          <ScrollView style={styles.flex} contentContainerStyle={styles.middle} keyboardShouldPersistTaps="handled">
+            <View style={[styles.amountRow, { borderColor: amountFocused ? theme.primary : theme.backgroundSelected }]}>
+              <ThemedText style={[styles.symbol, { color: theme.textSecondary }]}>{currency.symbol.trim()}</ThemedText>
+              <TextInput
+                value={formatDigits(digits)}
+                onChangeText={(t) => setDigits(toDigits(t, MAX_DIGITS))}
+                onFocus={() => setAmountFocused(true)}
+                onBlur={() => setAmountFocused(false)}
+                onSubmitEditing={save}
+                placeholder="0"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                autoFocus
+                accessibilityLabel="Nominal"
+                style={[styles.amount, { color: theme.text }]}
+              />
             </View>
-            {adding && (
-              <ThemedView type="backgroundElement" style={styles.newForm}>
-                <View style={styles.newRow}>
+
+            {!isTransfer && (
+              <>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Kategori{guessed ? ' (tebakan dari jam ini)' : ''}
+                </ThemedText>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.chipRow}
+                  contentContainerStyle={styles.grid}>
+                  {columns.map((column) => (
+                    <View key={column[0].id} style={styles.column}>
+                      {column.map((c) => {
+                        const on = c.id === categoryId;
+                        return (
+                          <Pressable
+                            key={c.id}
+                            onPress={() => pickCategory(c)}
+                            accessibilityState={{ selected: on }}
+                            style={({ pressed }) => [
+                              styles.tile,
+                              { backgroundColor: on ? theme.primary : theme.backgroundElement },
+                              pressed && styles.pressed,
+                            ]}>
+                            <CategoryIcon icon={c.icon} size={30} />
+                            <ThemedText type="small" numberOfLines={1} style={[styles.tileText, chipText(on)]}>
+                              {c.name}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ))}
                   <Pressable
-                    onPress={() => setPickingIcon((p) => !p)}
-                    accessibilityLabel="Pilih ikon"
-                    style={({ pressed }) => pressed && styles.pressed}>
-                    <CategoryIcon icon={newIcon} size={40} />
+                    onPress={openNewCategory}
+                    style={({ pressed }) => [
+                      styles.tile,
+                      styles.newTile,
+                      { borderColor: theme.primary },
+                      pressed && styles.pressed,
+                    ]}>
+                    <AppSymbol material="add" sf="plus" size={26} color={theme.primary} />
+                    <ThemedText type="small" themeColor="primary" numberOfLines={1} style={styles.tileText}>
+                      Baru
+                    </ThemedText>
                   </Pressable>
-                  <TextInput
-                    value={newName}
-                    onChangeText={(text) => {
-                      setNewName(text);
-                      if (!iconTouched) setNewIcon(guessIcon(text));
-                    }}
-                    onSubmitEditing={createCategory}
-                    placeholder="Nama kategori, mis. Skincare"
-                    placeholderTextColor={theme.textSecondary}
-                    maxLength={30}
-                    autoFocus
-                    style={[styles.input, styles.flex, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
-                  />
-                </View>
-                {pickingIcon && (
-                  <IconPicker
-                    value={newIcon}
-                    onChange={(key) => {
-                      setNewIcon(key);
-                      setIconTouched(true);
-                      setPickingIcon(false);
-                    }}
-                  />
+                </ScrollView>
+                {adding && (
+                  <ThemedView type="backgroundElement" style={styles.panel}>
+                    <View style={styles.row}>
+                      <Pressable
+                        onPress={() => setPickingIcon((p) => !p)}
+                        accessibilityLabel="Pilih ikon"
+                        style={({ pressed }) => pressed && styles.pressed}>
+                        <CategoryIcon icon={newIcon} size={40} />
+                      </Pressable>
+                      <TextInput
+                        value={newName}
+                        onChangeText={(text) => {
+                          setNewName(text);
+                          if (!iconTouched) setNewIcon(guessIcon(text));
+                        }}
+                        onSubmitEditing={createCategory}
+                        placeholder="Nama kategori, mis. Skincare"
+                        placeholderTextColor={theme.textSecondary}
+                        maxLength={30}
+                        autoFocus
+                        style={[styles.input, styles.flex, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
+                      />
+                    </View>
+                    {pickingIcon && (
+                      <IconPicker
+                        value={newIcon}
+                        onChange={(key) => {
+                          setNewIcon(key);
+                          setIconTouched(true);
+                          setPickingIcon(false);
+                        }}
+                      />
+                    )}
+                    <View style={styles.row}>
+                      <Pressable onPress={() => setPickingIcon((p) => !p)} hitSlop={8} style={styles.flex}>
+                        <ThemedText type="small" themeColor="primary">
+                          {pickingIcon ? 'Tutup ikon' : 'Ganti ikon'}
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable onPress={() => setAdding(false)} hitSlop={8}>
+                        <ThemedText type="smallBold" themeColor="textSecondary">
+                          Batal
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        onPress={createCategory}
+                        disabled={!newName.trim() || creating}
+                        style={[
+                          styles.addButton,
+                          { backgroundColor: theme.primary },
+                          (!newName.trim() || creating) && styles.disabled,
+                        ]}>
+                        <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                          {creating ? 'Menyimpan…' : 'Tambah'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </ThemedView>
                 )}
-                <View style={styles.newRow}>
-                  <Pressable onPress={() => setPickingIcon((p) => !p)} hitSlop={8} style={styles.flex}>
-                    <ThemedText type="small" themeColor="primary">
-                      {pickingIcon ? 'Tutup ikon' : 'Ganti ikon'}
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable onPress={() => setAdding(false)} hitSlop={8}>
-                    <ThemedText type="smallBold" themeColor="textSecondary">
-                      Batal
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable
-                    onPress={createCategory}
-                    disabled={!newName.trim() || creating}
-                    style={[styles.addButton, { backgroundColor: theme.primary }, (!newName.trim() || creating) && styles.disabled]}>
-                    <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                      {creating ? 'Menyimpan…' : 'Tambah'}
-                    </ThemedText>
-                  </Pressable>
-                </View>
+              </>
+            )}
+
+            <ThemedText type="small" themeColor="textSecondary">
+              {FROM_LABEL[mode]}
+            </ThemedText>
+            {loaded && accounts.length === 0 && (
+              <Pressable onPress={() => router.replace('/accounts')} style={chip(false)}>
+                <ThemedText type="small">Belum ada akun. Tambahkan dulu →</ThemedText>
+              </Pressable>
+            )}
+            {accountChips(accounts, accountId, pickFrom)}
+
+            {isTransfer && (
+              <>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Ke akun
+                </ThemedText>
+                {accounts.length < 2 ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Butuh minimal dua akun untuk transfer.
+                  </ThemedText>
+                ) : (
+                  accountChips(
+                    accounts.filter((a) => a.id !== accountId),
+                    toAccountId,
+                    setToAccountId,
+                  )
+                )}
+              </>
+            )}
+
+            <Pressable
+              onPress={() => setShowExtras((s) => !s)}
+              style={({ pressed }) => [styles.extrasToggle, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showExtras }}>
+              <View style={styles.flex}>
+                <ThemedText type="smallBold">Opsi tambahan</ThemedText>
+                {!showExtras && (
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}
+                    {note.trim() ? ` · ${note.trim()}` : ' · catatan'}
+                  </ThemedText>
+                )}
+              </View>
+              <AppSymbol
+                material={showExtras ? 'expand_less' : 'expand_more'}
+                sf={showExtras ? 'chevron.up' : 'chevron.down'}
+                size={22}
+                color={theme.textSecondary}
+              />
+            </Pressable>
+            {showExtras && (
+              <ThemedView type="backgroundElement" style={styles.panel}>
+                <Pressable
+                  onPress={() => setPickingDate((p) => !p)}
+                  style={({ pressed }) => [
+                    styles.when,
+                    { backgroundColor: theme.backgroundSelected },
+                    pressed && styles.pressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ubah tanggal transaksi">
+                  <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
+                  <ThemedText type="small" style={styles.flex}>
+                    {occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}
+                  </ThemedText>
+                  <ThemedText type="smallBold" themeColor="primary">
+                    {pickingDate ? 'Selesai' : 'Ubah'}
+                  </ThemedText>
+                </Pressable>
+                {pickingDate && <DateTimeField value={occurredAt ?? new Date()} onChange={setOccurredAt} />}
+                <TextInput
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder={isOther ? 'Lainnya untuk apa? mis. kado ulang tahun teman' : 'Catatan: beli apa, di mana'}
+                  placeholderTextColor={theme.textSecondary}
+                  maxLength={120}
+                  style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
+                />
+                <ThemedText type="small" themeColor="textSecondary">
+                  Foto struk bisa ditambahkan setelah disimpan: buka transaksinya dari Riwayat.
+                </ThemedText>
               </ThemedView>
             )}
-          </>
-        )}
 
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          onFocus={() => setTypingNote(true)}
-          onBlur={() => setTypingNote(false)}
-          placeholder={isOther ? 'Lainnya untuk apa? mis. kado ulang tahun teman' : 'Catatan: beli apa, di mana (opsional)'}
-          placeholderTextColor={theme.textSecondary}
-          maxLength={120}
-          style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-        />
+            {budgetNote && (
+              <ThemedText
+                type="small"
+                themeColor={budgetNote.level === 'ok' ? 'textSecondary' : budgetNote.level === 'over' ? 'danger' : 'warning'}>
+                {budgetNote.text}
+              </ThemedText>
+            )}
+            {missing && (
+              <ThemedText type="small" themeColor="warning">
+                {missing}
+              </ThemedText>
+            )}
+            {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+          </ScrollView>
 
-        {budgetNote && (
-          <ThemedText
-            type="small"
-            themeColor={budgetNote.level === 'ok' ? 'textSecondary' : budgetNote.level === 'over' ? 'danger' : 'warning'}>
-            {budgetNote.text}
-          </ThemedText>
-        )}
-
-        {missing && (
-          <ThemedText type="small" themeColor="warning">
-            {missing}
-          </ThemedText>
-        )}
-        {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-        </ScrollView>
-
-        {/* While the calendar or a text field is open it takes the keypad's place, so everything fits on a phone. */}
-        <View style={[styles.keypad, (pickingDate || adding || typingNote) && styles.hidden]}>
-          {KEYS.map((key) => (
-            <Pressable
-              key={key}
-              onPress={() => press(key)}
-              onLongPress={key === 'del' ? () => setDigits('') : undefined}
-              style={({ pressed }) => [
-                styles.key,
-                { backgroundColor: theme.backgroundElement },
-                pressed && styles.pressed,
-              ]}>
-              <ThemedText style={styles.keyText}>{key === 'del' ? '⌫' : keyDigits(key)}</ThemedText>
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          disabled={!canSave}
-          onPress={save}
-          style={({ pressed }) => [
-            styles.save,
-            { backgroundColor: theme.primary },
-            !canSave && !saving && styles.disabled,
-            (pressed || saving) && styles.pressed,
-          ]}>
-          {saving ? (
-            <ActivityIndicator color={theme.onPrimary} />
-          ) : (
-            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-              {SAVE_LABEL[mode]}
-            </ThemedText>
-          )}
-        </Pressable>
-      </SafeAreaView>
+          <Pressable
+            disabled={!canSave}
+            onPress={save}
+            style={({ pressed }) => [
+              styles.save,
+              { backgroundColor: theme.primary },
+              !canSave && !saving && styles.disabled,
+              (pressed || saving) && styles.pressed,
+            ]}>
+            {saving ? (
+              <ActivityIndicator color={theme.onPrimary} />
+            ) : (
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                {SAVE_LABEL[mode]}
+              </ThemedText>
+            )}
+          </Pressable>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -515,65 +565,18 @@ function describeBudget(budgets: CategoryBudget[], categories: Category[], categ
 }
 
 const styles = StyleSheet.create({
-  middle: {
-    flex: 1,
-  },
-  middleContent: {
-    gap: Spacing.two,
-  },
-  when: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-  },
-  newChip: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    paddingVertical: Spacing.two - 1.5,
-  },
-  newForm: {
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  newRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  addButton: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-  },
-  input: {
-    fontSize: 16,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    borderRadius: Spacing.three,
-  },
   flex: {
     flex: 1,
   },
-  iconChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one + 2,
-    paddingLeft: Spacing.one + 2,
-  },
   container: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
   safeArea: {
     flex: 1,
-    // Narrower than other screens: a keypad stretched across a laptop is hard to use.
+    width: '100%',
+    // Narrower than other screens: a form stretched across a laptop is hard to scan.
     maxWidth: QUICK_LOG_WIDTH,
+    alignSelf: 'center',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     gap: Spacing.two,
@@ -593,11 +596,30 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: Spacing.two,
   },
+  middle: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderBottomWidth: 2,
+    marginBottom: Spacing.one,
+  },
+  symbol: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: 700,
+  },
   amount: {
-    fontSize: 44,
-    lineHeight: 56,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 40,
     fontWeight: 700,
     paddingVertical: Spacing.two,
+    // The row's underline shows focus; the browser's own ring is drawn off-position on web.
+    outlineWidth: 0,
   },
   // Without this, a horizontal ScrollView on web grows to fill free height and stretches the chips.
   chipRow: {
@@ -607,45 +629,77 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     alignItems: 'flex-start',
   },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.five,
   },
-  keypad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  grid: {
     gap: Spacing.two,
-    marginTop: 'auto',
   },
-  key: {
-    width: '31.5%',
-    flexGrow: 1,
+  column: {
+    gap: Spacing.two,
+  },
+  tile: {
+    width: 76,
     alignItems: 'center',
-    paddingVertical: Spacing.three,
+    gap: Spacing.one,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.one,
     borderRadius: Spacing.three,
   },
-  keyText: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: 600,
+  tileText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  newTile: {
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  panel: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  addButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
+  },
+  extrasToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  when: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    borderRadius: Spacing.three,
+  },
+  input: {
+    fontSize: 16,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    borderRadius: Spacing.three,
   },
   save: {
     alignItems: 'center',
-    paddingVertical: Spacing.three,
+    paddingVertical: Spacing.three + 2,
     borderRadius: Spacing.three,
     marginBottom: Spacing.two,
   },
   disabled: {
     opacity: 0.35,
-  },
-  hidden: {
-    display: 'none',
   },
   pressed: {
     opacity: 0.7,
