@@ -1,19 +1,23 @@
+import { Image } from 'expo-image';
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmailOtpForm } from '@/components/email-otp-form';
 import { GoogleButton } from '@/components/google-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Wordmark } from '@/components/wordmark';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import { useSession } from '@/providers/session-provider';
 
-// Shown after signing out of an email account, or if the automatic guest sign-in failed.
-export default function SignInScreen() {
-  const { error: guestError } = useSession();
+// Welcome: what a device without a session sees (first launch, or after signing out). Returning users keep their
+// session and go straight to Beranda. Google and email open an existing account or make a new one; guest mode
+// starts right away and can be saved to Google or email later from Pengaturan. New accounts continue to the
+// onboarding (name, payday, accounts).
+export default function WelcomeScreen() {
+  const theme = useTheme();
+  const [showEmail, setShowEmail] = useState(false);
   const [startingGuest, setStartingGuest] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,29 +35,66 @@ export default function SignInScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <SafeAreaView style={styles.flex}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Wordmark size={40} />
-            <ThemedText themeColor="textSecondary">
-              Masuk dengan Google atau email untuk membuka datamu di HP dan laptop.
-            </ThemedText>
+            <View style={styles.hero}>
+              <Image source={require('@/assets/images/icon.png')} style={styles.logo} />
+              <ThemedText style={[styles.brand, { color: theme.primary }]}>Flowku</ThemedText>
+              <ThemedText type="subtitle" style={styles.center}>
+                Uangmu mengalir tenang.
+              </ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.center}>
+                Catat pengeluaran dalam dua ketukan, lihat polanya, dan tahu berapa yang aman dibelanjakan hari ini.
+              </ThemedText>
+            </View>
 
-            {guestError && <ThemedText themeColor="danger">Gagal masuk sebagai tamu: {guestError}</ThemedText>}
+            <View style={styles.actions}>
+              <GoogleButton mode="signin" label="Daftar / Masuk dengan Google" />
 
-            <GoogleButton mode="signin" label="Lanjut dengan Google" />
-            <ThemedText type="small" themeColor="textSecondary" style={styles.or}>
-              atau pakai email
-            </ThemedText>
-            <EmailOtpForm mode="signin" allowSignUp submitLabel="Kirim kode masuk" />
-
-            <Pressable disabled={startingGuest} onPress={continueAsGuest} style={styles.guest} hitSlop={8}>
-              {startingGuest ? (
-                <ActivityIndicator />
+              {showEmail ? (
+                <ThemedView type="backgroundElement" style={styles.emailCard}>
+                  <EmailOtpForm mode="signin" allowSignUp submitLabel="Kirim kode masuk" />
+                </ThemedView>
               ) : (
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  Lanjut tanpa akun →
-                </ThemedText>
+                <Pressable
+                  onPress={() => setShowEmail(true)}
+                  style={({ pressed }) => [
+                    styles.button,
+                    { borderColor: theme.backgroundSelected, backgroundColor: theme.background },
+                    pressed && styles.pressed,
+                  ]}>
+                  <ThemedText type="smallBold">Masuk dengan email</ThemedText>
+                </Pressable>
               )}
-            </Pressable>
-            {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+
+              <View style={styles.divider}>
+                <View style={[styles.line, { backgroundColor: theme.backgroundSelected }]} />
+                <ThemedText type="small" themeColor="textSecondary">
+                  atau
+                </ThemedText>
+                <View style={[styles.line, { backgroundColor: theme.backgroundSelected }]} />
+              </View>
+
+              <Pressable
+                disabled={startingGuest}
+                onPress={continueAsGuest}
+                style={({ pressed }) => [
+                  styles.button,
+                  styles.guest,
+                  { backgroundColor: theme.primary },
+                  (pressed || startingGuest) && styles.pressed,
+                ]}>
+                {startingGuest ? (
+                  <ActivityIndicator color={theme.onPrimary} />
+                ) : (
+                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                    Coba dulu tanpa akun (Mode Tamu)
+                  </ThemedText>
+                )}
+              </Pressable>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+                Mode tamu menyimpan data di perangkat ini. Simpan ke Google atau email kapan saja dari Pengaturan.
+              </ThemedText>
+              {error && <ThemedText themeColor="danger">{error}</ThemedText>}
+            </View>
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -75,13 +116,55 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+    paddingVertical: Spacing.five,
+    gap: Spacing.five,
   },
-  or: {
+  hero: {
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  logo: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    marginBottom: Spacing.two,
+  },
+  brand: {
+    fontSize: 40,
+    lineHeight: 48,
+    fontWeight: 800,
+    letterSpacing: -0.5,
+  },
+  center: {
     textAlign: 'center',
   },
+  actions: {
+    gap: Spacing.three,
+  },
+  button: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+  },
   guest: {
-    alignSelf: 'center',
-    padding: Spacing.two,
+    borderWidth: 0,
+  },
+  emailCard: {
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

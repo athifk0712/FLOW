@@ -77,7 +77,7 @@ export function AccountPicker({ selected, onPick, onCustom }: Props) {
           );
         })}
       </View>
-      {typed && !exact && (
+      {!!typed && !exact && (
         <Pressable
           onPress={() => {
             onCustom(typed);

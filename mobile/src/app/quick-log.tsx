@@ -620,6 +620,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     // The row's underline shows focus; the browser's own ring is drawn off-position on web.
     outlineWidth: 0,
+    outlineColor: 'transparent',
   },
   // Without this, a horizontal ScrollView on web grows to fill free height and stretches the chips.
   chipRow: {

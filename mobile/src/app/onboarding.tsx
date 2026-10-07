@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccountBadge } from '@/components/account-badge';
 import { AccountPicker } from '@/components/account-picker';
 import { CurrencyList } from '@/components/currency-list';
+import { CycleSection } from '@/components/settings/cycle-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -23,16 +24,18 @@ import { saveCurrency } from '@/hooks/use-currency-sync';
 import { useTheme } from '@/hooks/use-theme';
 import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
 import type { Enums } from '@/lib/database.types';
+import { displayName, NAME_MAX, saveDisplayName } from '@/lib/display-name';
 import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session-provider';
 
-type Step = 'welcome' | 'currency' | 'accounts' | 'budget' | 'done';
+type Step = 'welcome' | 'profile' | 'currency' | 'accounts' | 'budget' | 'done';
 type AccountType = Enums<'account_type'>;
 type Picked = { name: string; type: AccountType; digits: string };
 
-const STEPS: Step[] = ['welcome', 'currency', 'accounts', 'budget', 'done'];
+const STEPS: Step[] = ['welcome', 'profile', 'currency', 'accounts', 'budget', 'done'];
 
 
 // Rupiah only; other currencies type their own amount.
@@ -44,12 +47,16 @@ const VALUES = [
   { title: 'Lihat polanya', body: 'Diagram bulanan dan saran kecil untuk besok, dari kebiasaanmu sendiri.' },
 ];
 
-// First run for a guest with no accounts: what Flowku is, the first accounts, and a weekly "wants" budget.
+// First run for a new user (guest or account) with no accounts: what Flowku is, nickname and payday, currency,
+// the first accounts, and a weekly "wants" budget.
 // Every step can be skipped; the dashboard's empty states still guide the user afterwards.
 export default function OnboardingScreen() {
   const theme = useTheme();
   const currency = useCurrency();
+  const { session } = useSession();
   const [step, setStep] = useState<Step>('welcome');
+  // Prefilled with the name Google gave, if any; a guest starts empty.
+  const [name, setName] = useState(() => (session?.user.is_anonymous ? '' : displayName(session?.user)));
   const [picked, setPicked] = useState<Picked[]>([]);
   const [budget, setBudget] = useState('');
   const [budgetFocused, setBudgetFocused] = useState(false);
@@ -94,6 +101,23 @@ export default function OnboardingScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menyimpan mata uang.');
     }
+  }
+
+  async function saveProfile() {
+    if (saving) return;
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== displayName(session?.user)) {
+      setSaving(true);
+      setError(null);
+      try {
+        await saveDisplayName(trimmed);
+      } catch (e) {
+        setSaving(false);
+        return setError(e instanceof Error ? e.message : 'Gagal menyimpan nama.');
+      }
+      setSaving(false);
+    }
+    setStep('currency');
   }
 
   async function saveBudget() {
@@ -183,6 +207,34 @@ export default function OnboardingScreen() {
                     </View>
                   </View>
                 ))}
+              </>
+            )}
+
+            {step === 'profile' && (
+              <>
+                <View style={styles.titleBlock}>
+                  <ThemedText type="subtitle">Kenalan dulu, yuk</ThemedText>
+                  <ThemedText themeColor="textSecondary">
+                    Nama panggilan untuk sapaan di Beranda, dan tanggal gajian supaya budget bulanan dihitung dari
+                    gajian ke gajian.
+                  </ThemedText>
+                </View>
+                <View style={styles.titleBlock}>
+                  <ThemedText type="smallBold" themeColor="textSecondary">
+                    NAMA PANGGILAN
+                  </ThemedText>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="mis. Athif"
+                    placeholderTextColor={theme.textSecondary}
+                    maxLength={NAME_MAX}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                    style={[styles.nameInput, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+                  />
+                </View>
+                <CycleSection />
               </>
             )}
 
@@ -293,7 +345,8 @@ export default function OnboardingScreen() {
           </ScrollView>
 
           <View style={styles.footer}>
-            {step === 'welcome' && primaryButton('Mulai', () => setStep('currency'))}
+            {step === 'welcome' && primaryButton('Mulai', () => setStep('profile'))}
+            {step === 'profile' && primaryButton('Lanjut', saveProfile)}
             {step === 'currency' && primaryButton(`Lanjut dengan ${currency.code}`, () => setStep('accounts'))}
             {step === 'accounts' && primaryButton('Simpan akun', saveAccounts, picked.length > 0)}
             {step === 'budget' && (
@@ -414,10 +467,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.two,
   },
+  nameInput: {
+    fontSize: 18,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    outlineWidth: 0,
+    outlineColor: 'transparent',
+  },
   priceInput: {
     flex: 1,
     // The browser's own focus ring is drawn off-position on web; the row shows focus instead.
     outlineWidth: 0,
+    outlineColor: 'transparent',
     fontSize: 16,
     fontWeight: 600,
     paddingVertical: Spacing.two,

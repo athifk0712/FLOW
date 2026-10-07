@@ -515,6 +515,9 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
+    // The field's background shows it; the browser's focus ring would cover the digits on web.
+    outlineWidth: 0,
+    outlineColor: 'transparent',
     fontSize: 18,
     fontWeight: 600,
     paddingVertical: Spacing.two,
