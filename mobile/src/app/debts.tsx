@@ -26,10 +26,17 @@ import {
   formatDay,
   sortDebts,
 } from '@/lib/debts';
+import type { Tables } from '@/lib/database.types';
 import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { syncDueReminders } from '@/lib/reminders';
+import { newRequestId } from '@/lib/request-id';
 import { supabase } from '@/lib/supabase';
+
+type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
+type Payment = Pick<Tables<'debt_payments'>, 'id' | 'amount' | 'paid_at' | 'transaction_id'>;
+
+const paidFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // 'new' = the add form; an id = that debt is open (payment / edit).
 type Open = 'new' | string | null;
@@ -45,7 +52,10 @@ const DUE_SHORTCUTS = [
   { label: '1 bulan', days: 30 },
 ];
 
-// Who owes whom, with partial payments. A tracker only: account balances do not change.
+// Who owes whom, with partial payments. A payment can also move the money: received into a wallet (piutang) or paid
+// from one (utang). The database writes the payment and its transaction together (record_debt_payment), refuses
+// more than what is left, and treats a repeated request as the same payment. Cancelling a payment takes the money
+// back out again.
 export default function DebtsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ direction?: DebtDirection }>();
@@ -60,16 +70,37 @@ export default function DebtsScreen() {
   const [note, setNote] = useState('');
   const [dueDays, setDueDays] = useState<number | null>(null);
   const [payment, setPayment] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  // The wallet the money goes into / comes from; null = record the payment only (balances unchanged).
+  const [walletId, setWalletId] = useState<string | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState(newRequestId);
 
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from('v_debts').select('*');
-    if (error) return setError(error.message);
-    setDebts(sortDebts(data ?? []));
+    const [list, accs] = await Promise.all([
+      supabase.from('v_debts').select('*'),
+      supabase.from('accounts').select('id, name').is('archived_at', null).order('created_at'),
+    ]);
+    const failed = list.error ?? accs.error;
+    if (failed) return setError(failed.message);
+    setDebts(sortDebts(list.data ?? []));
+    setAccounts(accs.data ?? []);
     syncDueReminders();
+  }, []);
+
+  const loadPayments = useCallback(async (debtId: string) => {
+    const { data, error } = await supabase
+      .from('debt_payments')
+      .select('id, amount, paid_at, transaction_id')
+      .eq('debt_id', debtId)
+      .order('paid_at', { ascending: false });
+    if (error) return setError(error.message);
+    setPayments(data ?? []);
   }, []);
 
   useFocusEffect(
@@ -88,7 +119,12 @@ export default function DebtsScreen() {
     setDueDays(debt?.due_date ? daysFromToday(debt.due_date) : null);
     setPayment('');
     setConfirmDelete(false);
+    setConfirmUndo(null);
     setError(null);
+    setPayments([]);
+    setWalletId((current) => current ?? accounts[0]?.id ?? null);
+    setRequestId(newRequestId());
+    if (target && target !== 'new') loadPayments(target);
   }
 
   function switchDirection(next: DebtDirection) {
@@ -124,10 +160,31 @@ export default function DebtsScreen() {
     );
   }
 
-  function pay(debt: Debt, value: number) {
+  async function pay(debt: Debt, value: number) {
     if (!debt.id || value <= 0 || saving) return;
     if (value > (debt.remaining ?? 0)) return setError(`Sisanya tinggal ${formatMoney(debt.remaining ?? 0)}.`);
-    run(() => supabase.from('debt_payments').insert({ debt_id: debt.id!, amount: value }), value === debt.remaining);
+    const settles = value === debt.remaining;
+    await run(
+      () =>
+        supabase.rpc('record_debt_payment', {
+          p_debt_id: debt.id!,
+          p_amount: value,
+          p_account_id: walletId ?? undefined,
+          p_request_id: requestId,
+        }),
+      settles,
+    );
+    // The next payment is a new request; reload the history if the card stays open.
+    setRequestId(newRequestId());
+    if (!settles) loadPayments(debt.id);
+  }
+
+  async function undo(debt: Debt, paymentId: string) {
+    if (saving) return;
+    if (confirmUndo !== paymentId) return setConfirmUndo(paymentId);
+    setConfirmUndo(null);
+    await run(() => supabase.rpc('delete_debt_payment', { p_payment_id: paymentId }), false);
+    if (debt.id) loadPayments(debt.id);
   }
 
   function remove(id: string) {
@@ -284,6 +341,26 @@ export default function DebtsScreen() {
             <View style={styles.form}>
               {!debt.settled && (
                 <>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {direction === 'OWED_TO_ME' ? 'Uangnya masuk ke' : 'Dibayar dari'}
+                  </ThemedText>
+                  <View style={styles.chips}>
+                    {accounts.map((a) => (
+                      <Pressable key={a.id} onPress={() => setWalletId(a.id)} style={chip(walletId === a.id)}>
+                        <ThemedText type="small" style={chipText(walletId === a.id)}>
+                          {a.name}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                    <Pressable onPress={() => setWalletId(null)} style={chip(walletId === null)}>
+                      <ThemedText type="small" style={chipText(walletId === null)}>
+                        Saldo tidak berubah
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {walletLine(direction, debt.person ?? '', accounts.find((a) => a.id === walletId)?.name ?? null)}
+                  </ThemedText>
                   <View style={styles.inline}>
                     <View style={[...priceRow, styles.flex]}>
                       <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
@@ -325,6 +402,26 @@ export default function DebtsScreen() {
                     )}
                   </Pressable>
                 </>
+              )}
+              {payments.length > 0 && (
+                <View style={styles.payments}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Riwayat pembayaran
+                  </ThemedText>
+                  {payments.map((p) => (
+                    <View key={p.id} style={styles.inline}>
+                      <ThemedText type="small" style={styles.flex}>
+                        {paidFormat.format(new Date(p.paid_at))} · {formatMoney(p.amount)}
+                        {p.transaction_id ? '' : ' (saldo tidak diubah)'}
+                      </ThemedText>
+                      <Pressable onPress={() => undo(debt, p.id)} disabled={saving} hitSlop={8}>
+                        <ThemedText type="smallBold" themeColor="danger">
+                          {confirmUndo === p.id ? 'Yakin batalkan?' : 'Batalkan'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
               )}
               {error && <ThemedText themeColor="danger">{error}</ThemedText>}
               <Pressable onPress={() => setEditing(true)} hitSlop={8} style={styles.editLink}>
@@ -411,7 +508,8 @@ export default function DebtsScreen() {
               )}
 
               <ThemedText type="small" themeColor="textSecondary">
-                Catatan ini tidak mengubah saldo akun. Kalau uangnya memang berpindah, catat juga di Quick Log.
+                Membuat catatan utang/piutang tidak mengubah saldo. Saat dibayar, pilih dompetnya supaya saldo ikut
+                berubah; membatalkan pembayaran mengembalikan saldonya.
               </ThemedText>
             </ScrollView>
           )}
@@ -419,6 +517,14 @@ export default function DebtsScreen() {
       </KeyboardAvoidingView>
     </ThemedView>
   );
+}
+
+/** What recording a payment will do, in one line. */
+function walletLine(direction: DebtDirection, person: string, wallet: string | null) {
+  if (!wallet) return 'Hanya mencatat pembayarannya. Pilih ini kalau uangnya sudah kamu catat sendiri di Catat.';
+  return direction === 'OWED_TO_ME'
+    ? `Dicatat sebagai pemasukan "Pelunasan Piutang: ${person}", saldo ${wallet} bertambah.`
+    : `Dicatat sebagai pengeluaran "Pelunasan Utang: ${person}", saldo ${wallet} berkurang.`;
 }
 
 const styles = StyleSheet.create({
@@ -528,6 +634,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  payments: {
+    gap: Spacing.one,
   },
   editLink: {
     alignSelf: 'flex-end',

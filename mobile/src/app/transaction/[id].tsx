@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/date-time-field';
-import { deleteReceipt, ReceiptPhoto } from '@/components/receipt-photo';
+import { ReceiptPhoto } from '@/components/receipt-photo';
 import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,9 +21,9 @@ import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessit
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
-import { formatDigits, getCurrency, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
-import { type ScanResult, scannedDate } from '@/lib/receipts';
+import { deleteReceipt, type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
@@ -54,6 +54,13 @@ export default function TransactionScreen() {
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [occurredAt, setOccurredAt] = useState(() => new Date());
 
+  // Rows written together with this one: a transfer's admin fee, or the debt payment this settles.
+  const [linked, setLinked] = useState<{ fee: number | null; feeOf: boolean; debtPayment: boolean }>({
+    fee: null,
+    feeOf: false,
+    debtPayment: false,
+  });
+
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +70,11 @@ export default function TransactionScreen() {
       supabase.from('transactions').select(TRANSACTION_SELECT).eq('id', id).single(),
       supabase.from('categories').select('id, name, kind, icon').order('created_at'),
       supabase.from('accounts').select('id, name, archived_at').order('created_at'),
-    ]).then(([t, cats, accs]) => {
-      const failed = t.error ?? cats.error ?? accs.error;
+      supabase.from('transactions').select('amount').eq('fee_for_id', id),
+      supabase.from('transactions').select('fee_for_id').eq('id', id).single(),
+      supabase.from('debt_payments').select('id').eq('transaction_id', id),
+    ]).then(([t, cats, accs, fees, own, payments]) => {
+      const failed = t.error ?? cats.error ?? accs.error ?? fees.error ?? own.error ?? payments.error;
       if (failed) return setError(failed.message);
       const row = t.data;
       if (!row) return setError('Transaksi tidak ditemukan.');
@@ -85,6 +95,11 @@ export default function TransactionScreen() {
       setDescription(row.description ?? '');
       setReceiptId(row.receipt_id);
       setOccurredAt(new Date(row.occurred_at));
+      setLinked({
+        fee: (fees.data ?? []).reduce((sum, f) => sum + f.amount, 0) || null,
+        feeOf: !!own.data?.fee_for_id,
+        debtPayment: (payments.data ?? []).length > 0,
+      });
     });
   }, [id]);
 
@@ -103,7 +118,8 @@ export default function TransactionScreen() {
     setSaving(true);
     setError(null);
     const changes: TablesUpdate<'transactions'> = {
-      amount,
+      // A settlement's amount belongs to its debt payment (the database refuses a change).
+      ...(linked.debtPayment ? {} : { amount }),
       occurred_at: occurredAt.toISOString(),
       merchant: merchant.trim() || null,
       description: description.trim() || null,
@@ -191,10 +207,29 @@ export default function TransactionScreen() {
                 {/* Keyed so the time text resets when the date is set from outside (e.g. a receipt scan). */}
                 <DateTimeField key={occurredAt.getTime()} value={occurredAt} onChange={setOccurredAt} />
 
+                {linked.fee && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Biaya admin {formatMoney(linked.fee)} tercatat terpisah sebagai pengeluaran, ikut pindah akun bila
+                    akun asal diubah, dan ikut terhapus bila transfer ini dihapus.
+                  </ThemedText>
+                )}
+                {linked.feeOf && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Ini biaya admin sebuah transfer. Akun dan tanggalnya mengikuti transfer itu.
+                  </ThemedText>
+                )}
+                {linked.debtPayment && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Ini pembayaran utang/piutang. Nominalnya diatur dari halaman Utang & Piutang; menghapus transaksi
+                    ini membatalkan pembayarannya.
+                  </ThemedText>
+                )}
+
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.prefix}>{getCurrency().symbol.trim()}</ThemedText>
                   <TextInput
-                    style={[styles.priceInput, { color: theme.text }]}
+                    editable={!linked.debtPayment}
+                    style={[styles.priceInput, { color: linked.debtPayment ? theme.textSecondary : theme.text }]}
                     value={formatDigits(digits)}
                     onChangeText={(t) => setDigits(toDigits(t))}
                     placeholder="0"
@@ -311,7 +346,11 @@ export default function TransactionScreen() {
 
                 <Pressable onPress={remove} disabled={saving} style={styles.delete} hitSlop={8}>
                   <ThemedText type="smallBold" themeColor="danger">
-                    {confirmDelete ? 'Ketuk lagi untuk menghapus' : 'Hapus transaksi'}
+                    {confirmDelete
+                      ? linked.fee
+                        ? 'Ketuk lagi: transfer + biaya adminnya dihapus'
+                        : 'Ketuk lagi untuk menghapus'
+                      : 'Hapus transaksi'}
                   </ThemedText>
                 </Pressable>
               </ScrollView>
