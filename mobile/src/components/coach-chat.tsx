@@ -41,6 +41,14 @@ const spoken = (all: Bubble[]) => all.filter((b): b is ChatMessage => b.role !==
 
 const FORGOT = 'Ada, tapi lupa dicatat';
 
+// Always-available starting points in the Flowku chat; the AI answers them from the app's computed numbers.
+const STRATEGY_CHIPS = [
+  'Analisis pengeluaran terbesar',
+  'Bantu kejar target tabungan',
+  'Tinjau utang dan tagihan',
+  'Jelaskan perhitungan Safe to Spend',
+];
+
 type Props = {
   coachMode: CoachMode;
   /** In the Flowku tab instead of a modal: no "Tutup", and a finished chat can simply start again. */
@@ -272,6 +280,25 @@ export function CoachChat({ coachMode, embedded = false }: Props) {
             </View>
           )}
 
+          {!done && mode === 'ai' && coachMode === 'chat' && !busy && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.chipRow}
+              contentContainerStyle={styles.chips}>
+              {STRATEGY_CHIPS.filter((c) => !options.includes(c)).map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => reply(c)}
+                  style={({ pressed }) => [styles.chip, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
+                  <AppSymbol material="auto_awesome" sf="sparkles" size={14} color={theme.primary} />
+                  <ThemedText type="small">{c}</ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+
           {!done && mode === 'ai' && (
             <View style={[styles.inputRow, { backgroundColor: theme.backgroundElement }]}>
               <TextInput
@@ -333,6 +360,22 @@ export function CoachChat({ coachMode, embedded = false }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Without flexGrow 0, a horizontal ScrollView on web stretches to fill free height.
+  chipRow: {
+    flexGrow: 0,
+  },
+  chips: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    minHeight: 36,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.five,
+  },
   container: {
     flex: 1,
     flexDirection: 'row',

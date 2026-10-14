@@ -5,6 +5,7 @@
 // necessity labels or category moves the user has confirmed, which are saved.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { type GeminiContent, GeminiError, generateJson } from '../_shared/gemini.ts';
+import { buildSnapshot } from './snapshot.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -97,7 +98,22 @@ Ground rules:
   options like "Udahan dulu" / "Tanya hal lain" instead of vaguely asking "ada lagi?". Never claim something is done
   that isn't in your category_changes/tags.
 - This is not professional financial advice; don't recommend specific investments or loans. If the user wants to
-  stop, close warmly right away.`;
+  stop, close warmly right away.
+
+Financial strategist (you have "financial_snapshot", computed by the app):
+- When the user asks what to do with their money, be a calm, practical advisor: say the situation in one or two
+  specific sentences with the real numbers, then give at most 2-3 prioritized actions (most urgent and most impactful
+  first: overdue or soon-due debts and bills before goals, goals before nice-to-haves). Each action names an amount
+  and the reason, using numbers from the snapshot (e.g. "Makan di luar Rp450.000 siklus ini, naik dari Rp300.000").
+- Only use numbers from financial_snapshot or the transaction data, exactly as written. You may do small simple
+  arithmetic for a suggestion (e.g. Rp25.000 x 7 hari = Rp175.000) but show it; never invent balances or totals.
+- Say what you assume and what is uncertain; if data_gaps mentions missing data, say so instead of guessing.
+- "Safe to Spend" / sisa aman: explain it with safe_to_spend.formula and its breakdown when asked how it is counted.
+- Never promise investment returns. You cannot move money, create transactions or change balances; if an action
+  needs that, tell the user where to do it in the app (Catat, Target tabungan, Utang & Piutang).
+- After a recommendation, offer options such as "Setujui rekomendasi" / "Sesuaikan nominal" / "Jelaskan perhitungan".
+  "Setujui rekomendasi" means the user agrees with the plan: summarise the concrete steps to do in the app; it does not
+  change any data by itself.`;
 
 const MODE_RULES = {
   chat: `Mode: chat (the user tapped you on the home screen). Open with one short, friendly line that fits the time
@@ -134,6 +150,8 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return json({ error: 'Sesi tidak valid. Buka ulang aplikasinya.' }, 401);
 
   const weekAgo = new Date(dayStart.getTime() - 7 * 86_400_000).toISOString();
   const monthAgo = new Date(dayStart.getTime() - 35 * 86_400_000).toISOString();
@@ -218,6 +236,11 @@ Deno.serve(async (req) => {
   }));
 
   const uncategorizedRows = recentRows.filter((t) => t.type === 'EXPENSE' && !t.category);
+  // The money picture is a bonus: if it fails, the chat still works without it.
+  const snapshot = await buildSnapshot(supabase, auth.user.id, amountText).catch((e) => {
+    console.error('snapshot failed', e);
+    return null;
+  });
 
   // The data block comes first and stays identical for the whole conversation.
   const context = JSON.stringify({
@@ -230,7 +253,7 @@ Deno.serve(async (req) => {
     today_transactions: todayRows,
     unlabeled_from_last_7_days: olderRows,
     budgets_this_period: budgetRows,
-    safe_to_spend_today_text: typeof body.safe_daily === 'number' ? amountText(body.safe_daily) : null,
+    financial_snapshot: snapshot,
     previous_chat_summaries: history.data ?? [],
   });
   const recentIds = new Set((recent.data ?? []).map((t) => t.id));
@@ -298,8 +321,13 @@ Deno.serve(async (req) => {
   }
 
   return json({
-    ...turn,
-    options: (turn.options ?? []).slice(0, 4),
+    message: typeof turn.message === 'string' && turn.message.trim() ? turn.message.slice(0, 1500) : 'Maaf, coba ulangi ya.',
+    done: turn.done === true,
+    summary: typeof turn.summary === 'string' ? turn.summary.slice(0, 600) : '',
+    options: (Array.isArray(turn.options) ? turn.options : [])
+      .filter((o): o is string => typeof o === 'string' && o.trim().length > 0)
+      .map((o) => o.slice(0, 40))
+      .slice(0, 4),
     category_changes: moves,
     tags,
     notice: notices.length ? notices.join(' ') : null,
