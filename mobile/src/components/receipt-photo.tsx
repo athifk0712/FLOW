@@ -8,11 +8,18 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney, useCurrency } from '@/lib/money';
-import { isScanResult, type ScanResult, scanReceipt } from '@/lib/receipts';
+import {
+  deleteReceipt,
+  isScanResult,
+  RECEIPT_BUCKET,
+  receiptFileProblem,
+  type ScanResult,
+  scanReceipt,
+  uploadReceipt,
+} from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
-const BUCKET = 'receipts';
 const SIGNED_URL_SECONDS = 60 * 60;
 
 type Props = {
@@ -49,7 +56,7 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange, onApplyScan }
         if (!active) return;
         if (error) return setError(error.message);
         if (isScanResult(data.ocr_json)) setScan(data.ocr_json);
-        const signed = await supabase.storage.from(BUCKET).createSignedUrl(data.storage_path, SIGNED_URL_SECONDS);
+        const signed = await supabase.storage.from(RECEIPT_BUCKET).createSignedUrl(data.storage_path, SIGNED_URL_SECONDS);
         if (!active) return;
         if (signed.error) return setError(signed.error.message);
         setUrl(signed.data.signedUrl);
@@ -76,34 +83,26 @@ export function ReceiptPhoto({ transactionId, receiptId, onChange, onApplyScan }
         : await ImagePicker.launchImageLibraryAsync(options);
     const asset = result.canceled ? null : result.assets[0];
     if (!asset) return;
+    const problem = receiptFileProblem(asset);
+    if (problem) return setError(problem);
 
     setBusy(true);
     try {
-      const contentType = asset.mimeType ?? 'image/jpeg';
-      const extension = contentType.split('/')[1] ?? 'jpg';
-      const newPath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-      const body = await (await fetch(asset.uri)).arrayBuffer();
-
-      const upload = await supabase.storage.from(BUCKET).upload(newPath, body, { contentType });
-      if (upload.error) throw upload.error;
-
-      const inserted = await supabase.from('receipts').insert({ storage_path: newPath }).select('id').single();
-      if (inserted.error) throw inserted.error;
-
-      const linked = await supabase
-        .from('transactions')
-        .update({ receipt_id: inserted.data.id })
-        .eq('id', transactionId);
-      if (linked.error) throw linked.error;
+      const newId = await uploadReceipt(userId, asset);
+      const linked = await supabase.from('transactions').update({ receipt_id: newId }).eq('id', transactionId);
+      if (linked.error) {
+        await deleteReceipt(newId);
+        throw linked.error;
+      }
 
       // Replacing a photo: drop the old one only after the new one is linked.
       if (receiptId) await deleteReceipt(receiptId);
 
       setUrl(asset.uri);
       setScan(null);
-      onChange(inserted.data.id);
+      onChange(newId);
       setBusy(false);
-      await runScan(inserted.data.id);
+      await runScan(newId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal mengunggah foto.');
       setBusy(false);
@@ -237,12 +236,6 @@ function ScanCard({ scan, onApply }: { scan: ScanResult; onApply: () => void }) 
       )}
     </ThemedView>
   );
-}
-
-/** Deletes the receipt row, then its file. A leftover file is harmless, so file errors are ignored. */
-export async function deleteReceipt(receiptId: string) {
-  const { data } = await supabase.from('receipts').delete().eq('id', receiptId).select('storage_path').maybeSingle();
-  if (data) await supabase.storage.from(BUCKET).remove([data.storage_path]);
 }
 
 const styles = StyleSheet.create({

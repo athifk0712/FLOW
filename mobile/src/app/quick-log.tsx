@@ -1,7 +1,9 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,19 +23,27 @@ import { ThemedView } from '@/components/themed-view';
 import { guessIcon } from '@/constants/category-icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { appendThousands, digitsToAmount, dropLastDigit, MAX_AMOUNT_DIGITS } from '@/lib/amount-input';
+import { type CategoryUse, rankCategories } from '@/lib/category-rank';
 import type { Tables, TablesInsert } from '@/lib/database.types';
-import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
+import { formatDigits, formatMoney, fromWhole, toDigits, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
+import { deleteReceipt, receiptFileProblem, scanReceipt, scanToDraft, uploadReceipt } from '@/lib/receipts';
+import { isAlreadySaved, newRequestId } from '@/lib/request-id';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session-provider';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name'>;
 type Mode = 'EXPENSE' | 'INCOME' | 'TRANSFER';
 type CategoryBudget = Pick<Tables<'v_budget_remaining'>, 'category_id' | 'period' | 'limit_amount' | 'remaining'>;
+type RecentRow = CategoryUse & Pick<Tables<'transactions'>, 'type' | 'from_account_id'>;
 
 const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
 // Below this share of the limit left, the note turns into a gentle warning.
 const LOW_BUDGET_SHARE = 0.2;
+// Common Indonesian transfer fees (BI-FAST, online transfer), offered as one-tap amounts in rupiah.
+const IDR_FEE_SHORTCUTS = [2500, 6500];
 
 const MODES: { value: Mode; label: string }[] = [
   { value: 'EXPENSE', label: 'Pengeluaran' },
@@ -56,27 +66,30 @@ const FROM_LABEL: Record<Mode, string> = {
 const whenFormat = new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const QUICK_LOG_WIDTH = 520;
-const MAX_DIGITS = 12;
 
 const isOtherName = (name: string) => name.trim().toLowerCase() === 'lainnya';
 
-// Quick entry that fits one phone screen: type, amount (the keyboard opens straight away), category, account, and a
-// save button that stays above the keyboard. Date and note are folded under "Opsi tambahan".
+// Quick entry that fits one phone screen: type, when (a compact row; the calendar opens in place and pushes the form
+// down, never over it), amount (the keyboard opens straight away, with 000 / ⌫ / clear keys under it), category
+// (most used first), account, and a save button that stays above the keyboard. Note and shop name are folded under
+// "Opsi tambahan". A receipt scan fills what it could read; everything stays editable until saved.
 // Necessity is left NULL for the nightly check; only expenses go there.
-// A category is required (nothing is saved "somewhere"); "Lainnya" also needs a note saying what it was,
-// and a missing category can be created right here with its own icon.
+// Saving is idempotent: the form keeps one request id, so a double tap or a retry never saves twice.
 export default function QuickLogScreen() {
   const theme = useTheme();
   const currency = useCurrency();
+  const { session } = useSession();
   const [mode, setMode] = useState<Mode>('EXPENSE');
   const [digits, setDigits] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [recent, setRecent] = useState<RecentRow[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
+  const [feeDigits, setFeeDigits] = useState('');
   const [guess, setGuess] = useState<string | null>(null);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [saving, setSaving] = useState(false);
@@ -86,6 +99,7 @@ export default function QuickLogScreen() {
   const [occurredAt, setOccurredAt] = useState<Date | null>(null);
   const [pickingDate, setPickingDate] = useState(false);
   const [note, setNote] = useState('');
+  const [merchant, setMerchant] = useState('');
   // Inline "new category" form.
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -93,35 +107,47 @@ export default function QuickLogScreen() {
   const [iconTouched, setIconTouched] = useState(false);
   const [pickingIcon, setPickingIcon] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Receipt scan.
+  const [choosingSource, setChoosingSource] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const [suggestedId, setSuggestedId] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [requestId] = useState(newRequestId);
+  // A scanned receipt that never got saved with a transaction is removed when the form closes.
+  const pendingReceipt = useRef<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       supabase.from('categories').select('id, name, kind, icon').order('created_at'),
       supabase.from('accounts').select('id, name').is('archived_at', null).order('created_at'),
+      // One query for both the category ranking and the defaults below (no per-category lookups).
       supabase
         .from('transactions')
-        .select('category_id, from_account_id, occurred_at')
-        .eq('type', 'EXPENSE')
+        .select('category_id, from_account_id, occurred_at, type')
+        .in('type', ['EXPENSE', 'INCOME'])
         .order('occurred_at', { ascending: false })
-        .limit(100),
+        .limit(200),
       supabase
         .from('v_budget_remaining')
         .select('category_id, period, limit_amount, remaining')
         .eq('scope', 'CATEGORY'),
-    ]).then(([cats, accs, recent, buds]) => {
-      const failed = cats.error ?? accs.error ?? recent.error ?? buds.error;
+    ]).then(([cats, accs, recentRes, buds]) => {
+      const failed = cats.error ?? accs.error ?? recentRes.error ?? buds.error;
       if (failed) return setError(failed.message);
 
       const accountRows = accs.data ?? [];
-      const recentRows = recent.data ?? [];
+      const recentRows = recentRes.data ?? [];
+      const expenses = recentRows.filter((t) => t.type === 'EXPENSE');
       setCategories(cats.data ?? []);
       setAccounts(accountRows);
+      setRecent(recentRows);
       setBudgets(buds.data ?? []);
       setLoaded(true);
 
       // Default account: the one used last, else the first one. The last one may since have been archived,
       // and then it isn't in the list (and shouldn't get new transactions).
-      const lastUsed = recentRows[0]?.from_account_id;
+      const lastUsed = expenses[0]?.from_account_id;
       const defaultAccount = accountRows.find((a) => a.id === lastUsed)?.id ?? accountRows[0]?.id ?? null;
       setAccountId(defaultAccount);
       setToAccountId(accountRows.find((a) => a.id !== defaultAccount)?.id ?? null);
@@ -129,7 +155,7 @@ export default function QuickLogScreen() {
       // Smart guess: the category logged most often around this hour.
       const hour = new Date().getHours();
       const counts = new Map<string, number>();
-      for (const t of recentRows) {
+      for (const t of expenses.slice(0, 100)) {
         if (!t.category_id) continue;
         const diff = Math.abs(new Date(t.occurred_at).getHours() - hour);
         if (Math.min(diff, 24 - diff) <= 1) counts.set(t.category_id, (counts.get(t.category_id) ?? 0) + 1);
@@ -140,14 +166,22 @@ export default function QuickLogScreen() {
         setCategoryId(best[0]);
       }
     });
+    return () => {
+      if (pendingReceipt.current) deleteReceipt(pendingReceipt.current);
+    };
   }, []);
 
-  const amount = Number(digits || '0');
+  const amount = digitsToAmount(digits);
+  const fee = mode === 'TRANSFER' ? digitsToAmount(feeDigits) : 0;
   const isTransfer = mode === 'TRANSFER';
   const accountsValid = isTransfer ? !!accountId && !!toAccountId && accountId !== toAccountId : !!accountId;
   const kind = mode === 'INCOME' ? 'INCOME' : 'EXPENSE';
-  const visibleCategories = categories.filter((c) => c.kind === kind);
+  const visibleCategories = rankCategories(
+    categories.filter((c) => c.kind === kind),
+    recent,
+  );
   const selected = visibleCategories.find((c) => c.id === categoryId);
+  const suggested = !selected ? visibleCategories.find((c) => c.id === suggestedId) : undefined;
   const isOther = !!selected && isOtherName(selected.name);
   const missing =
     amount <= 0
@@ -157,9 +191,10 @@ export default function QuickLogScreen() {
         : !isTransfer && isOther && !note.trim()
           ? '"Lainnya" untuk apa? Tulis di catatan (Opsi tambahan), atau buat kategori baru.'
           : null;
-  const canSave = amount > 0 && accountsValid && !missing && !saving;
+  const canSave = amount > 0 && accountsValid && !missing && !saving && !scanning;
   const guessed = mode === 'EXPENSE' && !!guess && categoryId === guess;
   const budgetNote = mode === 'EXPENSE' ? describeBudget(budgets, categories, categoryId, amount) : null;
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name ?? '';
 
   // Categories in columns of two, so the grid scrolls sideways in two compact rows.
   const columns: Category[][] = [];
@@ -170,6 +205,7 @@ export default function QuickLogScreen() {
     setError(null);
     // The time-of-day guess only applies to expenses.
     setCategoryId(next === 'EXPENSE' ? guess : null);
+    setSuggestedId(null);
   }
 
   function pickFrom(id: string) {
@@ -181,9 +217,15 @@ export default function QuickLogScreen() {
   function pickCategory(c: Category) {
     const on = c.id === categoryId;
     setCategoryId(on ? null : c.id);
+    setSuggestedId(null);
     setAdding(false);
     // "Lainnya" needs a note, so open the section where the note lives.
     if (!on && isOtherName(c.name)) setShowExtras(true);
+  }
+
+  function toggleDate() {
+    Keyboard.dismiss();
+    setPickingDate((p) => !p);
   }
 
   function openNewCategory() {
@@ -220,21 +262,99 @@ export default function QuickLogScreen() {
     setAdding(false);
   }
 
+  // Receipt -> upload -> OCR -> fill in what was read. Nothing is saved as a transaction until the user saves.
+  async function scan(source: 'camera' | 'library') {
+    const userId = session?.user.id;
+    setChoosingSource(false);
+    if (!userId || scanning) return;
+    setError(null);
+    setScanNote(null);
+    if (source === 'camera' && Platform.OS !== 'web') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return setScanNote('Izin kamera ditolak. Aktifkan dari pengaturan HP, atau pilih dari galeri.');
+    }
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.6 };
+    const picked =
+      source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+    const asset = picked.canceled ? null : picked.assets[0];
+    if (!asset) return;
+    const problem = receiptFileProblem(asset);
+    if (problem) return setScanNote(problem);
+
+    Keyboard.dismiss();
+    setScanning(true);
+    try {
+      // A second scan replaces the first one's photo.
+      if (pendingReceipt.current) await deleteReceipt(pendingReceipt.current);
+      const id = await uploadReceipt(userId, asset);
+      pendingReceipt.current = id;
+      setReceiptId(id);
+      const draft = scanToDraft(await scanReceipt(id), categories);
+      const read: string[] = [];
+      if (draft.amount) {
+        setDigits(String(draft.amount));
+        read.push('nominal');
+      }
+      if (draft.merchant) {
+        setMerchant(draft.merchant);
+        read.push('toko');
+      }
+      if (draft.occurredAt) {
+        setOccurredAt(draft.occurredAt);
+        read.push('tanggal');
+      }
+      if (mode !== 'EXPENSE') setMode('EXPENSE');
+      if (draft.categoryId) {
+        setCategoryId(draft.categoryId);
+        read.push('kategori');
+      }
+      setSuggestedId(draft.suggestedCategoryId);
+      setScanNote(
+        read.length === 0
+          ? 'Struk belum terbaca jelas. Isi sendiri ya; fotonya tetap tersimpan bersama transaksi.'
+          : `Terisi dari struk: ${read.join(', ')}. Cek dulu sebelum simpan.`,
+      );
+    } catch (e) {
+      setScanNote(e instanceof Error ? e.message : 'Gagal membaca struk. Isi manual saja ya.');
+    } finally {
+      setScanning(false);
+    }
+  }
+
   async function save() {
     if (!canSave) return;
     setSaving(true);
     setError(null);
-    const row: TablesInsert<'transactions'> =
-      mode === 'EXPENSE'
-        ? { type: mode, amount, from_account_id: accountId, category_id: categoryId }
-        : mode === 'INCOME'
-          ? { type: mode, amount, to_account_id: accountId, category_id: categoryId }
-          : { type: mode, amount, from_account_id: accountId, to_account_id: toAccountId };
-    if (occurredAt) row.occurred_at = occurredAt.toISOString();
-    if (note.trim()) row.description = note.trim();
-    const { error } = await supabase.from('transactions').insert(row);
+    let failed: { message: string; code?: string } | null;
+    if (mode === 'TRANSFER') {
+      // Transfer and its fee are written together by the database (all or nothing).
+      const { error } = await supabase.rpc('create_transfer', {
+        p_from: accountId!,
+        p_to: toAccountId!,
+        p_amount: amount,
+        p_fee: fee,
+        p_occurred_at: occurredAt?.toISOString(),
+        p_note: note.trim() || undefined,
+        p_request_id: requestId,
+      });
+      failed = error;
+    } else {
+      const row: TablesInsert<'transactions'> =
+        mode === 'EXPENSE'
+          ? { type: mode, amount, from_account_id: accountId, category_id: categoryId }
+          : { type: mode, amount, to_account_id: accountId, category_id: categoryId };
+      row.client_request_id = requestId;
+      if (occurredAt) row.occurred_at = occurredAt.toISOString();
+      if (note.trim()) row.description = note.trim();
+      if (merchant.trim()) row.merchant = merchant.trim();
+      if (receiptId && mode === 'EXPENSE') row.receipt_id = receiptId;
+      const { error } = await supabase.from('transactions').insert(row);
+      // Already saved by an earlier attempt whose answer got lost: that is a success.
+      failed = isAlreadySaved(error) ? null : error;
+      if (!failed && row.receipt_id) pendingReceipt.current = null;
+    }
     setSaving(false);
-    if (error) return setError(error.message);
+    if (failed) return setError(failed.message);
     closeModal();
   }
 
@@ -270,6 +390,19 @@ export default function QuickLogScreen() {
       ))}
     </ScrollView>
   );
+  const key = (label: string, onPress: () => void, a11y: string, icon?: { material: string; sf: string }) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ pressed }) => [styles.key, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
+      {icon ? (
+        <AppSymbol material={icon.material} sf={icon.sf} size={20} color={theme.text} />
+      ) : (
+        <ThemedText type="smallBold">{label}</ThemedText>
+      )}
+    </Pressable>
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -301,12 +434,77 @@ export default function QuickLogScreen() {
 
           {/* The main fields fit a phone screen; opened extras or a new category scroll, the save button stays. */}
           <ScrollView style={styles.flex} contentContainerStyle={styles.middle} keyboardShouldPersistTaps="handled">
+            <View style={styles.row}>
+              <Pressable
+                onPress={toggleDate}
+                style={({ pressed }) => [styles.when, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Ubah tanggal dan jam transaksi"
+                accessibilityState={{ expanded: pickingDate }}>
+                <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
+                <ThemedText type="small" numberOfLines={1} style={styles.flex}>
+                  {occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}
+                </ThemedText>
+                <ThemedText type="smallBold" themeColor="primary">
+                  {pickingDate ? 'Selesai' : 'Ubah'}
+                </ThemedText>
+              </Pressable>
+              {!isTransfer && (
+                <Pressable
+                  onPress={() => setChoosingSource((c) => !c)}
+                  disabled={scanning}
+                  style={({ pressed }) => [styles.when, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Scan struk">
+                  {scanning ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <AppSymbol material="document_scanner" sf="doc.viewfinder" size={18} color={theme.primary} />
+                  )}
+                  <ThemedText type="smallBold" themeColor="primary">
+                    {scanning ? 'Membaca…' : 'Scan struk'}
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+            {choosingSource && (
+              <View style={styles.row}>
+                <Pressable onPress={() => scan('camera')} style={[chip(false), styles.sourceChip]}>
+                  <AppSymbol material="photo_camera" sf="camera.fill" size={18} color={theme.text} />
+                  <ThemedText type="small">Kamera</ThemedText>
+                </Pressable>
+                <Pressable onPress={() => scan('library')} style={[chip(false), styles.sourceChip]}>
+                  <AppSymbol material="photo_library" sf="photo.on.rectangle" size={18} color={theme.text} />
+                  <ThemedText type="small">Galeri</ThemedText>
+                </Pressable>
+              </View>
+            )}
+            {pickingDate && (
+              <ThemedView type="backgroundElement" style={styles.panel}>
+                <DateTimeField
+                  key={occurredAt?.getTime() ?? 0}
+                  value={occurredAt ?? new Date()}
+                  onChange={setOccurredAt}
+                />
+                {occurredAt && (
+                  <Pressable onPress={() => setOccurredAt(null)} hitSlop={8}>
+                    <ThemedText type="small" themeColor="primary">
+                      Kembali ke sekarang
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </ThemedView>
+            )}
+
             <View style={[styles.amountRow, { borderColor: amountFocused ? theme.primary : theme.backgroundSelected }]}>
               <ThemedText style={[styles.symbol, { color: theme.textSecondary }]}>{currency.symbol.trim()}</ThemedText>
               <TextInput
                 value={formatDigits(digits)}
-                onChangeText={(t) => setDigits(toDigits(t, MAX_DIGITS))}
-                onFocus={() => setAmountFocused(true)}
+                onChangeText={(t) => setDigits(toDigits(t, MAX_AMOUNT_DIGITS))}
+                onFocus={() => {
+                  setAmountFocused(true);
+                  setPickingDate(false);
+                }}
                 onBlur={() => setAmountFocused(false)}
                 onSubmitEditing={save}
                 placeholder="0"
@@ -318,11 +516,35 @@ export default function QuickLogScreen() {
                 style={[styles.amount, { color: theme.text }]}
               />
             </View>
+            <View style={styles.keys}>
+              {key('000', () => setDigits((d) => appendThousands(d)), 'Tambah tiga nol')}
+              {key('⌫', () => setDigits(dropLastDigit), 'Hapus satu angka', { material: 'backspace', sf: 'delete.left' })}
+              {key('Hapus', () => setDigits(''), 'Kosongkan nominal')}
+            </View>
+
+            {scanNote && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {scanNote}
+              </ThemedText>
+            )}
+            {suggested && (
+              <Pressable
+                onPress={() => pickCategory(suggested)}
+                style={({ pressed }) => [styles.suggest, { borderColor: theme.primary }, pressed && styles.pressed]}>
+                <CategoryIcon icon={suggested.icon} size={24} />
+                <ThemedText type="small" style={styles.flex}>
+                  Saran kategori dari struk: <ThemedText type="smallBold">{suggested.name}</ThemedText>
+                </ThemedText>
+                <ThemedText type="smallBold" themeColor="primary">
+                  Pakai
+                </ThemedText>
+              </Pressable>
+            )}
 
             {!isTransfer && (
               <>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Kategori{guessed ? ' (tebakan dari jam ini)' : ''}
+                  Kategori{guessed ? ' (tebakan dari jam ini)' : ' · yang sering dipakai di depan'}
                 </ThemedText>
                 <ScrollView
                   horizontal
@@ -393,8 +615,8 @@ export default function QuickLogScreen() {
                     {pickingIcon && (
                       <IconPicker
                         value={newIcon}
-                        onChange={(key) => {
-                          setNewIcon(key);
+                        onChange={(next) => {
+                          setNewIcon(next);
                           setIconTouched(true);
                           setPickingIcon(false);
                         }}
@@ -455,6 +677,44 @@ export default function QuickLogScreen() {
                     setToAccountId,
                   )
                 )}
+
+                <ThemedText type="small" themeColor="textSecondary">
+                  Biaya admin (opsional)
+                </ThemedText>
+                <View style={styles.row}>
+                  <View style={[styles.feeRow, { backgroundColor: theme.backgroundElement }]}>
+                    <ThemedText type="smallBold" themeColor="textSecondary">
+                      {currency.symbol.trim()}
+                    </ThemedText>
+                    <TextInput
+                      value={formatDigits(feeDigits)}
+                      onChangeText={(t) => setFeeDigits(toDigits(t, MAX_AMOUNT_DIGITS))}
+                      placeholder="0"
+                      placeholderTextColor={theme.textSecondary}
+                      keyboardType="number-pad"
+                      accessibilityLabel="Biaya admin transfer"
+                      style={[styles.feeInput, { color: theme.text }]}
+                    />
+                  </View>
+                  {currency.code === 'IDR' &&
+                    IDR_FEE_SHORTCUTS.map((value) => (
+                      <Pressable
+                        key={value}
+                        onPress={() => setFeeDigits(String(fromWhole(value)))}
+                        style={chip(fee === fromWhole(value))}>
+                        <ThemedText type="small" style={chipText(fee === fromWhole(value))}>
+                          {formatDigits(String(fromWhole(value)))}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                </View>
+                {amount > 0 && accountsValid && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {accountName(accountId)} berkurang {formatMoney(amount + fee)} · {accountName(toAccountId)} bertambah{' '}
+                    {formatMoney(amount)}
+                    {fee > 0 ? ` · biaya ${formatMoney(fee)} dicatat sebagai pengeluaran` : ''}
+                  </ThemedText>
+                )}
               </>
             )}
 
@@ -467,8 +727,8 @@ export default function QuickLogScreen() {
                 <ThemedText type="smallBold">Opsi tambahan</ThemedText>
                 {!showExtras && (
                   <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                    {occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}
-                    {note.trim() ? ` · ${note.trim()}` : ' · catatan'}
+                    {[merchant.trim(), note.trim()].filter(Boolean).join(' · ') || 'Catatan, nama toko'}
+                    {receiptId ? ' · foto struk terlampir' : ''}
                   </ThemedText>
                 )}
               </View>
@@ -481,24 +741,16 @@ export default function QuickLogScreen() {
             </Pressable>
             {showExtras && (
               <ThemedView type="backgroundElement" style={styles.panel}>
-                <Pressable
-                  onPress={() => setPickingDate((p) => !p)}
-                  style={({ pressed }) => [
-                    styles.when,
-                    { backgroundColor: theme.backgroundSelected },
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Ubah tanggal transaksi">
-                  <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
-                  <ThemedText type="small" style={styles.flex}>
-                    {occurredAt ? whenFormat.format(occurredAt) : 'Sekarang'}
-                  </ThemedText>
-                  <ThemedText type="smallBold" themeColor="primary">
-                    {pickingDate ? 'Selesai' : 'Ubah'}
-                  </ThemedText>
-                </Pressable>
-                {pickingDate && <DateTimeField value={occurredAt ?? new Date()} onChange={setOccurredAt} />}
+                {!isTransfer && (
+                  <TextInput
+                    value={merchant}
+                    onChangeText={setMerchant}
+                    placeholder="Nama toko / tempat (opsional)"
+                    placeholderTextColor={theme.textSecondary}
+                    maxLength={100}
+                    style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
+                  />
+                )}
                 <TextInput
                   value={note}
                   onChangeText={setNote}
@@ -507,9 +759,6 @@ export default function QuickLogScreen() {
                   maxLength={120}
                   style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundSelected }]}
                 />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Foto struk bisa ditambahkan setelah disimpan: buka transaksinya dari Riwayat.
-                </ThemedText>
               </ThemedView>
             )}
 
@@ -605,7 +854,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     borderBottomWidth: 2,
-    marginBottom: Spacing.one,
   },
   symbol: {
     fontSize: 24,
@@ -622,6 +870,18 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
     outlineColor: 'transparent',
   },
+  keys: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  // At least 44pt tall: comfortable to hit with a thumb.
+  key: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Spacing.three,
+  },
   // Without this, a horizontal ScrollView on web grows to fill free height and stretches the chips.
   chipRow: {
     flexGrow: 0,
@@ -634,6 +894,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.five,
+  },
+  sourceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   grid: {
     gap: Spacing.two,
@@ -657,6 +922,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderStyle: 'dashed',
+  },
+  suggest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
   },
   panel: {
     gap: Spacing.two,
@@ -683,9 +956,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+    minHeight: 44,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
     borderRadius: Spacing.three,
+    flexShrink: 1,
+    flexGrow: 1,
+  },
+  feeRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  feeInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 16,
+    paddingVertical: Spacing.two,
   },
   input: {
     fontSize: 16,

@@ -26,8 +26,13 @@ const RESULT_SCHEMA = {
     date: { type: 'string', description: 'Purchase date as YYYY-MM-DD, or "" if not printed' },
     time: { type: 'string', description: 'Purchase time as HH:MM (24h), or "" if not printed' },
     category: { type: 'string', description: 'Best matching name from the given category list, or ""' },
+    category_confidence: {
+      type: 'string',
+      enum: ['high', 'low'],
+      description: '"high" only when the receipt clearly belongs to that category (e.g. a fuel station -> fuel); else "low"',
+    },
   },
-  required: ['is_receipt', 'merchant', 'total', 'currency', 'date', 'time', 'category'],
+  required: ['is_receipt', 'merchant', 'total', 'currency', 'date', 'time', 'category', 'category_confidence'],
   additionalProperties: false,
 };
 
@@ -40,7 +45,29 @@ type ScanResult = {
   date: string;
   time: string;
   category: string;
+  category_confidence: 'high' | 'low';
 };
+
+// Largest amount the app accepts (12 digits in the smallest unit).
+const MAX_MINOR = 999_999_999_999;
+
+/** Keeps only well-formed values: anything malformed becomes "unknown" rather than a guess. */
+function sanitize(raw: Partial<ScanResult>, categoryNames: string[]): ScanResult {
+  const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const date = text(raw.date, 10);
+  const time = text(raw.time, 5);
+  const category = categoryNames.find((n) => n.toLowerCase() === text(raw.category, 50).toLowerCase()) ?? '';
+  return {
+    is_receipt: raw.is_receipt === true,
+    merchant: text(raw.merchant, 100),
+    total: typeof raw.total === 'number' && Number.isFinite(raw.total) && raw.total > 0 ? raw.total : 0,
+    currency: text(raw.currency, 3).toUpperCase(),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
+    time: /^\d{1,2}:\d{2}$/.test(time) ? time : '',
+    category,
+    category_confidence: category && raw.category_confidence === 'high' ? 'high' : 'low',
+  };
+}
 
 // Same rule as the app (lib/currencies.ts): these are stored as whole units, everything else in cents.
 const ZERO_DECIMAL = new Set(['IDR', 'JPY', 'KRW', 'VND']);
@@ -76,7 +103,8 @@ Deno.serve(async (req) => {
   const image = encodeBase64(new Uint8Array(await file.data.arrayBuffer()));
 
   const currency = profile.data?.currency ?? 'IDR';
-  const categoryNames = (categories.data ?? []).map((c) => c.name).join(', ');
+  const categoryList = (categories.data ?? []).map((c) => c.name);
+  const categoryNames = categoryList.join(', ');
 
   let result: ScanResult;
   try {
@@ -91,10 +119,13 @@ Deno.serve(async (req) => {
             {
               text:
                 'This is a photo of a purchase receipt, usually from Indonesia. Extract the merchant name, the grand ' +
-                'total actually paid (after discounts and tax) and its currency, and the purchase date and time as ' +
-                'printed. Mind the separators: rupiah uses "." for thousands, so "45.600" is 45600; "12.50" in ' +
-                `dollars is 12.5. The user keeps their books in ${currency}. Pick the category that best fits ` +
-                `from this list: ${categoryNames || '(none)'}. Leave any field empty that you cannot read.`,
+                'total actually paid (after discounts, service and tax: the line usually called TOTAL / GRAND TOTAL / ' +
+                'TOTAL BAYAR) and its currency, and the purchase date and time as printed. Do NOT return the subtotal, ' +
+                'a tax or service line, the cash handed over (TUNAI / CASH / BAYAR) or the change (KEMBALIAN / CHANGE). ' +
+                'Mind the separators: rupiah uses "." for thousands, so "45.600" is 45600; "12.50" in dollars is 12.5. ' +
+                `The user keeps their books in ${currency}. Pick the category that best fits from this list ` +
+                `(exact name): ${categoryNames || '(none)'}, and say how sure you are. Leave any field empty (or 0) ` +
+                'that you cannot read; never guess a value that is not printed.',
             },
           ],
         },
@@ -108,11 +139,13 @@ Deno.serve(async (req) => {
 
   // Into the user's currency's smallest unit. A receipt in another currency can't be converted here, so its
   // total is left for the user to type.
-  const printed = (result.currency ?? '').trim().toUpperCase();
+  result = sanitize(result, categoryList);
+  const printed = result.currency;
   const sameCurrency = !printed || printed === currency;
   const decimals = ZERO_DECIMAL.has(currency) ? 0 : 2;
-  const total = sameCurrency && result.total > 0 ? Math.round(result.total * 10 ** decimals) : 0;
-  result = { ...result, total, currency: printed };
+  const minor = Math.round(result.total * 10 ** decimals);
+  const total = sameCurrency && minor > 0 && minor <= MAX_MINOR ? minor : 0;
+  result = { ...result, total };
 
   // Kept for later (e.g. re-applying without another scan); failure here should not hide the result.
   await supabase.from('receipts').update({ ocr_json: result }).eq('id', receiptId);

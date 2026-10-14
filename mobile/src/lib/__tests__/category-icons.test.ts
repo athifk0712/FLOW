@@ -7,6 +7,15 @@ describe('category icons', () => {
     }
   });
 
+  it('covers the icons the database gives the categories it creates (fees, debt payments)', () => {
+    for (const key of ['bank', 'handshake']) expect(iconFor(key).key).toBe(key);
+  });
+
+  it('has stable, unique keys', () => {
+    const keys = CATEGORY_ICONS.map((i) => i.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it('falls back to "dots" for unknown or empty keys', () => {
     expect(iconFor('nope').key).toBe('dots');
     expect(iconFor(null).key).toBe('dots');

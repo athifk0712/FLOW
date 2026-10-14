@@ -1,21 +1,39 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
+import type { ScanResult } from '@/lib/receipt-scan';
 import { supabase } from '@/lib/supabase';
 
-/** What the scan-receipt edge function reads from a photo. Unknown fields are "" or 0. */
-export type ScanResult = {
-  is_receipt: boolean;
-  merchant: string;
-  /** In the user's currency's smallest unit (like stored amounts); 0 when unread or printed in another currency. */
-  total: number;
-  currency?: string; // as printed, e.g. "IDR"
-  date: string; // YYYY-MM-DD
-  time: string; // HH:MM
-  category: string;
-};
+export {
+  isScanResult,
+  receiptFileProblem,
+  type ScanDraft,
+  scanToDraft,
+  type ScanResult,
+  scannedDate,
+} from '@/lib/receipt-scan';
 
-export function isScanResult(value: unknown): value is ScanResult {
-  return typeof value === 'object' && value !== null && 'is_receipt' in value && 'total' in value;
+export const RECEIPT_BUCKET = 'receipts';
+
+/** Uploads a photo into the user's folder and creates its receipts row. Returns the receipt id. */
+export async function uploadReceipt(userId: string, file: { uri: string; mimeType?: string | null }) {
+  const contentType = file.mimeType ?? 'image/jpeg';
+  const extension = contentType.split('/')[1] ?? 'jpg';
+  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const body = await (await fetch(file.uri)).arrayBuffer();
+  const upload = await supabase.storage.from(RECEIPT_BUCKET).upload(path, body, { contentType });
+  if (upload.error) throw upload.error;
+  const inserted = await supabase.from('receipts').insert({ storage_path: path }).select('id').single();
+  if (inserted.error) {
+    await supabase.storage.from(RECEIPT_BUCKET).remove([path]);
+    throw inserted.error;
+  }
+  return inserted.data.id;
+}
+
+/** Deletes the receipt row, then its file. A leftover file is harmless, so file errors are ignored. */
+export async function deleteReceipt(receiptId: string) {
+  const { data } = await supabase.from('receipts').delete().eq('id', receiptId).select('storage_path').maybeSingle();
+  if (data) await supabase.storage.from(RECEIPT_BUCKET).remove([data.storage_path]);
 }
 
 /** Runs OCR on a stored receipt. Throws with a readable (Indonesian) message on failure. */
@@ -29,19 +47,3 @@ export async function scanReceipt(receiptId: string): Promise<ScanResult> {
   return data as ScanResult;
 }
 
-/** Local Date from the scanned date/time, or null when the receipt has no date. */
-export function scannedDate(result: ScanResult) {
-  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(result.date);
-  if (!date) return null;
-  const time = /^(\d{1,2}):(\d{2})$/.exec(result.time);
-  const scanned = new Date(
-    Number(date[1]),
-    Number(date[2]) - 1,
-    Number(date[3]),
-    time ? Number(time[1]) : 12,
-    time ? Number(time[2]) : 0,
-  );
-  // Ignore misreads that land in the future or implausibly far back.
-  const age = Date.now() - scanned.getTime();
-  return age >= -60 * 60_000 && age < 366 * 86_400_000 ? scanned : null;
-}
