@@ -35,6 +35,7 @@ import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
 import { celebratedOn, markCelebrated, shouldCelebrate, streakView, type StreakView } from '@/lib/streak';
+import { netWorth } from '@/lib/assets';
 import { supabase } from '@/lib/supabase';
 import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
@@ -77,6 +78,9 @@ export default function HomeScreen() {
   const [space, setSpace] = useSpace();
   const [streak, setStreak] = useState<StreakView>({ days: 0, activeToday: false });
   const [celebrate, setCelebrate] = useState<number | null>(null);
+  // Estimated value of the assets still held (game accounts, gold, stocks, ...); null until loaded.
+  const [assetsValue, setAssetsValue] = useState<number | null>(null);
+  const [assetCount, setAssetCount] = useState(0);
   // Bottom edge of the hero card (with its own Catat button), measured on layout.
   const [heroBottom, setHeroBottom] = useState<number | null>(null);
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
@@ -142,6 +146,7 @@ export default function HomeScreen() {
             .not('necessity', 'is', null)
             .gte('occurred_at', insightSince),
           supabase.from('profiles').select('streak_count, last_active_date').maybeSingle(),
+          supabase.from('v_assets').select('current_value').eq('status', 'ACTIVE'),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
@@ -156,7 +161,7 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow]) => {
+        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -186,6 +191,9 @@ export default function HomeScreen() {
           setRules(ruleRows.data ?? []);
           setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
           setTimeInsight(computeTimeInsight(judgedRows.data ?? []));
+          // Assets are optional: a failure only hides them from the net worth card.
+          setAssetsValue(assetRows.error ? null : (assetRows.data ?? []).reduce((s, a) => s + (a.current_value ?? 0), 0));
+          setAssetCount(assetRows.data?.length ?? 0);
           // The streak is kept by the server; the day's first counted save is celebrated once, here.
           if (profileRow.data) {
             const view = streakView(profileRow.data.streak_count, profileRow.data.last_active_date);
@@ -235,7 +243,8 @@ export default function HomeScreen() {
     },
     { label: 'Transaksi rutin', href: '/recurring', material: 'event_repeat', sf: 'repeat' },
     { label: 'Kategori', href: '/categories', material: 'category', sf: 'square.grid.2x2' },
-    { label: 'Kebiasaan', href: '/habits', material: 'self_improvement', sf: 'leaf' },
+    // Kebiasaan is one tap away on the streak badge in the header.
+    { label: 'Aset', href: '/portfolio', material: 'savings', sf: 'dollarsign.circle' },
     { label: 'Lainnya', href: '/settings', material: 'more_horiz', sf: 'ellipsis' },
   ];
 
@@ -413,6 +422,17 @@ export default function HomeScreen() {
               </Section>
             )}
 
+            <Section title="KEKAYAAN BERSIH">
+              <NetWorthCard
+                cash={total}
+                assets={assetsValue ?? 0}
+                assetCount={assetCount}
+                receivables={openDebts.filter((d) => d.direction === 'OWED_TO_ME').reduce((s, d) => s + (d.remaining ?? 0), 0)}
+                debts={openDebts.filter((d) => d.direction === 'I_OWE').reduce((s, d) => s + (d.remaining ?? 0), 0)}
+                hidden={hidden}
+              />
+            </Section>
+
             <Section title="AKUN">
               <Pressable onPress={() => router.push('/accounts')}>
                 <ThemedView type="backgroundElement" style={styles.card}>
@@ -559,6 +579,49 @@ function DebtsCard({ debts }: { debts: Debt[] }) {
   );
 }
 
+/**
+ * Cash + estimated assets + receivables - debts. Kept apart from "Aman dibelanjakan", which only ever counts cash:
+ * an asset's value is an estimate until it is sold.
+ */
+function NetWorthCard(props: { cash: number; assets: number; assetCount: number; receivables: number; debts: number; hidden: boolean }) {
+  const worth = netWorth(props);
+  const show = (n: number) => (props.hidden ? '•••••' : formatMoney(n));
+  return (
+    <Pressable onPress={() => router.push('/portfolio')}>
+      <ThemedView type="backgroundElement" style={styles.card}>
+        <ThemedText style={styles.worth}>{show(worth.total)}</ThemedText>
+        <View style={styles.row}>
+          <ThemedText type="small" themeColor="textSecondary">Saldo di akun</ThemedText>
+          <ThemedText type="small">{show(worth.cash)}</ThemedText>
+        </View>
+        <View style={styles.row}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Aset (estimasi){props.assetCount > 0 ? ` · ${props.assetCount}` : ''}
+          </ThemedText>
+          <ThemedText type="small">{show(worth.assets)}</ThemedText>
+        </View>
+        {worth.receivables > 0 && (
+          <View style={styles.row}>
+            <ThemedText type="small" themeColor="textSecondary">Piutang</ThemedText>
+            <ThemedText type="small">{show(worth.receivables)}</ThemedText>
+          </View>
+        )}
+        {worth.debts > 0 && (
+          <View style={styles.row}>
+            <ThemedText type="small" themeColor="textSecondary">Utang</ThemedText>
+            <ThemedText type="small" themeColor="danger">−{show(worth.debts)}</ThemedText>
+          </View>
+        )}
+        <ThemedText type="small" themeColor="textSecondary">
+          {props.assetCount > 0
+            ? 'Nilai aset hanya perkiraan dan tidak dihitung di "Aman dibelanjakan". Kelola aset →'
+            : 'Punya emas, saham, kripto, atau akun game? Catat di Aset →'}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
@@ -685,6 +748,11 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.two,
+  },
+  worth: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: 700,
   },
   card: {
     gap: Spacing.three,

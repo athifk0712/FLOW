@@ -45,6 +45,118 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_events: {
+        Row: {
+          amount: number | null
+          asset_id: string
+          cost_allocated: number | null
+          created_at: string
+          fee: number
+          id: string
+          kind: string
+          note: string | null
+          occurred_at: string
+          quantity: number | null
+          request_id: string | null
+          tax: number
+          transaction_id: string | null
+          unit_value: number | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          asset_id: string
+          cost_allocated?: number | null
+          created_at?: string
+          fee?: number
+          id?: string
+          kind: string
+          note?: string | null
+          occurred_at?: string
+          quantity?: number | null
+          request_id?: string | null
+          tax?: number
+          transaction_id?: string | null
+          unit_value?: number | null
+          user_id?: string
+        }
+        Update: {
+          amount?: number | null
+          asset_id?: string
+          cost_allocated?: number | null
+          created_at?: string
+          fee?: number
+          id?: string
+          kind?: string
+          note?: string | null
+          occurred_at?: string
+          quantity?: number | null
+          request_id?: string | null
+          tax?: number
+          transaction_id?: string | null
+          unit_value?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_events_asset_id_user_id_fkey"
+            columns: ["asset_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "asset_events_asset_id_user_id_fkey"
+            columns: ["asset_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "v_assets"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "asset_events_transaction_id_user_id_fkey"
+            columns: ["transaction_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          divisible: boolean
+          id: string
+          name: string
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          divisible?: boolean
+          id?: string
+          name: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          divisible?: boolean
+          id?: string
+          name?: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       budgets: {
         Row: {
           active_from: string
@@ -803,6 +915,31 @@ export type Database = {
         }
         Relationships: []
       }
+      v_assets: {
+        Row: {
+          category: string | null
+          cost_basis: number | null
+          created_at: string | null
+          current_value: number | null
+          description: string | null
+          divisible: boolean | null
+          first_bought_at: string | null
+          id: string | null
+          invested: number | null
+          name: string | null
+          net_proceeds: number | null
+          quantity: number | null
+          realized_pl: number | null
+          status: string | null
+          unit: string | null
+          unit_value: number | null
+          unrealized_pl: number | null
+          user_id: string | null
+          valued_at: string | null
+          value_source: string | null
+        }
+        Relationships: []
+      }
       v_budget_remaining: {
         Row: {
           budget_id: string | null
@@ -948,6 +1085,24 @@ export type Database = {
     }
     Functions: {
       bump_streak: { Args: { p_user_id: string }; Returns: undefined }
+      buy_asset: {
+        Args: {
+          p_account_id: string
+          p_asset_id: string | null
+          p_category: string | null
+          p_description?: string
+          p_divisible: boolean | null
+          p_fee: number
+          p_name: string | null
+          p_note?: string
+          p_occurred_at?: string
+          p_price: number
+          p_quantity: number
+          p_request_id?: string
+          p_unit: string | null
+        }
+        Returns: string
+      }
       create_group: {
         Args: { p_display_name: string; p_name: string }
         Returns: string
@@ -965,6 +1120,7 @@ export type Database = {
         Returns: string
       }
       cycle_start: { Args: { p_day: number; p_local: string }; Returns: string }
+      delete_asset: { Args: { p_asset_id: string }; Returns: undefined }
       delete_debt_payment: {
         Args: { p_payment_id: string }
         Returns: undefined
@@ -1022,7 +1178,31 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: { daily_limit: number; days_left: number; safe: number }[]
       }
+      sell_asset: {
+        Args: {
+          p_account_id: string
+          p_asset_id: string
+          p_fee: number
+          p_gross: number
+          p_note?: string
+          p_occurred_at?: string
+          p_quantity: number
+          p_request_id?: string
+          p_tax: number
+        }
+        Returns: string
+      }
+      undo_asset_event: { Args: { p_event_id: string }; Returns: undefined }
       user_today: { Args: { p_user_id: string }; Returns: string }
+      value_asset: {
+        Args: {
+          p_asset_id: string
+          p_note?: string
+          p_request_id?: string
+          p_unit_value: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       account_type: "BANK" | "EWALLET" | "CASH"
@@ -1032,7 +1212,7 @@ export type Database = {
       debt_direction: "OWED_TO_ME" | "I_OWE"
       intent_status: "PENDING" | "PURCHASED" | "CANCELLED"
       necessity_level: "NEED" | "IMPORTANT" | "WANT" | "IMPULSE"
-      transaction_type: "INCOME" | "EXPENSE" | "TRANSFER"
+      transaction_type: "INCOME" | "EXPENSE" | "TRANSFER" | "ASSET_BUY" | "ASSET_SELL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1150,7 +1330,7 @@ export const Constants = {
       debt_direction: ["OWED_TO_ME", "I_OWE"],
       intent_status: ["PENDING", "PURCHASED", "CANCELLED"],
       necessity_level: ["NEED", "IMPORTANT", "WANT", "IMPULSE"],
-      transaction_type: ["INCOME", "EXPENSE", "TRANSFER"],
+      transaction_type: ["INCOME", "EXPENSE", "TRANSFER", "ASSET_BUY", "ASSET_SELL"],
     },
   },
 } as const

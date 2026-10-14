@@ -23,8 +23,24 @@ export type TransactionRow = Pick<
   to_account: { name: string } | null;
 };
 
+export type TransactionType = TransactionRow['type'];
+
+/** Buying or selling an asset: money moves, but it is neither spending nor income (see the Aset screen). */
+export function isAssetType(type: TransactionType) {
+  return type === 'ASSET_BUY' || type === 'ASSET_SELL';
+}
+
+/** Which way money goes for the account(s) involved: out of one, into one, or between two of the user's own. */
+export function moneyDirection(type: TransactionType): 'out' | 'in' | 'move' {
+  if (type === 'EXPENSE' || type === 'ASSET_BUY') return 'out';
+  if (type === 'INCOME' || type === 'ASSET_SELL') return 'in';
+  return 'move';
+}
+
 /** What a transaction is called in lists: merchant, else category, else a fallback per type. */
 export function transactionTitle(t: TransactionRow) {
   if (t.type === 'TRANSFER') return t.merchant ?? 'Transfer';
+  if (t.type === 'ASSET_BUY') return t.merchant ?? 'Beli aset';
+  if (t.type === 'ASSET_SELL') return t.merchant ?? 'Jual aset';
   return t.merchant ?? t.categories?.name ?? (t.type === 'INCOME' ? 'Pemasukan' : 'Tanpa kategori');
 }

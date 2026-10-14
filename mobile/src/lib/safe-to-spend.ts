@@ -1,10 +1,11 @@
+import type { Enums } from '@/lib/database.types';
 import { localDate } from '@/lib/debts';
 
 // "Safe to spend": cash that is not already promised to something until the end of the cycle.
 //   safe = cash − upcoming bills − debts falling due − money set aside for goals − essentials reserve
 // The daily limit is computed from this morning's position, so it stays put while you spend during the day.
 
-export type SafeRule = { name: string; amount: number; type: 'INCOME' | 'EXPENSE' | 'TRANSFER'; active: boolean; next_due: string; day_of_month: number };
+export type SafeRule = { name: string; amount: number; type: Enums<'transaction_type'>; active: boolean; next_due: string; day_of_month: number };
 export type SafeDebt = { direction: 'OWED_TO_ME' | 'I_OWE' | null; remaining: number | null; due_date: string | null; settled: boolean | null };
 export type EssentialBudget = { limit_amount: number; remaining: number } | null;
 

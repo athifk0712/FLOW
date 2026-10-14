@@ -8,20 +8,21 @@ import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/money';
-import { transactionTitle, type TransactionRow } from '@/lib/transactions';
+import { isAssetType, moneyDirection, transactionTitle, type TransactionRow } from '@/lib/transactions';
 
 const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
 
 /** One transaction in a list (Riwayat, Kalender): icon with its necessity dot, title, time · account, amount. */
 export function TransactionItem({ item }: { item: TransactionRow }) {
   const theme = useTheme();
-  const sign = item.type === 'EXPENSE' ? '-' : item.type === 'INCOME' ? '+' : '';
+  const direction = moneyDirection(item.type);
+  const sign = direction === 'out' ? '-' : direction === 'in' ? '+' : '';
   const dotColor =
     item.type === 'EXPENSE' ? (item.necessity ? NECESSITY[item.necessity].color : UNREVIEWED_COLOR) : null;
   const account =
     item.type === 'TRANSFER'
       ? `${item.from_account?.name ?? '-'} → ${item.to_account?.name ?? '-'}`
-      : ((item.type === 'INCOME' ? item.to_account : item.from_account)?.name ?? '-');
+      : ((direction === 'in' ? item.to_account : item.from_account)?.name ?? '-');
 
   return (
     <Pressable
@@ -29,7 +30,10 @@ export function TransactionItem({ item }: { item: TransactionRow }) {
       style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView type="backgroundElement" style={styles.row}>
         <View>
-          <CategoryIcon icon={item.type === 'TRANSFER' ? 'transfer' : item.categories?.icon} size={38} />
+          <CategoryIcon
+            icon={item.type === 'TRANSFER' ? 'transfer' : isAssetType(item.type) ? 'invest' : item.categories?.icon}
+            size={38}
+          />
           {dotColor && (
             <View style={[styles.dot, { backgroundColor: dotColor, borderColor: theme.backgroundElement }]} />
           )}
@@ -41,7 +45,7 @@ export function TransactionItem({ item }: { item: TransactionRow }) {
             {item.receipt_id ? ' · ada struk' : ''}
           </ThemedText>
         </View>
-        <ThemedText type="smallBold" style={item.type === 'INCOME' && { color: theme.primary }}>
+        <ThemedText type="smallBold" style={direction === 'in' && { color: theme.primary }}>
           {sign}
           {formatMoney(item.amount)}
         </ThemedText>

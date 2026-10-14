@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +25,7 @@ import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { deleteReceipt, type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
-import { TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
+import { isAssetType, TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name' | 'archived_at'>;
@@ -34,6 +34,8 @@ const TYPE_LABEL: Record<TransactionRow['type'], string> = {
   EXPENSE: 'PENGELUARAN',
   INCOME: 'PEMASUKAN',
   TRANSFER: 'TRANSFER',
+  ASSET_BUY: 'BELI ASET',
+  ASSET_SELL: 'JUAL ASET',
 };
 
 // Edit or delete one transaction. The type is fixed; to change it, delete and log it again.
@@ -55,10 +57,11 @@ export default function TransactionScreen() {
   const [occurredAt, setOccurredAt] = useState(() => new Date());
 
   // Rows written together with this one: a transfer's admin fee, or the debt payment this settles.
-  const [linked, setLinked] = useState<{ fee: number | null; feeOf: boolean; debtPayment: boolean }>({
+  const [linked, setLinked] = useState<{ fee: number | null; feeOf: boolean; debtPayment: boolean; assetId: string | null }>({
     fee: null,
     feeOf: false,
     debtPayment: false,
+    assetId: null,
   });
 
   const [saving, setSaving] = useState(false);
@@ -73,8 +76,9 @@ export default function TransactionScreen() {
       supabase.from('transactions').select('amount').eq('fee_for_id', id),
       supabase.from('transactions').select('fee_for_id').eq('id', id).single(),
       supabase.from('debt_payments').select('id').eq('transaction_id', id),
-    ]).then(([t, cats, accs, fees, own, payments]) => {
-      const failed = t.error ?? cats.error ?? accs.error ?? fees.error ?? own.error ?? payments.error;
+      supabase.from('asset_events').select('asset_id').eq('transaction_id', id).maybeSingle(),
+    ]).then(([t, cats, accs, fees, own, payments, assetEvent]) => {
+      const failed = t.error ?? cats.error ?? accs.error ?? fees.error ?? own.error ?? payments.error ?? assetEvent.error;
       if (failed) return setError(failed.message);
       const row = t.data;
       if (!row) return setError('Transaksi tidak ditemukan.');
@@ -99,6 +103,7 @@ export default function TransactionScreen() {
         fee: (fees.data ?? []).reduce((sum, f) => sum + f.amount, 0) || null,
         feeOf: !!own.data?.fee_for_id,
         debtPayment: (payments.data ?? []).length > 0,
+        assetId: assetEvent.data?.asset_id ?? null,
       });
     });
   }, [id]);
@@ -201,6 +206,27 @@ export default function TransactionScreen() {
             ) : (
               <ActivityIndicator style={styles.flex} />
             )
+          ) : isAssetType(tx.type) ? (
+            // Buying or selling an asset: its amount and wallet belong to the asset's history.
+            <ThemedView type="backgroundElement" style={styles.assetCard}>
+              <ThemedText type="smallBold">{tx.merchant ?? (tx.type === 'ASSET_BUY' ? 'Beli aset' : 'Jual aset')}</ThemedText>
+              <ThemedText>{formatMoney(tx.amount)}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {tx.type === 'ASSET_BUY'
+                  ? 'Uang keluar untuk membeli aset. Ini bukan pengeluaran konsumtif: nilainya pindah ke asetmu.'
+                  : 'Uang masuk dari penjualan aset (sudah dipotong biaya). Bukan pemasukan biasa.'}{' '}
+                Nominal dan dompetnya diatur dari halaman Aset; membatalkannya di sana juga mengembalikan saldo.
+              </ThemedText>
+              {linked.assetId && (
+                <Pressable
+                  onPress={() => router.replace({ pathname: '/asset/[id]', params: { id: linked.assetId! } })}
+                  style={({ pressed }) => [styles.save, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                    Buka aset
+                  </ThemedText>
+                </Pressable>
+              )}
+            </ThemedView>
           ) : (
             <>
               <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
@@ -381,6 +407,11 @@ export default function TransactionScreen() {
 }
 
 const styles = StyleSheet.create({
+  assetCard: {
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
   iconChip: {
     flexDirection: 'row',
     alignItems: 'center',
