@@ -77,6 +77,9 @@ export default function HomeScreen() {
   const [space, setSpace] = useSpace();
   const [streak, setStreak] = useState<StreakView>({ days: 0, activeToday: false });
   const [celebrate, setCelebrate] = useState<number | null>(null);
+  // Bottom edge of the hero card (with its own Catat button), measured on layout.
+  const [heroBottom, setHeroBottom] = useState<number | null>(null);
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -258,9 +261,15 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={wide ? styles.scrollWide : styles.scroll}>
+      <ScrollView
+        contentContainerStyle={wide ? styles.scrollWide : styles.scroll}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          const past = heroBottom !== null && e.nativeEvent.contentOffset.y > heroBottom;
+          if (past !== scrolledPastHero) setScrolledPastHero(past);
+        }}>
         <View style={[styles.band, { backgroundColor: bandColor, height: bandHeight, paddingTop: insets.top }]}>
-          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: group ? theme.primary : theme.accent }]} />
+          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: group ? theme.backgroundElement : theme.accent }]} />
           <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: onBand }]} />
           <View style={[styles.bandInner, { maxWidth: wide ? WideContentWidth : MaxContentWidth }]}>
             <View style={styles.headerRow}>
@@ -322,7 +331,9 @@ export default function HomeScreen() {
         ) : (
         <View style={[styles.body, wide ? styles.bodyWide : { maxWidth: MaxContentWidth }]}>
           <View style={[styles.column, wide && styles.leftColumn]}>
-            {hero}
+            <View onLayout={(e) => setHeroBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height + bandHeight - BAND_OVERLAP)}>
+              {hero}
+            </View>
 
             <ThemedView type="backgroundElement" style={styles.card}>
               <ThemedText type="smallBold" themeColor="textSecondary">
@@ -422,8 +433,9 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* On a laptop the sidebar has the Catat button. Group Space has no personal logging. */}
-      {!wide && !group && (
+      {/* On a laptop the sidebar has the Catat button; Group Space has no personal logging. On a phone it shows up only
+          after the card's own Catat button has scrolled out of view, so at rest it never covers the menu. */}
+      {!wide && !group && (scrolledPastHero || balances.length === 0) && (
         <Pressable
           onPress={() => router.push('/quick-log')}
           style={({ pressed }) => [styles.fab, { backgroundColor: theme.primary }, pressed && styles.pressed]}>

@@ -5,7 +5,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { displayName, initials, NAME_MAX, saveDisplayName } from '@/lib/display-name';
+import { Avatar } from '@/components/avatar';
+import { displayName, NAME_MAX, saveDisplayName } from '@/lib/display-name';
 import { useSession } from '@/providers/session-provider';
 
 /** The profile header: avatar, the name Flowku calls you, and an inline editor for it. */
@@ -43,11 +44,7 @@ export function NameSection() {
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <View style={styles.head}>
-        <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-          <ThemedText type="smallBold" style={[styles.avatarText, { color: theme.onPrimary }]}>
-            {initials(editing && draft.trim() ? draft : name)}
-          </ThemedText>
-        </View>
+        <Avatar name={editing && draft.trim() ? draft : name} size={56} />
         <View style={styles.flex}>
           <ThemedText type="small" themeColor="textSecondary">
             Nama panggilan
@@ -124,17 +121,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 20,
-    lineHeight: 26,
   },
   flex: {
     flex: 1,

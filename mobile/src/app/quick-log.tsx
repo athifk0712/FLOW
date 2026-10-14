@@ -126,6 +126,7 @@ export default function QuickLogScreen() {
         .from('transactions')
         .select('category_id, from_account_id, occurred_at, type')
         .in('type', ['EXPENSE', 'INCOME'])
+        .is('fee_for_id', null)
         .order('occurred_at', { ascending: false })
         .limit(200),
       supabase
@@ -975,6 +976,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     fontSize: 16,
     paddingVertical: Spacing.two,
+    outlineWidth: 0,
+    outlineColor: 'transparent',
   },
   input: {
     fontSize: 16,

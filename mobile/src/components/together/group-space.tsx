@@ -118,13 +118,16 @@ export function GroupSpace({ userId, displayName }: Props) {
           <Pressable
             key={g.id}
             onPress={() => open(g.id)}
-            style={[styles.chip, { backgroundColor: g.id === selected ? theme.accent : theme.backgroundElement }]}>
-            <ThemedText type="smallBold" style={{ color: g.id === selected ? theme.onAccent : theme.text }}>
+            accessibilityState={{ selected: g.id === selected }}
+            style={[styles.chip, { backgroundColor: g.id === selected ? theme.primary : theme.backgroundElement }]}>
+            <ThemedText type="smallBold" style={{ color: g.id === selected ? theme.onPrimary : theme.text }}>
               {g.name}
             </ThemedText>
           </Pressable>
         ))}
-        <Pressable onPress={() => setAdding(true)} style={[styles.chip, styles.dashed, { borderColor: theme.textSecondary }]}>
+        <Pressable
+          onPress={() => setAdding(true)}
+          style={[styles.chip, styles.dashed, { borderColor: theme.text, backgroundColor: theme.backgroundElement }]}>
           <ThemedText type="smallBold">+ Grup</ThemedText>
         </Pressable>
       </View>
