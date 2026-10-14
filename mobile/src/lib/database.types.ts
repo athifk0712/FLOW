@@ -212,6 +212,8 @@ export type Database = {
           debt_id: string
           id: string
           paid_at: string
+          request_id: string | null
+          transaction_id: string | null
           user_id: string
         }
         Insert: {
@@ -219,6 +221,8 @@ export type Database = {
           debt_id: string
           id?: string
           paid_at?: string
+          request_id?: string | null
+          transaction_id?: string | null
           user_id?: string
         }
         Update: {
@@ -226,6 +230,8 @@ export type Database = {
           debt_id?: string
           id?: string
           paid_at?: string
+          request_id?: string | null
+          transaction_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -241,6 +247,13 @@ export type Database = {
             columns: ["debt_id", "user_id"]
             isOneToOne: false
             referencedRelation: "v_debts"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "debt_payments_transaction_fkey"
+            columns: ["transaction_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id", "user_id"]
           },
         ]
@@ -334,26 +347,198 @@ export type Database = {
           },
         ]
       }
+      group_contributions: {
+        Row: {
+          amount: number
+          contributed_at: string
+          group_id: string
+          id: string
+          note: string | null
+          status: string
+          target_id: string
+          user_id: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          contributed_at?: string
+          group_id: string
+          id?: string
+          note?: string | null
+          status?: string
+          target_id: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          contributed_at?: string
+          group_id?: string
+          id?: string
+          note?: string | null
+          status?: string
+          target_id?: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_contributions_group_id_user_id_fkey"
+            columns: ["group_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "group_members"
+            referencedColumns: ["group_id", "user_id"]
+          },
+          {
+            foreignKeyName: "group_contributions_target_id_group_id_fkey"
+            columns: ["target_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "group_targets"
+            referencedColumns: ["id", "group_id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          display_name: string
+          group_id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          display_name: string
+          group_id: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          display_name?: string
+          group_id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_targets: {
+        Row: {
+          created_at: string
+          created_by: string
+          deadline: string | null
+          description: string | null
+          group_id: string
+          id: string
+          name: string
+          status: string
+          target_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          group_id: string
+          id?: string
+          name: string
+          status?: string
+          target_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          group_id?: string
+          id?: string
+          name?: string
+          status?: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_targets_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          currency: string
+          id: string
+          invite_code: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          currency?: string
+          id?: string
+          invite_code?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          currency?: string
+          id?: string
+          invite_code?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          avatar_path: string | null
           created_at: string
           currency: string
           cycle_start_day: number
           id: string
+          last_active_date: string | null
+          streak_count: number
           timezone: string
         }
         Insert: {
+          avatar_path?: string | null
           created_at?: string
           currency?: string
           cycle_start_day?: number
           id: string
+          last_active_date?: string | null
+          streak_count?: number
           timezone?: string
         }
         Update: {
+          avatar_path?: string | null
           created_at?: string
           currency?: string
           cycle_start_day?: number
           id?: string
+          last_active_date?: string | null
+          streak_count?: number
           timezone?: string
         }
         Relationships: []
@@ -483,8 +668,10 @@ export type Database = {
         Row: {
           amount: number
           category_id: string | null
+          client_request_id: string | null
           created_at: string
           description: string | null
+          fee_for_id: string | null
           from_account_id: string | null
           id: string
           merchant: string | null
@@ -503,8 +690,10 @@ export type Database = {
         Insert: {
           amount: number
           category_id?: string | null
+          client_request_id?: string | null
           created_at?: string
           description?: string | null
+          fee_for_id?: string | null
           from_account_id?: string | null
           id?: string
           merchant?: string | null
@@ -523,8 +712,10 @@ export type Database = {
         Update: {
           amount?: number
           category_id?: string | null
+          client_request_id?: string | null
           created_at?: string
           description?: string | null
+          fee_for_id?: string | null
           from_account_id?: string | null
           id?: string
           merchant?: string | null
@@ -546,6 +737,13 @@ export type Database = {
             columns: ["category_id", "user_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "transactions_fee_for_fkey"
+            columns: ["fee_for_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id", "user_id"]
           },
           {
@@ -749,13 +947,47 @@ export type Database = {
       }
     }
     Functions: {
+      bump_streak: { Args: { p_user_id: string }; Returns: undefined }
+      create_group: {
+        Args: { p_display_name: string; p_name: string }
+        Returns: string
+      }
+      create_transfer: {
+        Args: {
+          p_amount: number
+          p_fee?: number
+          p_from: string
+          p_note?: string
+          p_occurred_at?: string
+          p_request_id?: string
+          p_to: string
+        }
+        Returns: string
+      }
       cycle_start: { Args: { p_day: number; p_local: string }; Returns: string }
+      delete_debt_payment: {
+        Args: { p_payment_id: string }
+        Returns: undefined
+      }
       delete_my_account: { Args: never; Returns: undefined }
+      ensure_category: {
+        Args: {
+          p_icon: string
+          p_kind: Database["public"]["Enums"]["category_kind"]
+          p_name: string
+        }
+        Returns: string
+      }
       intent_cooldown: {
         Args: { p_cost: number; p_user_id: string }
         Returns: string
       }
-      post_due_recurring: { Args: never; Returns: number }
+      is_group_member: { Args: { p_group_id: string }; Returns: boolean }
+      is_group_owner: { Args: { p_group_id: string }; Returns: boolean }
+      join_group: {
+        Args: { p_code: string; p_display_name: string }
+        Returns: string
+      }
       post_due_recurring_details: {
         Args: never
         Returns: {
@@ -767,17 +999,28 @@ export type Database = {
           rule_id: string
         }[]
       }
-      safe_to_spend: {
-        Args: { p_user_id: string }
-        Returns: { daily_limit: number; days_left: number; safe: number }[]
-      }
+      post_due_recurring: { Args: never; Returns: number }
       purchase_intent: {
         Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
+        Returns: string
+      }
+      record_debt_payment: {
+        Args: {
+          p_account_id?: string
+          p_amount: number
+          p_debt_id: string
+          p_paid_at?: string
+          p_request_id?: string
+        }
         Returns: string
       }
       recurring_due_date: {
         Args: { p_day: number; p_month: number; p_year: number }
         Returns: string
+      }
+      safe_to_spend: {
+        Args: { p_user_id: string }
+        Returns: { daily_limit: number; days_left: number; safe: number }[]
       }
       user_today: { Args: { p_user_id: string }; Returns: string }
     }
