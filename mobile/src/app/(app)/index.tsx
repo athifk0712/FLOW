@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { Avatar } from '@/components/avatar';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { HabitCard } from '@/components/dashboard/habit-card';
 import { MenuGrid, type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
@@ -12,6 +13,9 @@ import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
 import { TimeInsightCard } from '@/components/dashboard/time-insight-card';
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
+import { StreakBadge } from '@/components/streak-badge';
+import { StreakCelebration } from '@/components/streak-celebration';
+import { GroupSpace } from '@/components/together/group-space';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Toast } from '@/components/toast';
@@ -30,6 +34,7 @@ import { formatMoney } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
+import { celebratedOn, markCelebrated, shouldCelebrate, streakView, type StreakView } from '@/lib/streak';
 import { supabase } from '@/lib/supabase';
 import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
 import { weeklyReviewWindow } from '@/lib/weekly-review';
@@ -50,9 +55,15 @@ const QUICK_ACTIONS: MenuItem[] = [
   { label: 'Laporan', href: '/report', material: 'bar_chart', sf: 'chart.bar' },
 ];
 
-// Height of the teal band the first card overlaps.
+// How far the first card reaches up into the band.
 const BAND_OVERLAP = 64;
+// Header row (avatar, greeting, streak, settings) and the Pribadi/Grup switch under it.
+const HEADER_HEIGHT = 56;
+const SWITCH_HEIGHT = 40;
 const HIDDEN_KEY = 'flowku.hideBalance';
+const SPACE_KEY = 'flowku.space';
+
+type Space = 'personal' | 'group';
 
 // Beranda, laid out like a banking app: a teal band with a greeting, the safe-to-spend card with quick actions,
 // a menu grid with everything that used to live under Pengaturan, small to-do rows, then the overview cards.
@@ -60,8 +71,12 @@ const HIDDEN_KEY = 'flowku.hideBalance';
 export default function HomeScreen() {
   const theme = useTheme();
   const wide = useWide();
+  const insets = useSafeAreaInsets();
   const { session } = useSession();
   const [hidden, toggleHidden] = useHiddenBalance();
+  const [space, setSpace] = useSpace();
+  const [streak, setStreak] = useState<StreakView>({ days: 0, activeToday: false });
+  const [celebrate, setCelebrate] = useState<number | null>(null);
   const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -123,6 +138,7 @@ export default function HomeScreen() {
             .eq('type', 'EXPENSE')
             .not('necessity', 'is', null)
             .gte('occurred_at', insightSince),
+          supabase.from('profiles').select('streak_count, last_active_date').maybeSingle(),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
@@ -137,7 +153,7 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows]) => {
+        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -167,12 +183,27 @@ export default function HomeScreen() {
           setRules(ruleRows.data ?? []);
           setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
           setTimeInsight(computeTimeInsight(judgedRows.data ?? []));
+          // The streak is kept by the server; the day's first counted save is celebrated once, here.
+          if (profileRow.data) {
+            const view = streakView(profileRow.data.streak_count, profileRow.data.last_active_date);
+            setStreak(view);
+            if (shouldCelebrate(view, celebratedOn())) {
+              markCelebrated();
+              setCelebrate(view.days);
+            }
+          }
         });
     }, [cycleDay, cycleLoaded]),
   );
 
   const user = session?.user;
   const name = displayName(user);
+  // Group Space wears honey instead of teal, so it is always clear which money you are looking at.
+  const group = space === 'group';
+  const bandColor = group ? theme.accent : theme.primary;
+  const onBand = group ? theme.onAccent : theme.onPrimary;
+  // Grows with the status bar instead of a fixed height, so the greeting never sits under it on any phone.
+  const bandHeight = insets.top + Spacing.three + HEADER_HEIGHT + Spacing.two + SWITCH_HEIGHT + Spacing.three + BAND_OVERLAP;
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
   const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
   const cycleEnd = cycleRange(new Date(), cycleDay).end;
@@ -228,35 +259,67 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={wide ? styles.scrollWide : styles.scroll}>
-        <View style={[styles.band, { backgroundColor: theme.primary }]}>
-          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
-          <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
-          <SafeAreaView
-            edges={['top', 'left', 'right']}
-            style={[styles.bandInner, { maxWidth: wide ? WideContentWidth : MaxContentWidth }]}>
-            <Pressable
-              onPress={() => router.push('/profile')}
-              accessibilityLabel="Ubah nama"
-              style={({ pressed }) => [styles.flex, pressed && styles.pressed]}>
-              <ThemedText type="small" style={[styles.greetingSmall, { color: theme.onPrimary }]}>
-                {greeting()}
-              </ThemedText>
-              <ThemedText type="subtitle" style={[styles.greeting, { color: theme.onPrimary }]} numberOfLines={1}>
-                {name}
-              </ThemedText>
-            </Pressable>
-            {!wide && (
+        <View style={[styles.band, { backgroundColor: bandColor, height: bandHeight, paddingTop: insets.top }]}>
+          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: group ? theme.primary : theme.accent }]} />
+          <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: onBand }]} />
+          <View style={[styles.bandInner, { maxWidth: wide ? WideContentWidth : MaxContentWidth }]}>
+            <View style={styles.headerRow}>
               <Pressable
-                onPress={() => router.push('/settings')}
-                hitSlop={8}
-                accessibilityLabel="Pengaturan"
-                style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-                <AppSymbol material="settings" sf="gearshape" size={24} color={theme.onPrimary} />
+                onPress={() => router.push('/profile')}
+                accessibilityLabel="Profil: ubah nama dan foto"
+                style={({ pressed }) => [styles.who, pressed && styles.pressed]}>
+                <Avatar name={name} size={44} ringColor={onBand} />
+                <View style={styles.flex}>
+                  <ThemedText type="small" style={[styles.greetingSmall, { color: onBand }]} numberOfLines={1}>
+                    {greeting()}
+                  </ThemedText>
+                  <ThemedText type="subtitle" style={[styles.greeting, { color: onBand }]} numberOfLines={1}>
+                    {name}
+                  </ThemedText>
+                </View>
               </Pressable>
-            )}
-          </SafeAreaView>
+              <StreakBadge streak={streak} color={onBand} onPress={() => router.push('/habits')} />
+              {!wide && (
+                <Pressable
+                  onPress={() => router.push('/settings')}
+                  hitSlop={8}
+                  accessibilityLabel="Pengaturan"
+                  style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
+                  <AppSymbol material="settings" sf="gearshape" size={24} color={onBand} />
+                </Pressable>
+              )}
+            </View>
+            <View style={styles.switch} accessibilityRole="tablist">
+              {(['personal', 'group'] as const).map((value) => {
+                const on = space === value;
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => setSpace(value)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: on }}
+                    style={[styles.switchItem, on && { backgroundColor: onBand }]}>
+                    <AppSymbol
+                      material={value === 'personal' ? 'person' : 'groups'}
+                      sf={value === 'personal' ? 'person.crop.circle' : 'person.3.fill'}
+                      size={16}
+                      color={on ? bandColor : onBand}
+                    />
+                    <ThemedText type="smallBold" style={{ color: on ? bandColor : onBand }}>
+                      {value === 'personal' ? 'Pribadi' : 'Grup'}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
         </View>
 
+        {group ? (
+          <View style={[styles.body, { maxWidth: MaxContentWidth }]}>
+            {session && <GroupSpace userId={session.user.id} displayName={name} />}
+          </View>
+        ) : (
         <View style={[styles.body, wide ? styles.bodyWide : { maxWidth: MaxContentWidth }]}>
           <View style={[styles.column, wide && styles.leftColumn]}>
             {hero}
@@ -356,10 +419,11 @@ export default function HomeScreen() {
             </Section>
           </View>
         </View>
+        )}
       </ScrollView>
 
-      {/* On a laptop the sidebar has the Catat button. */}
-      {!wide && (
+      {/* On a laptop the sidebar has the Catat button. Group Space has no personal logging. */}
+      {!wide && !group && (
         <Pressable
           onPress={() => router.push('/quick-log')}
           style={({ pressed }) => [styles.fab, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
@@ -369,6 +433,7 @@ export default function HomeScreen() {
         </Pressable>
       )}
       <Toast message={toasts[0] ?? null} onHide={hideToast} />
+      <StreakCelebration days={celebrate} onClose={() => setCelebrate(null)} />
     </ThemedView>
   );
 }
@@ -379,6 +444,26 @@ function greeting(now = new Date()) {
   if (hour < 15) return 'Selamat siang';
   if (hour < 18) return 'Selamat sore';
   return 'Selamat malam';
+}
+
+/** Personal or Group Space; remembered on this device. Personal is the default. */
+function useSpace() {
+  const [space, setSpace] = useState<Space>(() => {
+    try {
+      return localStorage.getItem(SPACE_KEY) === 'group' ? 'group' : 'personal';
+    } catch {
+      return 'personal';
+    }
+  });
+  const choose = (next: Space) => {
+    setSpace(next);
+    try {
+      localStorage.setItem(SPACE_KEY, next);
+    } catch {
+      // Not remembered; it still switches for now.
+    }
+  };
+  return [space, choose] as const;
 }
 
 /** Whether amounts on Beranda are masked; remembered on this device. */
@@ -484,29 +569,56 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.five,
   },
   band: {
-    height: 170,
     overflow: 'hidden',
   },
   bandInner: {
     width: '100%',
     alignSelf: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+  },
+  headerRow: {
+    height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
   },
-  // Soft shapes in the band, echoing the sun-over-waves mark (same as Pengaturan).
+  who: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + 2,
+  },
+  switch: {
+    height: SWITCH_HEIGHT,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    padding: 3,
+    gap: 2,
+    borderRadius: SWITCH_HEIGHT / 2,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  switchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: SWITCH_HEIGHT / 2,
+  },
+  // Soft shapes in the band, echoing the sun-over-waves mark. The sun sits low on the right, behind the first card,
+  // so it never collides with the settings button or the streak badge.
   bubble: {
     position: 'absolute',
     borderRadius: 999,
   },
   bubbleOne: {
-    width: 120,
-    height: 120,
-    right: -20,
-    top: -30,
-    opacity: 0.9,
+    width: 110,
+    height: 110,
+    right: -36,
+    bottom: BAND_OVERLAP - 40,
+    opacity: 0.55,
   },
   bubbleTwo: {
     width: 260,
@@ -519,8 +631,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   greeting: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 28,
   },
   headerButton: {
     width: 44,

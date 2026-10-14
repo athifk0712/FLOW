@@ -1,4 +1,5 @@
 import type { Enums } from '@/lib/database.types';
+import { streakView } from '@/lib/streak';
 import { supabase } from '@/lib/supabase';
 
 export type HabitTransaction = {
@@ -11,6 +12,8 @@ export type HabitInput = {
   transactions: HabitTransaction[]; // the last HISTORY_DAYS days
   chatCount: number; // finished nightly chats
   goalReached: boolean;
+  /** The server's win streak (profiles.streak_count), which wins over the count derived from transaction dates. */
+  serverStreak?: { days: number; activeToday: boolean } | null;
 };
 
 export type Milestone = { key: string; title: string; hint: string; done: boolean };
@@ -58,6 +61,7 @@ export function computeHabits(input: HabitInput, now = new Date()): Habits {
   // Today not logged yet does not break the streak; it just hasn't grown today.
   let streak = 0;
   for (let i = loggedToday ? 0 : 1; logged.has(dayKey(daysAgo(i, now))); i++) streak++;
+  if (input.serverStreak) streak = input.serverStreak.days;
 
   const lastSeven = Array.from({ length: 7 }, (_, i) => logged.has(dayKey(daysAgo(6 - i, now))));
 
@@ -103,18 +107,20 @@ export function computeHabits(input: HabitInput, now = new Date()): Habits {
 /** Loads what computeHabits needs: 90 days of transactions, finished nightly chats, and whether any goal is reached. */
 export async function fetchHabits(now = new Date()) {
   const since = daysAgo(HISTORY_DAYS, now).toISOString();
-  const [tx, chats, goals] = await Promise.all([
+  const [tx, chats, goals, profile] = await Promise.all([
     supabase.from('transactions').select('occurred_at, type, necessity').gte('occurred_at', since),
     supabase.from('coach_sessions').select('id', { count: 'exact', head: true }).not('summary', 'is', null),
     supabase.from('v_goal_progress').select('saved, target_amount'),
+    supabase.from('profiles').select('streak_count, last_active_date').maybeSingle(),
   ]);
-  const failed = tx.error ?? chats.error ?? goals.error;
+  const failed = tx.error ?? chats.error ?? goals.error ?? profile.error;
   if (failed) throw failed;
   return computeHabits(
     {
       transactions: tx.data ?? [],
       chatCount: chats.count ?? 0,
       goalReached: (goals.data ?? []).some((g) => (g.saved ?? 0) >= (g.target_amount ?? 1)),
+      serverStreak: profile.data ? streakView(profile.data.streak_count, profile.data.last_active_date) : null,
     },
     now,
   );
