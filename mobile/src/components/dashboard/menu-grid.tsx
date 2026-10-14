@@ -38,7 +38,7 @@ export function MenuGrid({ items, columns = 4 }: { items: MenuItem[]; columns?: 
 }
 
 /** A row of round action buttons inside a card (Catat, Riwayat, ...). */
-export function QuickActions({ items }: { items: MenuItem[] }) {
+export function QuickActions({ items, soft = false }: { items: MenuItem[]; soft?: boolean }) {
   const theme = useTheme();
   return (
     <View style={[styles.actions, { borderTopColor: theme.backgroundSelected }]}>
@@ -47,8 +47,9 @@ export function QuickActions({ items }: { items: MenuItem[] }) {
           key={item.label}
           onPress={() => router.push(item.href)}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          <View style={[styles.actionCircle, { backgroundColor: theme.primary }]}>
-            <AppSymbol material={item.material} sf={item.sf} size={22} color={theme.onPrimary} />
+          {/* Soft circles next to a primary button, so only that button reads as the main action. */}
+          <View style={[styles.actionCircle, { backgroundColor: soft ? theme.backgroundSelected : theme.primary }]}>
+            <AppSymbol material={item.material} sf={item.sf} size={22} color={soft ? theme.primary : theme.onPrimary} />
           </View>
           <ThemedText type="small" numberOfLines={1}>
             {item.label}

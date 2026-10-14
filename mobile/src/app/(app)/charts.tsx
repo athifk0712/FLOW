@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CategoryIcon } from '@/components/category-icon';
 import { Donut } from '@/components/charts/donut';
 import { FlowBars } from '@/components/charts/flow-bars';
+import { ReflectionSection } from '@/components/dashboard/reflection-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useChartColors } from '@/constants/chart-colors';
@@ -207,6 +208,8 @@ export default function ChartsScreen() {
                   Ketuk satu bulan untuk melihat rinciannya di atas.
                 </ThemedText>
               </ThemedView>
+
+              <ReflectionSection cycleDay={day} />
 
               <Pressable
                 onPress={() => router.push('/report')}

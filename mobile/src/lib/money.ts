@@ -83,3 +83,11 @@ export function toDigits(text: string, maxDigits = 12) {
 export function fromWhole(units: number, currency: Currency = getCurrency()) {
   return units * 10 ** currency.decimals;
 }
+
+/** Short form for tight spots: 37737435 -> "Rp37,7 jt", 950000 -> "Rp950 rb"; small amounts stay exact. */
+export function formatMoneyShort(amount: number, currency: Currency = getCurrency()) {
+  const units = Math.abs(amount) / 10 ** currency.decimals;
+  if (units < 100_000) return formatMoney(amount, currency);
+  const text = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 }).format(units);
+  return `${amount < 0 ? '-' : ''}${currency.symbol}${text.replace(/\s/g, ' ')}`;
+}

@@ -1,17 +1,13 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { Avatar } from '@/components/avatar';
 import { BudgetCard } from '@/components/dashboard/budget-card';
-import { HabitCard } from '@/components/dashboard/habit-card';
-import { MenuGrid, type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
-import { RegretInsight } from '@/components/dashboard/regret-insight';
+import { type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
-import { TimeInsightCard } from '@/components/dashboard/time-insight-card';
-import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { GoalProgress } from '@/components/goal-progress';
 import { StreakBadge } from '@/components/streak-badge';
 import { StreakCelebration } from '@/components/streak-celebration';
@@ -24,13 +20,13 @@ import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { useWide } from '@/hooks/use-wide';
 import { adminFeeMessages } from '@/lib/admin-fee';
-import { cycleKey, cycleRange, untilLabel } from '@/lib/cycle';
+import { cycleRange, untilLabel } from '@/lib/cycle';
 import type { Tables } from '@/lib/database.types';
 import { type Debt, dueStatus } from '@/lib/debts';
-import type { Goal } from '@/lib/goals';
-import { fetchHabits, type Habits } from '@/lib/habits';
+import { type Goal, goalStatus } from '@/lib/goals';
 import { displayName } from '@/lib/display-name';
-import { formatMoney } from '@/lib/money';
+import { takeSaved } from '@/lib/last-saved';
+import { formatMoney, formatMoneyShort } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
@@ -43,18 +39,15 @@ import { useSession } from '@/providers/session-provider';
 
 type Balance = Tables<'v_account_balances'>;
 type Budget = Tables<'v_budget_remaining'>;
-type MixRow = Tables<'v_spending_mix_monthly'>;
-type RegretRow = Tables<'v_regret_by_necessity'>;
-type Unreviewed = Pick<Tables<'transactions'>, 'id' | 'amount' | 'occurred_at'> & {
-  categories: { name: string } | null;
-};
-
-const QUICK_ACTIONS: MenuItem[] = [
-  { label: 'Catat', href: '/quick-log', material: 'add', sf: 'plus' },
-  { label: 'Riwayat', href: '/history', material: 'receipt_long', sf: 'list.bullet.rectangle' },
-  { label: 'Diagram', href: '/charts', material: 'pie_chart', sf: 'chart.pie' },
-  { label: 'Laporan', href: '/report', material: 'bar_chart', sf: 'chart.bar' },
+// Riwayat and Diagram are already in the tab bar; these are the next most used places. Everything else is under
+// "Semua menu", so nothing is lost by keeping Beranda short.
+const SHORTCUTS: MenuItem[] = [
+  { label: 'Dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
+  { label: 'Anggaran', href: '/budgets', material: 'donut_large', sf: 'chart.pie' },
+  { label: 'Aset', href: '/portfolio', material: 'savings', sf: 'dollarsign.circle' },
+  { label: 'Semua', href: '/menu', material: 'apps', sf: 'square.grid.2x2' },
 ];
+const BUDGETS_ON_HOME = 3;
 
 // How far the first card reaches up into the band.
 const BAND_OVERLAP = 64;
@@ -66,9 +59,11 @@ const SPACE_KEY = 'flowku.space';
 
 type Space = 'personal' | 'group';
 
-// Beranda, laid out like a banking app: a teal band with a greeting, the safe-to-spend card with quick actions,
-// a menu grid with everything that used to live under Pengaturan, small to-do rows, then the overview cards.
-// On a laptop-wide window the overview moves into a second column.
+// Beranda answers "how am I doing, and log this" with as little reading as possible: one number to check before
+// spending (with a single Catat button and four shortcuts), at most two small to-dos, then short summaries (money
+// overall, the top budgets, the nearest goal, one insight). Each summary opens its full page; the evaluation parts
+// (needs vs wants, reflections) live on the Diagram tab. On a laptop-wide window the summaries move into a second
+// column.
 export default function HomeScreen() {
   const theme = useTheme();
   const wide = useWide();
@@ -87,41 +82,37 @@ export default function HomeScreen() {
   const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [mix, setMix] = useState<MixRow[]>([]);
-  const [unreviewed, setUnreviewed] = useState<Unreviewed[]>([]);
+  const [unreviewed, setUnreviewed] = useState(0);
   const [weeklyDue, setWeeklyDue] = useState(0);
-  const [regret, setRegret] = useState<RegretRow[]>([]);
   const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
   const [goals, setGoals] = useState<Goal[]>([]);
   const [openDebts, setOpenDebts] = useState<Debt[]>([]);
-  const [habits, setHabits] = useState<Habits | null>(null);
   const [rules, setRules] = useState<SafeRule[]>([]);
   const [spentToday, setSpentToday] = useState(0);
   const [timeInsight, setTimeInsight] = useState<TimeInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Admin fees charged on this open, shown one after another.
-  const [toasts, setToasts] = useState<string[]>([]);
+  // Admin fees charged on this open and "it's saved" after Catat, shown one after another.
+  const [toasts, setToasts] = useState<{ text: string; icon: 'bank' | 'done' }[]>([]);
+  // False until the first load, so Beranda never flashes "Rp0" before the real numbers arrive.
+  const [loaded, setLoaded] = useState(false);
   const hideToast = useCallback(() => setToasts((list) => list.slice(1)), []);
 
   // Refetch every time the screen regains focus, e.g. after closing Quick Log or Review.
   useFocusEffect(
     useCallback(() => {
-      if (!cycleLoaded) return; // month keys depend on the payday cycle
+      if (!cycleLoaded) return; // Safe to Spend needs the payday cycle
       const now = new Date();
-      const month = cycleKey(now, cycleDay);
       const week = weeklyReviewWindow();
+      // A small win after logging: Catat just saved something.
+      const saved = takeSaved();
+      if (saved) setToasts((list) => [...list, { text: saved, icon: 'done' }]);
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const insightSince = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString();
       const load = () =>
         Promise.all([
           supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
           supabase.from('v_budget_remaining').select('*'),
-          supabase.from('v_spending_mix_monthly').select('*').eq('month', month),
-          supabase
-            .from('transactions')
-            .select('id, amount, occurred_at, categories(name)')
-            .eq('needs_review', true)
-            .order('occurred_at', { ascending: false }),
+          supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('needs_review', true),
           supabase
             .from('transactions')
             .select('id', { count: 'exact', head: true })
@@ -130,7 +121,6 @@ export default function HomeScreen() {
             .is('regret', null)
             .gte('occurred_at', week.from)
             .lte('occurred_at', week.to),
-          supabase.from('v_regret_by_necessity').select('*'),
           supabase.from('categories').select('id, name'),
           supabase.from('v_goal_progress').select('*').order('created_at'),
           supabase.from('v_debts').select('*').eq('settled', false),
@@ -150,25 +140,20 @@ export default function HomeScreen() {
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
-      // Habits are a nice-to-have: failures just leave the card hidden.
-      const loadHabits = () => fetchHabits().then(setHabits, () => {});
       supabase
         .rpc('post_due_recurring_details')
         .then(({ data }) => {
           const messages = adminFeeMessages(data ?? []);
-          if (messages.length > 0) setToasts((list) => [...list, ...messages]);
-          loadHabits();
+          if (messages.length > 0) setToasts((list) => [...list, ...messages.map((text) => ({ text, icon: 'bank' as const }))]);
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, mixRes, rev, due, reg, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
+        .then(([bal, bud, rev, due, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
           const failed =
             bal.error ??
             bud.error ??
-            mixRes.error ??
             rev.error ??
             due.error ??
-            reg.error ??
             cats.error ??
             goalRows.error ??
             debtRows.error ??
@@ -177,14 +162,13 @@ export default function HomeScreen() {
             judgedRows.error;
           if (failed) return setError(failed.message);
           setError(null);
+          setLoaded(true);
           // A brand-new guest (no accounts, never onboarded) gets the first-run setup.
           if ((bal.data ?? []).length === 0 && !isOnboarded()) router.push('/onboarding');
           setBalances(bal.data ?? []);
           setBudgets(bud.data ?? []);
-          setMix(mixRes.data ?? []);
-          setUnreviewed(rev.data ?? []);
+          setUnreviewed(rev.count ?? 0);
           setWeeklyDue(due.count ?? 0);
-          setRegret(reg.data ?? []);
           setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
           setGoals(goalRows.data ?? []);
           setOpenDebts(debtRows.data ?? []);
@@ -204,7 +188,7 @@ export default function HomeScreen() {
             }
           }
         });
-    }, [cycleDay, cycleLoaded]),
+    }, [cycleLoaded]),
   );
 
   const user = session?.user;
@@ -216,7 +200,6 @@ export default function HomeScreen() {
   // Grows with the status bar instead of a fixed height, so the greeting never sits under it on any phone.
   const bandHeight = insets.top + Spacing.three + HEADER_HEIGHT + Spacing.two + SWITCH_HEIGHT + Spacing.three + BAND_OVERLAP;
   const total = balances.reduce((sum, b) => sum + (b.current_balance ?? 0), 0);
-  const unreviewedTotal = unreviewed.reduce((sum, t) => sum + t.amount, 0);
   const cycleEnd = cycleRange(new Date(), cycleDay).end;
   const essential = budgets.find((b) => b.scope === 'ESSENTIAL' && b.period === 'WEEKLY');
   const safe = computeSafeToSpend({
@@ -228,35 +211,37 @@ export default function HomeScreen() {
     spentToday,
     cycleEnd,
   });
-  const overdueDebts = openDebts.filter((d) => dueStatus(d)?.overdue).length;
+  const sumDebts = (direction: Debt['direction']) =>
+    openDebts.filter((d) => d.direction === direction).reduce((s, d) => s + (d.remaining ?? 0), 0);
+  const worth = netWorth({
+    cash: total,
+    assets: assetsValue ?? 0,
+    receivables: sumDebts('OWED_TO_ME'),
+    debts: sumDebts('I_OWE'),
+  });
+  // The goal to show: still open, nearest deadline first (no deadline last), else the furthest along.
+  const nearestGoal = [...goals]
+    .filter((g) => !goalStatus(g).done)
+    .sort(
+      (a, b) =>
+        (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999') ||
+        (b.saved ?? 0) / (b.target_amount || 1) - (a.saved ?? 0) / (a.target_amount || 1),
+    )[0];
 
-  const menu: MenuItem[] = [
-    { label: 'Akun & dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
-    { label: 'Budget', href: '/budgets', material: 'donut_large', sf: 'chart.pie' },
-    { label: 'Target tabungan', href: '/goals', material: 'flag', sf: 'flag' },
-    {
-      label: 'Utang & piutang',
-      href: '/debts',
-      material: 'handshake',
-      sf: 'person.2',
-      badge: overdueDebts > 0 ? String(overdueDebts) : undefined,
-    },
-    { label: 'Transaksi rutin', href: '/recurring', material: 'event_repeat', sf: 'repeat' },
-    { label: 'Kategori', href: '/categories', material: 'category', sf: 'square.grid.2x2' },
-    // Kebiasaan is one tap away on the streak badge in the header.
-    { label: 'Aset', href: '/portfolio', material: 'savings', sf: 'dollarsign.circle' },
-    { label: 'Lainnya', href: '/settings', material: 'more_horiz', sf: 'ellipsis' },
-  ];
 
-  const hero =
-    balances.length > 0 ? (
+  const hero = !loaded ? (
+    <ThemedView type="backgroundElement" style={[styles.card, styles.loading]}>
+      <ActivityIndicator color={theme.primary} />
+    </ThemedView>
+  ) : balances.length > 0 ? (
       <SafeToSpendCard
         data={safe}
         cash={total}
         until={untilLabel(cycleEnd, cycleDay)}
         hidden={hidden}
         onToggleHidden={toggleHidden}>
-        <QuickActions items={QUICK_ACTIONS} />
+        <LogButton />
+        <QuickActions items={SHORTCUTS} soft />
       </SafeToSpendCard>
     ) : (
       <ThemedView type="backgroundElement" style={styles.card}>
@@ -264,7 +249,8 @@ export default function HomeScreen() {
           Total uang
         </ThemedText>
         <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
-        <QuickActions items={QUICK_ACTIONS} />
+        <LogButton />
+        <QuickActions items={SHORTCUTS} soft />
       </ThemedView>
     );
 
@@ -344,20 +330,13 @@ export default function HomeScreen() {
               {hero}
             </View>
 
-            <ThemedView type="backgroundElement" style={styles.card}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                MENU
-              </ThemedText>
-              <MenuGrid items={menu} />
-            </ThemedView>
-
-            {/* Small to-do rows, not banners: the daily check is a quick labelling step, not the centre of the app. */}
-            {unreviewed.length > 0 && (
+            {/* At most two small to-do rows, worded as an invitation, not a backlog. */}
+            {unreviewed > 0 && (
               <TodoRow
                 material="checklist"
                 sf="checklist"
-                title="Cek harian"
-                detail={`${unreviewed.length} pengeluaran (${formatMoney(unreviewedTotal)}) belum dilabeli`}
+                title={`${unreviewed} transaksi perlu ditinjau`}
+                detail="Cek harian, cukup 1–2 menit"
                 onPress={() => router.push('/coach')}
               />
             )}
@@ -366,7 +345,7 @@ export default function HomeScreen() {
                 material="rate_review"
                 sf="text.bubble"
                 title="Refleksi mingguan"
-                detail={`${weeklyDue} pengeluaran: masih puas, atau menyesal?`}
+                detail={`${weeklyDue} pengeluaran: masih puas?`}
                 onPress={() => router.push('/weekly-review')}
               />
             )}
@@ -375,79 +354,61 @@ export default function HomeScreen() {
           <View style={[styles.column, wide && styles.rightColumn]}>
             {error && <ThemedText themeColor="danger">{error}</ThemedText>}
 
-            {habits && habits.milestones[0].done && (
-              <Section title="KEBIASAAN">
-                <HabitCard habits={habits} />
-              </Section>
+            {loaded && (
+            <Section title="KONDISI UANGMU">
+              <View style={styles.tiles}>
+                <Tile
+                  label="Saldo"
+                  value={hidden ? '•••••' : formatMoneyShort(total)}
+                  hint={`${balances.length} akun`}
+                  onPress={() => router.push('/accounts')}
+                />
+                <Tile
+                  label="Kekayaan bersih"
+                  value={hidden ? '•••••' : formatMoneyShort(worth.total)}
+                  hint={assetCount > 0 ? `termasuk ${assetCount} aset` : 'saldo + aset − utang'}
+                  onPress={() => router.push('/portfolio')}
+                />
+              </View>
+              {(worth.debts > 0 || worth.receivables > 0) && <DebtsLine debts={openDebts} hidden={hidden} />}
+            </Section>
             )}
 
-            <Section title="BUDGET">
-              <BudgetCard budgets={budgets} categoryNames={categoryNames} />
+            <Section title="ANGGARAN">
+              <BudgetCard budgets={budgets} categoryNames={categoryNames} limit={BUDGETS_ON_HOME} />
             </Section>
-
-            <Section title="PENGELUARAN BULAN INI">
-              <SpendingMix rows={mix} />
-              <Pressable onPress={() => router.push('/report')} hitSlop={8}>
-                <ThemedText type="smallBold">Lihat laporan bulanan →</ThemedText>
-              </Pressable>
-            </Section>
-
-            {(timeInsight || regret.some((r) => (r.reviewed ?? 0) > 0)) && (
-              <Section title="REFLEKSI">
-                {timeInsight && <TimeInsightCard insight={timeInsight} />}
-                <RegretInsight rows={regret} />
-              </Section>
-            )}
 
             <Section title="TARGET TABUNGAN">
-              <Pressable onPress={() => router.push('/goals')}>
-                <ThemedView type="backgroundElement" style={[styles.card, styles.goals]}>
-                  {goals.slice(0, 3).map((g) => (
-                    <GoalProgress key={g.id} goal={g} />
-                  ))}
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {goals.length === 0
-                      ? 'Mau menabung untuk sesuatu? Buat target tabungan →'
-                      : goals.length > 3
-                        ? `Lihat semua ${goals.length} target →`
-                        : 'Kelola target →'}
-                  </ThemedText>
+              <Pressable onPress={() => router.push('/goals')} style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedView type="backgroundElement" style={styles.card}>
+                  {nearestGoal ? (
+                    <GoalProgress goal={nearestGoal} />
+                  ) : (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {goals.length > 0 ? 'Semua target sudah tercapai. Buat target baru?' : 'Mau menabung untuk sesuatu? Buat target →'}
+                    </ThemedText>
+                  )}
+                  {goals.length > 1 && (
+                    <ThemedText type="small" themeColor="primary">
+                      Lihat semua {goals.length} target →
+                    </ThemedText>
+                  )}
                 </ThemedView>
               </Pressable>
             </Section>
 
-            {openDebts.length > 0 && (
-              <Section title="UTANG & PIUTANG">
-                <DebtsCard debts={openDebts} />
+            {timeInsight && (
+              <Section title="INSIGHT">
+                <Pressable onPress={() => router.push('/charts')} style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundElement" style={styles.card}>
+                    <ThemedText>{timeInsight.headline}</ThemedText>
+                    <ThemedText type="small" themeColor="primary">
+                      Lihat analisis lengkap →
+                    </ThemedText>
+                  </ThemedView>
+                </Pressable>
               </Section>
             )}
-
-            <Section title="KEKAYAAN BERSIH">
-              <NetWorthCard
-                cash={total}
-                assets={assetsValue ?? 0}
-                assetCount={assetCount}
-                receivables={openDebts.filter((d) => d.direction === 'OWED_TO_ME').reduce((s, d) => s + (d.remaining ?? 0), 0)}
-                debts={openDebts.filter((d) => d.direction === 'I_OWE').reduce((s, d) => s + (d.remaining ?? 0), 0)}
-                hidden={hidden}
-              />
-            </Section>
-
-            <Section title="AKUN">
-              <Pressable onPress={() => router.push('/accounts')}>
-                <ThemedView type="backgroundElement" style={styles.card}>
-                  {balances.map((b) => (
-                    <View key={b.account_id} style={styles.row}>
-                      <ThemedText>{b.name}</ThemedText>
-                      <ThemedText>{hidden ? '•••••' : formatMoney(b.current_balance ?? 0)}</ThemedText>
-                    </View>
-                  ))}
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {balances.length === 0 ? 'Belum ada akun. Ketuk untuk menambahkan →' : 'Kelola akun →'}
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
-            </Section>
           </View>
         </View>
         )}
@@ -455,7 +416,7 @@ export default function HomeScreen() {
 
       {/* On a laptop the sidebar has the Catat button; Group Space has no personal logging. On a phone it shows up only
           after the card's own Catat button has scrolled out of view, so at rest it never covers the menu. */}
-      {!wide && !group && (scrolledPastHero || balances.length === 0) && (
+      {!wide && !group && loaded && (scrolledPastHero || balances.length === 0) && (
         <Pressable
           onPress={() => router.push('/quick-log')}
           style={({ pressed }) => [styles.fab, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
@@ -464,7 +425,7 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       )}
-      <Toast message={toasts[0] ?? null} onHide={hideToast} />
+      <Toast message={toasts[0]?.text ?? null} icon={toasts[0]?.icon} onHide={hideToast} />
       <StreakCelebration days={celebrate} onClose={() => setCelebrate(null)} />
     </ThemedView>
   );
@@ -549,74 +510,62 @@ function TodoRow({
   );
 }
 
-/** Open receivables and debts at a glance; red when something is overdue. */
-function DebtsCard({ debts }: { debts: Debt[] }) {
-  const sum = (direction: Debt['direction']) =>
-    debts.filter((d) => d.direction === direction).reduce((s, d) => s + (d.remaining ?? 0), 0);
-  const overdue = debts.filter((d) => dueStatus(d)?.overdue).length;
-  const owedToMe = sum('OWED_TO_ME');
-  const iOwe = sum('I_OWE');
+/** The main action of Beranda. */
+function LogButton() {
+  const theme = useTheme();
   return (
-    <Pressable onPress={() => router.push('/debts')}>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        {owedToMe > 0 && (
-          <View style={styles.row}>
-            <ThemedText>Piutang (orang pinjam ke kamu)</ThemedText>
-            <ThemedText type="smallBold">{formatMoney(owedToMe)}</ThemedText>
-          </View>
-        )}
-        {iOwe > 0 && (
-          <View style={styles.row}>
-            <ThemedText>Utang (kamu pinjam)</ThemedText>
-            <ThemedText type="smallBold">{formatMoney(iOwe)}</ThemedText>
-          </View>
-        )}
-        <ThemedText type="small" themeColor={overdue > 0 ? 'danger' : 'textSecondary'}>
-          {overdue > 0 ? `${overdue} lewat jatuh tempo · lihat →` : 'Kelola →'}
+    <Pressable
+      onPress={() => router.push('/quick-log')}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.logButton, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+      <AppSymbol material="add" sf="plus" size={22} color={theme.onPrimary} />
+      <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+        Catat transaksi
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+/** One number with a label; the whole tile opens its page. */
+function Tile({ label, value, hint, onPress }: { label: string; value: string; hint: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.flex, pressed && styles.pressed]}>
+      <ThemedView type="backgroundElement" style={styles.tile}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {label}
+        </ThemedText>
+        <ThemedText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
+          {value}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+          {hint}
         </ThemedText>
       </ThemedView>
     </Pressable>
   );
 }
 
-/**
- * Cash + estimated assets + receivables - debts. Kept apart from "Aman dibelanjakan", which only ever counts cash:
- * an asset's value is an estimate until it is sold.
- */
-function NetWorthCard(props: { cash: number; assets: number; assetCount: number; receivables: number; debts: number; hidden: boolean }) {
-  const worth = netWorth(props);
-  const show = (n: number) => (props.hidden ? '•••••' : formatMoney(n));
+/** Debts and receivables in one line; an overdue one is mentioned, calmly. */
+function DebtsLine({ debts, hidden }: { debts: Debt[]; hidden: boolean }) {
+  const theme = useTheme();
+  const sum = (direction: Debt['direction']) =>
+    debts.filter((d) => d.direction === direction).reduce((s, d) => s + (d.remaining ?? 0), 0);
+  const overdue = debts.filter((d) => dueStatus(d)?.overdue).length;
+  const show = (n: number) => (hidden ? '•••••' : formatMoneyShort(n));
+  const parts = [sum('I_OWE') > 0 && `Utang ${show(sum('I_OWE'))}`, sum('OWED_TO_ME') > 0 && `Piutang ${show(sum('OWED_TO_ME'))}`].filter(Boolean);
   return (
-    <Pressable onPress={() => router.push('/portfolio')}>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText style={styles.worth}>{show(worth.total)}</ThemedText>
-        <View style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary">Saldo di akun</ThemedText>
-          <ThemedText type="small">{show(worth.cash)}</ThemedText>
+    <Pressable onPress={() => router.push('/debts')} style={({ pressed }) => pressed && styles.pressed}>
+      <ThemedView type="backgroundElement" style={[styles.card, styles.todo]}>
+        <AppSymbol material="handshake" sf="person.2" size={20} color={theme.primary} />
+        <View style={styles.flex}>
+          <ThemedText type="small">{parts.join(' · ')}</ThemedText>
+          {overdue > 0 && (
+            <ThemedText type="small" themeColor="warning">
+              {overdue} sudah lewat jatuh tempo
+            </ThemedText>
+          )}
         </View>
-        <View style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Aset (estimasi){props.assetCount > 0 ? ` · ${props.assetCount}` : ''}
-          </ThemedText>
-          <ThemedText type="small">{show(worth.assets)}</ThemedText>
-        </View>
-        {worth.receivables > 0 && (
-          <View style={styles.row}>
-            <ThemedText type="small" themeColor="textSecondary">Piutang</ThemedText>
-            <ThemedText type="small">{show(worth.receivables)}</ThemedText>
-          </View>
-        )}
-        {worth.debts > 0 && (
-          <View style={styles.row}>
-            <ThemedText type="small" themeColor="textSecondary">Utang</ThemedText>
-            <ThemedText type="small" themeColor="danger">−{show(worth.debts)}</ThemedText>
-          </View>
-        )}
-        <ThemedText type="small" themeColor="textSecondary">
-          {props.assetCount > 0
-            ? 'Nilai aset hanya perkiraan dan tidak dihitung di "Aman dibelanjakan". Kelola aset →'
-            : 'Punya emas, saham, kripto, atau akun game? Catat di Aset →'}
-        </ThemedText>
+        <AppSymbol material="chevron_right" sf="chevron.right" size={20} color={theme.textSecondary} />
       </ThemedView>
     </Pressable>
   );
@@ -749,18 +698,37 @@ const styles = StyleSheet.create({
   section: {
     gap: Spacing.two,
   },
-  worth: {
-    fontSize: 26,
-    lineHeight: 32,
+  loading: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    minHeight: 52,
+    borderRadius: Spacing.three,
+  },
+  tiles: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  tile: {
+    gap: Spacing.half,
+    padding: Spacing.three,
+    borderRadius: Spacing.four,
+  },
+  tileValue: {
+    fontSize: 22,
+    lineHeight: 30,
     fontWeight: 700,
   },
   card: {
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.four,
-  },
-  goals: {
-    gap: Spacing.three,
   },
   todo: {
     flexDirection: 'row',

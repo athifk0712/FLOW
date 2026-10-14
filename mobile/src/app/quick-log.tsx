@@ -28,6 +28,7 @@ import { appendDigit, digitsToAmount, dropLastDigit } from '@/lib/amount-input';
 import { type CategoryUse, rankCategories } from '@/lib/category-rank';
 import type { Tables, TablesInsert } from '@/lib/database.types';
 import { formatDigits, formatMoney, fromWhole, useCurrency } from '@/lib/money';
+import { announceSaved } from '@/lib/last-saved';
 import { closeModal } from '@/lib/navigation';
 import { deleteReceipt, receiptFileProblem, scanReceipt, scanToDraft, uploadReceipt } from '@/lib/receipts';
 import { isAlreadySaved, newRequestId } from '@/lib/request-id';
@@ -368,6 +369,9 @@ export default function QuickLogScreen() {
     }
     setSaving(false);
     if (failed) return setError(failed.message);
+    // A small win: Beranda confirms it in one line.
+    const what = mode === 'TRANSFER' ? `Transfer ke ${accountName(toAccountId)}` : (selected?.name ?? 'Transaksi');
+    announceSaved(`Tercatat: ${what} ${formatMoney(amount)}`);
     closeModal();
   }
 

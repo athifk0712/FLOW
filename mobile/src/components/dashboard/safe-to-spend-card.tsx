@@ -26,8 +26,9 @@ type Props = {
 };
 
 /**
- * The one number to check before spending. Calm by default: the breakdown stays folded until asked for,
- * and a shortfall is worded as a pause, not an alarm.
+ * The one number to check before spending. Calm by default: one number, how long it has to last, and today's limit
+ * in one line. The breakdown (total balance, bills, debts, savings, essentials) stays folded until asked for, and
+ * going over is worded as information, not a telling-off. The numbers come from computeSafeToSpend, unchanged.
  */
 export function SafeToSpendCard({ data, cash, until, hidden = false, onToggleHidden, children }: Props) {
   const theme = useTheme();
@@ -59,34 +60,25 @@ export function SafeToSpendCard({ data, cash, until, hidden = false, onToggleHid
           {hidden ? HIDDEN : short ? formatMoney(0) : formatMoney(data.safe)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          Total saldo {hidden ? HIDDEN : formatMoney(cash)} · {data.daysLeft} hari lagi sampai {until}
+          {data.daysLeft} hari lagi sampai {until}
         </ThemedText>
       </View>
 
       {short ? (
-        <ThemedText type="small" themeColor="warning">
-          Kebutuhan wajib sampai {until} melebihi saldomu {money(-data.safe)}. Tahan dulu belanja keinginan,
-          ya.
+        <ThemedText type="small" themeColor="textSecondary">
+          Kebutuhan wajib sampai {until} lebih besar {money(-data.safe)} dari saldo. Dahulukan yang wajib dulu.
         </ThemedText>
       ) : (
         <View style={styles.today}>
-          <View style={styles.row}>
-            <ThemedText type="smallBold">
-              {overToday ? `Lewat ${money(-data.leftToday)} hari ini` : `Sisa hari ini ${money(data.leftToday)}`}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              dari {money(data.dailyLimit)}/hari
-            </ThemedText>
-          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            Batas harian <ThemedText type="smallBold">{money(data.dailyLimit)}</ThemedText>
+            {overToday ? ' · hari ini sudah terlewati, besok menyesuaikan' : ` · sisa hari ini ${money(data.leftToday)}`}
+          </ThemedText>
           <ProgressBar
+            height={6}
             total={Math.max(data.dailyLimit, spentToday)}
-            segments={[{ value: spentToday, color: overToday ? theme.warning : theme.primary }]}
+            segments={[{ value: spentToday, color: overToday ? theme.accent : theme.primary }]}
           />
-          {overToday && (
-            <ThemedText type="small" themeColor="textSecondary">
-              Tidak apa-apa. Batas besok menyesuaikan sendiri.
-            </ThemedText>
-          )}
         </View>
       )}
 
@@ -96,7 +88,7 @@ export function SafeToSpendCard({ data, cash, until, hidden = false, onToggleHid
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}>
         <ThemedText type="smallBold" themeColor="primary">
-          {open ? 'Tutup rincian' : 'Dari mana angka ini?'}
+          {open ? 'Tutup perhitungan' : 'Lihat perhitungan'}
         </ThemedText>
       </Pressable>
 

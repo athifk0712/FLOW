@@ -1,5 +1,5 @@
 import { findCurrency } from '@/lib/currencies';
-import { formatDigits, formatMoney, fromWhole, toDigits } from '@/lib/money';
+import { formatDigits, formatMoney, formatMoneyShort, fromWhole, toDigits } from '@/lib/money';
 
 const USD = findCurrency('USD');
 const EUR = findCurrency('EUR');
@@ -38,5 +38,15 @@ describe('money', () => {
 
   it('falls back to rupiah for an unknown code', () => {
     expect(findCurrency('XXX').code).toBe('IDR');
+  });
+});
+
+describe('formatMoneyShort', () => {
+  const idr = findCurrency('IDR');
+  it('shortens millions and thousands, keeps small amounts exact', () => {
+    expect(formatMoneyShort(37_737_435, idr)).toBe('Rp37,7 jt');
+    expect(formatMoneyShort(950_000, idr)).toBe('Rp950 rb');
+    expect(formatMoneyShort(57_500, idr)).toBe('Rp57.500');
+    expect(formatMoneyShort(-2_500_000, idr)).toBe('-Rp2,5 jt');
   });
 });

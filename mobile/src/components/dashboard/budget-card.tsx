@@ -27,8 +27,17 @@ const SCOPE_COLOR = {
 const PERIOD_LABEL = { WEEKLY: 'minggu ini', MONTHLY: 'bulan ini' } as const;
 
 /** Current budgets. Discretionary first: it is the one the app is really about.
- * Category budgets follow, the closest to their limit first. */
-export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; categoryNames: Map<string, string> }) {
+ * Category budgets follow, the closest to their limit first. With `limit`, only that many are shown (Beranda) and
+ * the full list is one tap away. Going over is shown in honey, not red: information, not a telling-off. */
+export function BudgetCard({
+  budgets,
+  categoryNames,
+  limit,
+}: {
+  budgets: Budget[];
+  categoryNames: Map<string, string>;
+  limit?: number;
+}) {
   const theme = useTheme();
   const weekly = budgets
     .filter((b) => b.period === 'WEEKLY' && b.scope !== 'CATEGORY')
@@ -53,8 +62,8 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      {[...weekly, ...perCategory].map((b) => {
-        const limit = b.limit_amount ?? 0;
+      {[...weekly, ...perCategory].slice(0, limit).map((b) => {
+        const cap = b.limit_amount ?? 0;
         const spent = b.spent ?? 0;
         const remaining = b.remaining ?? 0;
         const over = remaining < 0;
@@ -67,14 +76,14 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
             <View style={styles.row}>
               <ThemedText type="smallBold">{label}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {formatMoney(spent)} / {formatMoney(limit)}
+                {formatMoney(spent)} / {formatMoney(cap)}
               </ThemedText>
             </View>
-            <ProgressBar total={limit} segments={[{ value: spent, color: over ? theme.danger : SCOPE_COLOR[scope] }]} />
-            <ThemedText type="small" themeColor={over ? 'danger' : 'textSecondary'}>
-              {over ? `Lewat ${formatMoney(-remaining)} ${period}` : `Sisa ${formatMoney(remaining)} ${period}`}
+            <ProgressBar total={cap} segments={[{ value: spent, color: over ? theme.accent : SCOPE_COLOR[scope] }]} />
+            <ThemedText type="small" themeColor="textSecondary">
+              {over ? `Terpakai ${formatMoney(-remaining)} lebih dari batas ${period}` : `Sisa ${formatMoney(remaining)} ${period}`}
             </ThemedText>
-            {(b.unreviewed_amount ?? 0) > 0 && (
+            {!limit && (b.unreviewed_amount ?? 0) > 0 && (
               <ThemedText type="small" themeColor="textSecondary">
                 + {formatMoney(b.unreviewed_amount ?? 0)} belum dinilai, belum dihitung di sini
               </ThemedText>
@@ -82,6 +91,15 @@ export function BudgetCard({ budgets, categoryNames }: { budgets: Budget[]; cate
           </View>
         );
       })}
+      {limit !== undefined && (
+        <Link href="/budgets" asChild>
+          <Pressable hitSlop={8}>
+            <ThemedText type="small" themeColor="primary">
+              {weekly.length + perCategory.length > limit ? `Lihat semua ${weekly.length + perCategory.length} anggaran →` : 'Kelola anggaran →'}
+            </ThemedText>
+          </Pressable>
+        </Link>
+      )}
     </ThemedView>
   );
 }

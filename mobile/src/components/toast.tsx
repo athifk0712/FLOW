@@ -10,8 +10,21 @@ import { useTheme } from '@/hooks/use-theme';
 
 const VISIBLE_MS = 6000;
 
+const ICONS = {
+  bank: { material: 'account_balance', sf: 'building.columns' },
+  done: { material: 'check_circle', sf: 'checkmark.circle.fill' },
+} as const;
+
 /** A short message floating at the top of the screen; hides itself after a few seconds, or on tap. */
-export function Toast({ message, onHide }: { message: string | null; onHide: () => void }) {
+export function Toast({
+  message,
+  onHide,
+  icon = 'bank',
+}: {
+  message: string | null;
+  onHide: () => void;
+  icon?: keyof typeof ICONS;
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -32,7 +45,7 @@ export function Toast({ message, onHide }: { message: string | null; onHide: () 
         onPress={onHide}
         accessibilityRole="alert"
         style={[styles.toast, { backgroundColor: theme.text }]}>
-        <AppSymbol material="account_balance" sf="building.columns" size={20} color={theme.background} />
+        <AppSymbol material={ICONS[icon].material} sf={ICONS[icon].sf} size={20} color={theme.background} />
         <ThemedText type="small" style={[styles.text, { color: theme.background }]}>
           {message}
         </ThemedText>
