@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { type Href, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -165,7 +166,7 @@ export default function SettingsScreen() {
           ))}
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.footer}>
-            Flowku · uangmu mengalir tenang
+            Flowku {Constants.expoConfig?.version ?? ''} · uangmu mengalir tenang
           </ThemedText>
         </View>
       </ScrollView>
