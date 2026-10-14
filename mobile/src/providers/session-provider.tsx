@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 
+import { resetAvatar } from '@/lib/avatar';
 import { supabase } from '@/lib/supabase';
 
 type SessionState = {
@@ -19,7 +20,13 @@ export function SessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     // onAuthStateChange fires INITIAL_SESSION first (restored from storage, or from a Google redirect on web),
     // then SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED / USER_UPDATED, so the guard redirects on login and logout.
+    let userId: string | undefined;
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Another account (or none): its profile photo must not linger.
+      if (session?.user.id !== userId) {
+        if (userId !== undefined) resetAvatar();
+        userId = session?.user.id;
+      }
       setState({ session, isLoading: false });
     });
     return () => data.subscription.unsubscribe();

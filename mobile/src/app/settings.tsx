@@ -3,12 +3,13 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
-import { displayName, initials } from '@/lib/display-name';
+import { displayName } from '@/lib/display-name';
 import { useLockSettings } from '@/lib/app-lock';
 import { APPEARANCE_OPTIONS, useAppearance } from '@/lib/appearance';
 import { useCurrency } from '@/lib/money';
@@ -96,17 +97,13 @@ export default function SettingsScreen() {
         <View style={styles.body}>
           <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => pressed && styles.pressed}>
             <ThemedView type="backgroundElement" style={styles.profile}>
-              <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                <ThemedText type="smallBold" style={[styles.avatarText, { color: theme.onPrimary }]}>
-                  {initials(name)}
-                </ThemedText>
-              </View>
+              <Avatar name={name} size={64} />
               <View style={styles.flex}>
                 <ThemedText type="subtitle" style={styles.name} numberOfLines={1}>
                   {name}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  {guest ? 'Mode tamu · ketuk untuk ubah nama' : user.email}
+                  {guest ? 'Mode tamu · ketuk untuk ubah nama & foto' : user.email}
                 </ThemedText>
               </View>
               <AppSymbol material="edit" sf="pencil" size={22} color={theme.text} />
@@ -233,16 +230,6 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.four,
     borderRadius: Spacing.four,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 20,
   },
   name: {
     fontSize: 22,

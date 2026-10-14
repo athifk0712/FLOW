@@ -1,4 +1,5 @@
 import { disableLock, LOCK_SUPPORTED } from '@/lib/app-lock';
+import { removeAllAvatarFiles } from '@/lib/avatar';
 import { applyReminderSettings, getReminderSettings, REMINDERS_SUPPORTED } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 
@@ -7,7 +8,7 @@ const BUCKET = 'receipts';
 const DEVICE_KEYS = ['flowku.onboarded'];
 
 /**
- * Permanently deletes the signed-in account: receipt photos, then every row (server side), then the device's
+ * Permanently deletes the signed-in account: receipt and profile photos, then every row (server side), then the device's
  * own traces. Afterwards the app starts over as a fresh guest. Throws with a readable message on failure.
  */
 export async function deleteMyAccount() {
@@ -19,6 +20,9 @@ export async function deleteMyAccount() {
     const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100));
     if (error) throw new Error(error.message);
   }
+
+  const { data: auth } = await supabase.auth.getUser();
+  if (auth.user) await removeAllAvatarFiles(auth.user.id);
 
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error(error.message);
