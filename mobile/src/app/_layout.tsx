@@ -84,6 +84,8 @@ function RootNavigator() {
         <Stack.Protected guard={!session}>
           <Stack.Screen name="sign-in" />
         </Stack.Protected>
+        {/* Return point of the Google login on Android/iOS, with or without a session; it closes itself. */}
+        <Stack.Screen name="auth-callback" options={{ presentation: 'transparentModal', animation: 'none' }} />
       </Stack>
       {session && <LockScreen />}
     </>

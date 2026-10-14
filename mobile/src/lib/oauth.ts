@@ -74,7 +74,7 @@ export async function continueWithGoogle(mode: OAuthMode): Promise<GoogleResult>
   // Pengaturan, where the button was, so its result can be shown there.
   const redirectTo = isWeb
     ? `${window.location.origin}/${mode === 'link' ? 'settings' : ''}`
-    : Linking.createURL('/');
+    : Linking.createURL('auth-callback'); // flow://auth-callback, a route that steps aside (app/auth-callback.tsx)
   const options = { redirectTo, skipBrowserRedirect: !isWeb };
 
   if (isWeb && mode === 'link') safeStorage.setItem(WEB_LINK_KEY, String(Date.now()));
