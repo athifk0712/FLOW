@@ -1,9 +1,23 @@
-import { appendThousands, digitsToAmount, dropLastDigit, MAX_AMOUNT_DIGITS } from '@/lib/amount-input';
+import { appendDigit, appendThousands, digitsToAmount, dropLastDigit, MAX_AMOUNT_DIGITS } from '@/lib/amount-input';
 import { rankCategories } from '@/lib/category-rank';
 import { formatDigits } from '@/lib/money';
 import { scanToDraft } from '@/lib/receipt-scan';
 
 describe('amount keys', () => {
+  it('typing 5, 0 then 000 on the keypad gives 50000', () => {
+    let d = '';
+    for (const key of ['5', '0']) d = appendDigit(d, key);
+    d = appendThousands(d);
+    expect(d).toBe('50000');
+    expect(formatDigits(d)).toBe('50.000');
+  });
+
+  it('keypad digits: no leading zero, no junk, capped length', () => {
+    expect(appendDigit('', '0')).toBe('');
+    expect(appendDigit('1', 'x')).toBe('1');
+    expect(appendDigit('9'.repeat(MAX_AMOUNT_DIGITS), '1')).toBe('9'.repeat(MAX_AMOUNT_DIGITS));
+  });
+
   it('50 then 000 is 50000, shown as 50.000', () => {
     const digits = appendThousands('50');
     expect(digits).toBe('50000');

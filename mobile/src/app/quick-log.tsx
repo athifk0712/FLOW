@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AmountKeypad } from '@/components/amount-keypad';
 import { AppSymbol } from '@/components/app-symbol';
 import { CategoryIcon } from '@/components/category-icon';
 import { DateTimeField } from '@/components/date-time-field';
@@ -23,10 +24,10 @@ import { ThemedView } from '@/components/themed-view';
 import { guessIcon } from '@/constants/category-icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { appendThousands, digitsToAmount, dropLastDigit, MAX_AMOUNT_DIGITS } from '@/lib/amount-input';
+import { appendDigit, digitsToAmount, dropLastDigit } from '@/lib/amount-input';
 import { type CategoryUse, rankCategories } from '@/lib/category-rank';
 import type { Tables, TablesInsert } from '@/lib/database.types';
-import { formatDigits, formatMoney, fromWhole, toDigits, useCurrency } from '@/lib/money';
+import { formatDigits, formatMoney, fromWhole, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { deleteReceipt, receiptFileProblem, scanReceipt, scanToDraft, uploadReceipt } from '@/lib/receipts';
 import { isAlreadySaved, newRequestId } from '@/lib/request-id';
@@ -70,8 +71,8 @@ const QUICK_LOG_WIDTH = 520;
 const isOtherName = (name: string) => name.trim().toLowerCase() === 'lainnya';
 
 // Quick entry that fits one phone screen: type, when (a compact row; the calendar opens in place and pushes the form
-// down, never over it), amount (the keyboard opens straight away, with 000 / ⌫ / clear keys under it), category
-// (most used first), account, and a save button that stays above the keyboard. Note and shop name are folded under
+// down, never over it), amount (typed on Flowku's own keypad with 000 next to 0; it sits above the save button and
+// pushes the form up instead of covering it), category (most used first), account, and the save button. Note and shop name are folded under
 // "Opsi tambahan". A receipt scan fills what it could read; everything stays editable until saved.
 // Necessity is left NULL for the nightly check; only expenses go there.
 // Saving is idempotent: the form keeps one request id, so a double tap or a retry never saves twice.
@@ -81,7 +82,8 @@ export default function QuickLogScreen() {
   const { session } = useSession();
   const [mode, setMode] = useState<Mode>('EXPENSE');
   const [digits, setDigits] = useState('');
-  const [amountFocused, setAmountFocused] = useState(false);
+  // Which amount the keypad is typing into; it opens on the amount straight away. null = keypad hidden.
+  const [keypad, setKeypad] = useState<'amount' | 'fee' | null>('amount');
   const [categories, setCategories] = useState<Category[]>([]);
   const [recent, setRecent] = useState<RecentRow[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -229,7 +231,17 @@ export default function QuickLogScreen() {
     setPickingDate((p) => !p);
   }
 
+  // The system keyboard and the keypad never show at the same time.
+  function openKeypad(target: 'amount' | 'fee') {
+    Keyboard.dismiss();
+    setPickingDate(false);
+    setKeypad(target);
+  }
+  const keypadDigits = keypad === 'fee' ? feeDigits : digits;
+  const setKeypadDigits = keypad === 'fee' ? setFeeDigits : setDigits;
+
   function openNewCategory() {
+    setKeypad(null);
     setAdding(true);
     setNewName('');
     setNewIcon('dots');
@@ -361,8 +373,11 @@ export default function QuickLogScreen() {
 
   // On a laptop: Enter saves (also from the amount field) and Escape closes.
   const onKey = useEffectEvent((e: KeyboardEvent) => {
+    const typing = (e.target as HTMLElement | null)?.tagName === 'INPUT';
     if (e.key === 'Escape') closeModal();
     else if (e.key === 'Enter' && !adding) save();
+    else if (keypad && !typing && /^\d$/.test(e.key)) setKeypadDigits((d) => appendDigit(d, e.key));
+    else if (keypad && !typing && e.key === 'Backspace') setKeypadDigits(dropLastDigit);
     else return;
     e.preventDefault();
   });
@@ -391,20 +406,6 @@ export default function QuickLogScreen() {
       ))}
     </ScrollView>
   );
-  const key = (label: string, onPress: () => void, a11y: string, icon?: { material: string; sf: string }) => (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-      style={({ pressed }) => [styles.key, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
-      {icon ? (
-        <AppSymbol material={icon.material} sf={icon.sf} size={20} color={theme.text} />
-      ) : (
-        <ThemedText type="smallBold">{label}</ThemedText>
-      )}
-    </Pressable>
-  );
-
   return (
     <ThemedView style={styles.container}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -497,31 +498,25 @@ export default function QuickLogScreen() {
               </ThemedView>
             )}
 
-            <View style={[styles.amountRow, { borderColor: amountFocused ? theme.primary : theme.backgroundSelected }]}>
+            <Pressable
+              onPress={() => openKeypad('amount')}
+              accessibilityRole="button"
+              accessibilityLabel={`Nominal ${digits ? formatMoney(amount) : 'kosong'}, ketuk untuk mengubah`}
+              style={[styles.amountRow, { borderColor: keypad === 'amount' ? theme.primary : theme.backgroundSelected }]}>
               <ThemedText style={[styles.symbol, { color: theme.textSecondary }]}>{currency.symbol.trim()}</ThemedText>
-              <TextInput
-                value={formatDigits(digits)}
-                onChangeText={(t) => setDigits(toDigits(t, MAX_AMOUNT_DIGITS))}
-                onFocus={() => {
-                  setAmountFocused(true);
-                  setPickingDate(false);
-                }}
-                onBlur={() => setAmountFocused(false)}
-                onSubmitEditing={save}
-                placeholder="0"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                autoFocus
-                accessibilityLabel="Nominal"
-                style={[styles.amount, { color: theme.text }]}
-              />
-            </View>
-            <View style={styles.keys}>
-              {key('000', () => setDigits((d) => appendThousands(d)), 'Tambah tiga nol')}
-              {key('⌫', () => setDigits(dropLastDigit), 'Hapus satu angka', { material: 'backspace', sf: 'delete.left' })}
-              {key('Hapus', () => setDigits(''), 'Kosongkan nominal')}
-            </View>
+              <ThemedText
+                testID="amount-display"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={[styles.amount, { color: digits ? theme.text : theme.textSecondary }]}>
+                {digits ? formatDigits(digits) : '0'}
+              </ThemedText>
+              {!!digits && (
+                <Pressable onPress={() => setDigits('')} hitSlop={10} accessibilityLabel="Kosongkan nominal">
+                  <AppSymbol material="cancel" sf="xmark.circle.fill" size={22} color={theme.textSecondary} />
+                </Pressable>
+              )}
+            </Pressable>
 
             {scanNote && (
               <ThemedText type="small" themeColor="textSecondary">
@@ -606,6 +601,7 @@ export default function QuickLogScreen() {
                           if (!iconTouched) setNewIcon(guessIcon(text));
                         }}
                         onSubmitEditing={createCategory}
+                        onFocus={() => setKeypad(null)}
                         placeholder="Nama kategori, mis. Skincare"
                         placeholderTextColor={theme.textSecondary}
                         maxLength={30}
@@ -683,20 +679,21 @@ export default function QuickLogScreen() {
                   Biaya admin (opsional)
                 </ThemedText>
                 <View style={styles.row}>
-                  <View style={[styles.feeRow, { backgroundColor: theme.backgroundElement }]}>
+                  <Pressable
+                    onPress={() => openKeypad('fee')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Biaya admin transfer ${fee ? formatMoney(fee) : 'kosong'}, ketuk untuk mengubah`}
+                    style={[
+                      styles.feeRow,
+                      { backgroundColor: theme.backgroundElement, borderColor: keypad === 'fee' ? theme.primary : 'transparent' },
+                    ]}>
                     <ThemedText type="smallBold" themeColor="textSecondary">
                       {currency.symbol.trim()}
                     </ThemedText>
-                    <TextInput
-                      value={formatDigits(feeDigits)}
-                      onChangeText={(t) => setFeeDigits(toDigits(t, MAX_AMOUNT_DIGITS))}
-                      placeholder="0"
-                      placeholderTextColor={theme.textSecondary}
-                      keyboardType="number-pad"
-                      accessibilityLabel="Biaya admin transfer"
-                      style={[styles.feeInput, { color: theme.text }]}
-                    />
-                  </View>
+                    <ThemedText style={[styles.feeInput, { color: feeDigits ? theme.text : theme.textSecondary }]}>
+                      {feeDigits ? formatDigits(feeDigits) : '0'}
+                    </ThemedText>
+                  </Pressable>
                   {currency.code === 'IDR' &&
                     IDR_FEE_SHORTCUTS.map((value) => (
                       <Pressable
@@ -746,6 +743,7 @@ export default function QuickLogScreen() {
                   <TextInput
                     value={merchant}
                     onChangeText={setMerchant}
+                    onFocus={() => setKeypad(null)}
                     placeholder="Nama toko / tempat (opsional)"
                     placeholderTextColor={theme.textSecondary}
                     maxLength={100}
@@ -755,6 +753,7 @@ export default function QuickLogScreen() {
                 <TextInput
                   value={note}
                   onChangeText={setNote}
+                  onFocus={() => setKeypad(null)}
                   placeholder={isOther ? 'Lainnya untuk apa? mis. kado ulang tahun teman' : 'Catatan: beli apa, di mana'}
                   placeholderTextColor={theme.textSecondary}
                   maxLength={120}
@@ -777,6 +776,15 @@ export default function QuickLogScreen() {
             )}
             {error && <ThemedText themeColor="danger">{error}</ThemedText>}
           </ScrollView>
+
+          {keypad && (
+            <AmountKeypad
+              digits={keypadDigits}
+              onChange={setKeypadDigits}
+              label={keypad === 'fee' ? 'Biaya admin transfer' : 'Nominal'}
+              onClose={() => setKeypad(null)}
+            />
+          )}
 
           <Pressable
             disabled={!canSave}
@@ -865,23 +873,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 40,
+    lineHeight: 52,
     fontWeight: 700,
-    paddingVertical: Spacing.two,
-    // The row's underline shows focus; the browser's own ring is drawn off-position on web.
-    outlineWidth: 0,
-    outlineColor: 'transparent',
-  },
-  keys: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  // At least 44pt tall: comfortable to hit with a thumb.
-  key: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Spacing.three,
+    paddingVertical: Spacing.one,
   },
   // Without this, a horizontal ScrollView on web grows to fill free height and stretches the chips.
   chipRow: {
@@ -968,16 +962,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+    minHeight: 44,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
+    borderWidth: 1.5,
   },
   feeInput: {
     flex: 1,
     minWidth: 0,
     fontSize: 16,
-    paddingVertical: Spacing.two,
-    outlineWidth: 0,
-    outlineColor: 'transparent',
   },
   input: {
     fontSize: 16,

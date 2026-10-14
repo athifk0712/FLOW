@@ -1,7 +1,14 @@
-// Shortcut keys under the amount field (the phone's own number keyboard does the rest). The amount is kept as a
-// string of digits in the currency's smallest unit and saved as an integer; only the display is formatted.
+// The keys of the amount keypad in Catat (components/amount-keypad). The amount is kept as a string of digits in the
+// currency's smallest unit and saved as an integer; only the display is formatted.
 
 export const MAX_AMOUNT_DIGITS = 12; // up to 999.999.999.999: far inside bigint, and beyond any real entry
+
+/** "5" + "0" -> "50". A leading zero is never kept ("" + "0" stays ""); never grows past maxDigits. */
+export function appendDigit(digits: string, digit: string, maxDigits = MAX_AMOUNT_DIGITS) {
+  if (!/^\d$/.test(digit)) return digits;
+  if (!digits && digit === '0') return digits;
+  return digits.length >= maxDigits ? digits : `${digits}${digit}`;
+}
 
 /** "50" -> "50000". Nothing to multiply when empty; never grows past maxDigits. */
 export function appendThousands(digits: string, maxDigits = MAX_AMOUNT_DIGITS) {
