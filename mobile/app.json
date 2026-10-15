@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flowku",
     "slug": "flow",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "flow",
@@ -16,7 +16,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "output": "single",
@@ -41,8 +45,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "FLOW memakai galeri untuk melampirkan foto struk ke transaksi.",
-          "cameraPermission": "FLOW memakai kamera untuk memotret struk belanja.",
+          "photosPermission": "Flowku memakai galeri untuk melampirkan foto struk ke transaksi.",
+          "cameraPermission": "Flowku memakai kamera untuk memotret struk belanja.",
           "microphonePermission": false
         }
       ],
