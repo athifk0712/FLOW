@@ -5,6 +5,7 @@
 // necessity labels or category moves the user has confirmed, which are saved.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { type GeminiContent, GeminiError, generateJson } from '../_shared/gemini.ts';
+import { QuotaExhausted, quotaResponse, withQuota } from '../_shared/quota.ts';
 import { buildSnapshot } from './snapshot.ts';
 
 const CORS = {
@@ -279,8 +280,11 @@ Deno.serve(async (req) => {
 
   let turn: Turn;
   try {
-    turn = await generateJson<Turn>({ apiKey, system: `${PERSONA}\n\n${MODE_RULES[mode]}`, contents, schema: TURN_SCHEMA });
+    turn = await withQuota(auth.user, 'chat', () =>
+      generateJson<Turn>({ apiKey, system: `${PERSONA}\n\n${MODE_RULES[mode]}`, contents, schema: TURN_SCHEMA }),
+    );
   } catch (error) {
+    if (error instanceof QuotaExhausted) return quotaResponse(error, CORS);
     if (!(error instanceof GeminiError)) throw error;
     if (error.status === 422) {
       return json({ message: 'Maaf, aku tidak bisa membahas itu. Ada hal lain soal uangmu yang bisa aku bantu?', options: [], category_changes: [], tags: [], done: false, summary: '' });

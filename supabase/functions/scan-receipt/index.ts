@@ -3,6 +3,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding/base64';
 import { GeminiError, generateJson } from '../_shared/gemini.ts';
+import { QuotaExhausted, quotaResponse, withQuota } from '../_shared/quota.ts';
 
 const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 type SupportedType = (typeof SUPPORTED_TYPES)[number];
@@ -88,6 +89,9 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return json({ error: 'Sesi tidak valid. Buka ulang aplikasinya.' }, 401);
+  const user = auth.user;
 
   const [receipt, categories, profile] = await Promise.all([
     supabase.from('receipts').select('storage_path').eq('id', receiptId).single(),
@@ -108,7 +112,7 @@ Deno.serve(async (req) => {
 
   let result: ScanResult;
   try {
-    result = await generateJson<ScanResult>({
+    result = await withQuota(user, 'scan', () => generateJson<ScanResult>({
       apiKey,
       schema: RESULT_SCHEMA,
       contents: [
@@ -130,8 +134,9 @@ Deno.serve(async (req) => {
           ],
         },
       ],
-    });
+    }));
   } catch (error) {
+    if (error instanceof QuotaExhausted) return quotaResponse(error, CORS);
     if (!(error instanceof GeminiError)) throw error;
     if (error.status === 422) return json({ error: 'Struk ini tidak bisa dibaca.' }, 422);
     return json({ error: error.message.replace(/^AI/, 'OCR') }, error.status);

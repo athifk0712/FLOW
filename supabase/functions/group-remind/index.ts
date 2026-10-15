@@ -3,6 +3,7 @@
 // Runs as the calling user, so RLS decides what they can read: a non-member gets "not found".
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { GeminiError, generateJson } from '../_shared/gemini.ts';
+import { QuotaExhausted, quotaResponse, withQuota } from '../_shared/quota.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +40,9 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return json({ error: 'Sesi tidak valid. Buka ulang aplikasinya.' }, 401);
+  const user = auth.user;
 
   const target = await supabase
     .from('group_targets')
@@ -82,7 +86,7 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const result = await generateJson<{ message: string }>({
+    const result = await withQuota(user, 'group_remind', () => generateJson<{ message: string }>({
       apiKey,
       schema: SCHEMA,
       system:
@@ -92,11 +96,12 @@ Deno.serve(async (req) => {
         'address them by name kindly and mention only their own remaining share. Ask people to confirm in Flowku ' +
         'after paying. No links, no hashtags.',
       contents: [{ role: 'user', parts: [{ text: `Facts (JSON): ${JSON.stringify(facts)}` }] }],
-    });
+    }));
     const message = typeof result.message === 'string' ? result.message.trim().slice(0, 600) : '';
     if (!message) return json({ error: 'AI tidak mengembalikan pesan.' }, 502);
     return json({ message });
   } catch (error) {
+    if (error instanceof QuotaExhausted) return quotaResponse(error, CORS);
     if (!(error instanceof GeminiError)) throw error;
     return json({ error: error.message }, error.status);
   }
