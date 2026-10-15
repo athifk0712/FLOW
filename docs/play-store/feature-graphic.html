@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Flowku feature graphic</title>
+<style>
+  html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; }
+  body { background: #0F5C55; font-family: "Segoe UI", system-ui, sans-serif; position: relative; }
+  .glow { position: absolute; width: 520px; height: 520px; border-radius: 50%; right: -120px; top: -160px;
+          background: radial-gradient(circle, rgba(246,241,231,.10), rgba(246,241,231,0) 65%); }
+  .waves { position: absolute; left: 0; right: 0; bottom: -10px; }
+  .mark { position: absolute; left: 92px; top: 112px; width: 200px; height: 200px; }
+  .text { position: absolute; left: 330px; top: 128px; color: #F6F1E7; }
+  h1 { margin: 0; font-size: 84px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
+  p { margin: 18px 0 0; font-size: 34px; font-weight: 500; color: #F6F1E7; opacity: .92; }
+  .chips { margin-top: 26px; display: flex; gap: 12px; }
+  .chip { font-size: 21px; font-weight: 600; color: #1C2B2A; background: #F6F1E7; padding: 8px 18px; border-radius: 999px; }
+  .chip.honey { background: #E9A23B; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <svg class="waves" viewBox="0 0 1024 120" preserveAspectRatio="none" height="120" width="1024" aria-hidden="true">
+    <path d="M0 70 C 180 20, 340 120, 520 70 S 860 20, 1024 60 L1024 120 L0 120 Z" fill="#14695F" />
+    <path d="M0 95 C 200 60, 380 130, 560 95 S 880 60, 1024 90 L1024 120 L0 120 Z" fill="#17756A" />
+  </svg>
+  <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+    <circle cx="512" cy="391" r="112" fill="#E9A23B" />
+    <path d="M232 608 C 330 525, 430 520, 530 585 S 700 680, 792 606" fill="none" stroke="#F6F1E7" stroke-width="72" stroke-linecap="round" />
+    <path d="M312 748 C 380 700, 440 690, 512 740 S 640 800, 712 746" fill="none" stroke="#8FAEA7" stroke-width="52" stroke-linecap="round" />
+  </svg>
+  <div class="text">
+    <h1>Flowku</h1>
+    <p>Catat uang, tetap tenang.</p>
+    <div class="chips">
+      <span class="chip honey">Aman dibelanjakan</span>
+      <span class="chip">Scan struk</span>
+      <span class="chip">Budget &amp; target</span>
+    </div>
+  </div>
+</body>
+</html>
