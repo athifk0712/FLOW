@@ -1,0 +1,83 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Flowku icon render</title>
+<style>html,body{margin:0;width:1024px;height:1024px;overflow:hidden;background:transparent}
+svg{display:block} .mono{filter:brightness(0) invert(1)}</style></head>
+<body>
+<!-- Renders one icon variant at 1024x1024, picked by ?v= : icon | fg | mono | splash. Used by render-icons.sh. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" id="out">
+<defs>
+    <!-- One painted flower (5 petals around a centre), the classic motif on clay celengan. -->
+    <g id="flower">
+      <circle cx="0" cy="-22" r="16" /><circle cx="21" cy="-7" r="16" /><circle cx="13" cy="18" r="16" />
+      <circle cx="-13" cy="18" r="16" /><circle cx="-21" cy="-7" r="16" />
+    </g>
+    <!-- The hen, drawn facing right on a 1024 canvas; the compositions mirror it so it faces left. -->
+    <g id="hen">
+      <!-- tail feathers, painted -->
+      <path d="M262 560 C 190 520, 170 430, 214 372 C 246 420, 270 470, 300 500 Z" fill="#8FC9BE" />
+      <path d="M232 418 C 248 452, 266 482, 288 506" fill="none" stroke="#F6F1E7" stroke-width="10" stroke-linecap="round" />
+      <path d="M250 610 C 160 600, 120 520, 140 452 C 190 500, 236 540, 292 556 Z" fill="#E9A23B" />
+      <path d="M160 490 C 196 526, 232 548, 276 566" fill="none" stroke="#F6F1E7" stroke-width="10" stroke-linecap="round" />
+      <!-- body -->
+      <path d="M270 600 C 270 470, 380 410, 520 410 C 600 410, 640 380, 650 330 C 662 262, 712 232, 760 236
+               C 836 242, 870 310, 846 380 C 830 428, 800 450, 800 520 C 800 660, 690 750, 530 750
+               C 370 750, 270 700, 270 600 Z" fill="#F6F1E7" stroke="#E6DAC4" stroke-width="10" />
+      <!-- painted band along the belly: scallops and dots -->
+      <path d="M318 668 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0 q 26 30 52 0"
+            fill="none" stroke="#E0604A" stroke-width="10" stroke-linecap="round" />
+      <g fill="#E9A23B"><circle cx="344" cy="706" r="9"/><circle cx="396" cy="710" r="9"/><circle cx="448" cy="712" r="9"/>
+        <circle cx="500" cy="713" r="9"/><circle cx="552" cy="713" r="9"/><circle cx="604" cy="711" r="9"/><circle cx="656" cy="706" r="9"/><circle cx="708" cy="698" r="9"/></g>
+      <!-- collar of dots round the neck -->
+      <g fill="#0F5C55"><circle cx="668" cy="420" r="10"/><circle cx="694" cy="440" r="10"/><circle cx="724" cy="452" r="10"/>
+        <circle cx="756" cy="456" r="10"/><circle cx="788" cy="450" r="10"/></g>
+      <!-- wing, painted: coral with sand stripes and a honey flower -->
+      <path d="M392 560 C 430 500, 540 492, 610 540 C 580 610, 500 650, 420 640 C 392 620, 382 590, 392 560 Z" fill="#E0604A" />
+      <path d="M418 610 C 470 626, 530 616, 576 580" fill="none" stroke="#F6F1E7" stroke-width="10" stroke-linecap="round" />
+      <path d="M434 636 C 486 646, 532 636, 560 612" fill="none" stroke="#F6F1E7" stroke-width="8" stroke-linecap="round" opacity=".8" />
+      <g transform="translate(486 556) scale(.9)" fill="#E9A23B"><use href="#flower" /></g>
+      <circle cx="486" cy="556" r="12" fill="#F6F1E7" />
+      <!-- flowers on the back and chest -->
+      <g transform="translate(372 520) scale(.7)" fill="#8FC9BE"><use href="#flower" /></g>
+      <circle cx="372" cy="520" r="9" fill="#E9A23B" />
+      <g transform="translate(720 560) scale(.75)" fill="#8FC9BE"><use href="#flower" /></g>
+      <circle cx="720" cy="560" r="9" fill="#E0604A" />
+      <!-- base / shadow line -->
+      <rect x="330" y="742" width="420" height="22" rx="11" fill="#0B4A44" opacity=".55" />
+      <!-- comb -->
+      <path d="M722 248 C 708 206, 734 176, 760 196 C 766 160, 806 156, 812 196 C 834 176, 864 196, 846 236
+               C 820 250, 760 256, 722 248 Z" fill="#E0604A" />
+      <!-- wattle -->
+      <path d="M842 370 C 862 384, 862 420, 838 428 C 820 420, 818 388, 842 370 Z" fill="#E0604A" />
+      <!-- beak -->
+      <path d="M856 320 L 920 344 L 856 366 C 846 352, 846 334, 856 320 Z" fill="#E9A23B" />
+      <!-- eye -->
+      <circle cx="790" cy="310" r="22" fill="#1C2B2A" />
+      <circle cx="798" cy="302" r="7" fill="#FFFFFF" />
+      <!-- cheek -->
+      <circle cx="770" cy="372" r="20" fill="#E0604A" opacity=".25" />
+      <!-- coin slot on the back -->
+      <rect x="478" y="436" width="116" height="24" rx="12" fill="#1C2B2A" opacity=".8" transform="rotate(-6 536 448)" />
+    </g>
+    <!-- Facing left: mirrored around x = 530, the coin's centre, so the slot stays under the coin. -->
+    <g id="henLeft"><g transform="matrix(-1 0 0 1 1060 0)"><use href="#hen" /></g></g>
+    <g id="coin">
+      <circle cx="530" cy="270" r="100" fill="#E9A23B" />
+      <circle cx="530" cy="270" r="78" fill="none" stroke="#C9851F" stroke-width="12" />
+      <text x="530" y="298" text-anchor="middle" font-family="Segoe UI, sans-serif" font-weight="800" font-size="80" fill="#1C2B2A">Rp</text>
+    </g>
+    <g id="mark"><use href="#coin" /><use href="#henLeft" /></g>
+  </defs>
+<rect id="bg" width="1024" height="1024" fill="#0F5C55"/>
+<g id="place"><use href="#mark"/></g>
+</svg>
+<script>
+  const v = new URLSearchParams(location.search).get('v') || 'icon';
+  const place = document.getElementById('place');
+  // icon: full square with teal. fg/mono: Android adaptive foreground, kept inside the 66% safe circle.
+  // splash: transparent, nearly full width (shown small on a teal splash).
+  const t = { icon: 'translate(512 520) scale(1.12)', fg: 'translate(512 530) scale(.7)', mono: 'translate(512 530) scale(.7)', splash: 'translate(512 520) scale(1.15)' }[v];
+  place.setAttribute('transform', t + ' translate(-530 -500)');
+  if (v !== 'icon') document.getElementById('bg').remove();
+  if (v === 'mono') document.getElementById('out').classList.add('mono');
+</script>
+</body></html>

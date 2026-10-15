@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** The Flowku mark (sun over calm water) with the name beside it. */
+/** The Flowku mark (the painted celengan ayam) with the name beside it. */
 export function Wordmark({ size = 28 }: { size?: number }) {
   const theme = useTheme();
   return (
