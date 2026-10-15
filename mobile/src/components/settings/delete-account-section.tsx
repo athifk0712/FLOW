@@ -49,8 +49,9 @@ export function DeleteAccountSection({ onExport, exporting }: { onExport: () => 
           <>
             <ThemedText type="smallBold">Yakin ingin menghapus {email ? `akun ${email}` : 'akun tamu ini'}?</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Semua transaksi, akun & dompet, kategori, budget, target tabungan, utang-piutang, niat beli, dan foto struk
-              akan dihapus permanen{email ? ' dari semua perangkat' : ''}. Ini tidak bisa dibatalkan.
+              Semua transaksi, akun & dompet, kategori, budget, target tabungan, utang-piutang, aset, percakapan Flowku AI,
+              foto struk, dan foto profil akan dihapus permanen{email ? ' dari semua perangkat' : ''}. Grup yang kamu buat
+              ikut terhapus untuk semua anggotanya. Ini tidak bisa dibatalkan.
             </ThemedText>
             <Pressable
               onPress={onExport}

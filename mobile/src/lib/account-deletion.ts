@@ -1,31 +1,25 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
 import { disableLock, LOCK_SUPPORTED } from '@/lib/app-lock';
-import { removeAllAvatarFiles } from '@/lib/avatar';
+import { resetAvatar } from '@/lib/avatar';
 import { applyReminderSettings, getReminderSettings, REMINDERS_SUPPORTED } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 
-const BUCKET = 'receipts';
 // Device-only preferences that belong to the deleted account's habits.
 const DEVICE_KEYS = ['flowku.onboarded'];
 
 /**
- * Permanently deletes the signed-in account: receipt and profile photos, then every row (server side), then the device's
- * own traces. Afterwards the app starts over as a fresh guest. Throws with a readable message on failure.
+ * Permanently deletes the signed-in account. The server (edge function delete-account) removes the receipt and profile
+ * photos, then every row; the app then wipes the device's own traces. Afterwards it starts over as a fresh guest.
+ * Throws with a readable message on failure.
  */
 export async function deleteMyAccount() {
-  // Storage files are not covered by the database cascade, so remove them first.
-  const { data: receipts, error: listError } = await supabase.from('receipts').select('storage_path');
-  if (listError) throw new Error(listError.message);
-  const paths = (receipts ?? []).map((r) => r.storage_path);
-  for (let i = 0; i < paths.length; i += 100) {
-    const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100));
-    if (error) throw new Error(error.message);
+  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+  if (error) {
+    const body = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+    throw new Error(body?.error ?? 'Gagal menghapus akun. Periksa koneksi lalu coba lagi.');
   }
-
-  const { data: auth } = await supabase.auth.getUser();
-  if (auth.user) await removeAllAvatarFiles(auth.user.id);
-
-  const { error } = await supabase.rpc('delete_my_account');
-  if (error) throw new Error(error.message);
+  resetAvatar();
 
   // Local clean-up: reminders, lock, onboarding flag. Failures here must not block starting over.
   if (REMINDERS_SUPPORTED) {

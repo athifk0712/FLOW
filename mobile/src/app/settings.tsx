@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { type Href, router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,13 +20,22 @@ import { useSession } from '@/providers/session-provider';
 
 type Row = {
   title: string;
-  href: Href;
+  /** In-app page, or a web page opened in the browser. */
+  href: Href | { url: string };
   material: string;
   sf: string;
   /** Current value, shown greyed on the right. */
   value?: string;
   badge?: string;
 };
+
+// Static pages on the web build (mobile/public), also linked from the Play Store listing.
+const PRIVACY_URL = 'https://flowku.expo.app/privasi.html';
+
+function open(href: Row['href']) {
+  if (typeof href === 'object' && 'url' in href) WebBrowser.openBrowserAsync(href.url);
+  else router.push(href);
+}
 
 // Pengaturan as one calm list: a profile card on top, then grouped rows with an icon and a chevron.
 // Each row opens its own page, so this screen stays short. Opened from the gear on Beranda.
@@ -76,6 +86,10 @@ export default function SettingsScreen() {
         { title: 'Kebiasaan & pencapaian', href: '/habits', material: 'self_improvement', sf: 'leaf' },
         { title: 'Data & cadangan', href: '/backup', material: 'download', sf: 'square.and.arrow.down' },
       ],
+    },
+    {
+      title: 'Tentang',
+      rows: [{ title: 'Kebijakan privasi', href: { url: PRIVACY_URL }, material: 'policy', sf: 'hand.raised' }],
     },
   ];
 
@@ -134,7 +148,7 @@ export default function SettingsScreen() {
                 {section.rows.map((row, i) => (
                   <Pressable
                     key={row.title}
-                    onPress={() => router.push(row.href)}
+                    onPress={() => open(row.href)}
                     style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
                     <AppSymbol material={row.material} sf={row.sf} size={24} color={theme.text} />
                     <View

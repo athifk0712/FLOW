@@ -73,14 +73,6 @@ export async function removeAvatar(userId: string) {
   if (old) await supabase.storage.from(AVATAR_BUCKET).remove([old]);
 }
 
-/** Every file in the user's avatar folder (for account deletion). */
-export async function removeAllAvatarFiles(userId: string) {
-  const { data } = await supabase.storage.from(AVATAR_BUCKET).list(userId);
-  const paths = (data ?? []).map((f) => `${userId}/${f.name}`);
-  if (paths.length) await supabase.storage.from(AVATAR_BUCKET).remove(paths);
-  set({ loaded: true, path: null, url: null });
-}
-
 /** Forget the photo of a user who signed out or switched account. */
 export function resetAvatar() {
   loading = null;
