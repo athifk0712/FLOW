@@ -41,25 +41,26 @@ solusinya domain sendiri (mis. `flowku.id`) yang diarahkan ke hosting web.
 | Metode pembuatan akun | OAuth (Google), dan email (kode OTP); juga mode tamu tanpa akun |
 | URL hapus akun | https://flowku.expo.app/hapus-akun.html |
 
-**Jenis data** (semua: *dikumpulkan*, *tidak dibagikan*, *tidak diproses sementara*, tujuan = Fungsi aplikasi kecuali disebut lain)
+**Jenis data**. Flowku masih memakai Gemini API **gratis**, dan di tier gratis Google boleh memakai input untuk
+produknya sendiri. Jadi data yang dikirim ke AI ditandai **dibagikan** (penerima: Google). Data lain hanya
+*dikumpulkan*. Semua: *tidak diproses sementara*, tujuan = Fungsi aplikasi kecuali disebut lain.
 
-| Kategori Play | Jenis | Wajib/opsional | Tujuan |
-|---|---|---|---|
-| Info pribadi | Alamat email | Opsional (hanya jika akun disimpan) | Fungsi aplikasi, Pengelolaan akun |
-| Info pribadi | Nama | Opsional (nama tampilan) | Fungsi aplikasi, Personalisasi |
-| Info pribadi | ID pengguna | Wajib | Fungsi aplikasi, Pengelolaan akun |
-| Info keuangan | Info keuangan lainnya (transaksi, saldo, budget, utang, aset) | Wajib | Fungsi aplikasi |
-| Foto dan video | Foto (struk, foto profil) | Opsional | Fungsi aplikasi |
-| Pesan | Pesan dalam aplikasi lainnya (chat Flowku AI) | Opsional | Fungsi aplikasi |
-| Aktivitas aplikasi | Konten buatan pengguna lainnya (catatan, refleksi) | Opsional | Fungsi aplikasi |
+| Kategori Play | Jenis | Wajib/opsional | Dibagikan? | Tujuan |
+|---|---|---|---|---|
+| Info pribadi | Alamat email | Opsional (hanya jika akun disimpan) | Tidak | Fungsi aplikasi, Pengelolaan akun |
+| Info pribadi | Nama | Opsional (nama tampilan) | **Ya** (dikirim ke Gemini untuk menyapa) | Fungsi aplikasi, Personalisasi |
+| Info pribadi | ID pengguna | Wajib | Tidak | Fungsi aplikasi, Pengelolaan akun |
+| Info keuangan | Info keuangan lainnya (transaksi, saldo, budget, utang, aset) | Wajib | **Ya** (ringkasan ke Gemini saat chat AI) | Fungsi aplikasi |
+| Foto dan video | Foto (struk, foto profil) | Opsional | **Ya** (foto struk ke Gemini saat scan) | Fungsi aplikasi |
+| Pesan | Pesan dalam aplikasi lainnya (chat Flowku AI) | Opsional | **Ya** (ke Gemini) | Fungsi aplikasi |
+| Aktivitas aplikasi | Konten buatan pengguna lainnya (catatan, refleksi) | Opsional | **Ya** (catatan transaksi ikut di ringkasan AI) | Fungsi aplikasi |
 
 Tidak dikumpulkan: lokasi, kontak, SMS/log panggilan, info kesehatan, file/dokumen lain, kalender, ID perangkat/iklan,
 log error & diagnostik (tidak ada SDK analitik/crash), riwayat penelusuran.
 
-**Tentang "dibagikan" dan Gemini.** Menurut definisi Play, data yang dikirim ke penyedia layanan yang memprosesnya *atas
-nama kita* tidak dihitung "dibagikan". Itu benar untuk Gemini API **berbayar**. Di tier gratis, Google boleh memakai
-input untuk memperbaiki produknya, sehingga lebih aman dihitung "dibagikan". **Aktifkan billing Gemini sebelum mengisi
-formulir ini**, lalu jawab "tidak dibagikan" seperti tabel di atas.
+**Kalau nanti billing Gemini diaktifkan**, data yang dikirim ke penyedia layanan yang memprosesnya *atas nama kita*
+tidak lagi dihitung "dibagikan". Saat itu ubah kolom "Dibagikan?" menjadi Tidak semua, dan hapus kotak "Penting —
+layanan Gemini API gratis" di `mobile/public/privasi.html` (beserta kalimat pengecualian di Ringkasnya).
 
 ## 4. Lainnya yang diminta Play
 

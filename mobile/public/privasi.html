@@ -36,6 +36,8 @@
     <strong>Ringkasnya:</strong> Flowku menyimpan catatan keuangan yang <em>kamu sendiri</em> masukkan, supaya aplikasinya
     bisa bekerja. Flowku tidak terhubung ke rekening bankmu, tidak menampilkan iklan, tidak memakai pelacak analitik pihak
     ketiga, dan <strong>tidak menjual datamu</strong> kepada siapa pun. Kamu bisa mengekspor atau menghapus semuanya kapan saja.
+    Satu pengecualian penting: fitur AI (opsional) memakai layanan Google Gemini versi gratis, sehingga Google dapat
+    memakai data yang dikirim ke fitur itu (lihat bagian 3).
   </div>
 
   <p>Flowku ("kami") adalah aplikasi pencatat keuangan pribadi yang dikembangkan oleh Athif Khairullah (pengembang
@@ -79,9 +81,18 @@
     supaya jawabannya relevan, dan nama tampilanmu supaya AI bisa menyapamu.</li>
     <li>Draf pengingat grup: nama grup dan target, nama tampilan anggota, serta jumlah kontribusinya.</li>
   </ul>
-  <p>Kami tidak mengirim email atau ID akunmu bersama data tersebut. Pemrosesan oleh Google tunduk pada
-  <a href="https://ai.google.dev/gemini-api/terms" rel="noopener">Ketentuan Gemini API</a>. Jika kamu tidak ingin data ini
-  dikirim, cukup jangan gunakan fitur-fitur itu; fitur lain tetap berjalan tanpa AI.</p>
+  <p>Kami tidak mengirim email atau ID akunmu bersama data tersebut.</p>
+  <div class="card">
+    <strong>Penting — Flowku saat ini memakai layanan Gemini API gratis.</strong> Pada layanan gratis, Google dapat
+    menyimpan dan memakai data yang dikirim (termasuk foto struk, pesan, dan ringkasan keuangan di atas) untuk
+    meningkatkan produk dan layanannya, dan petugas peninjau Google dapat membacanya. Karena itu,
+    <strong>jangan menulis informasi rahasia</strong> (nomor rekening, PIN, kata sandi, nomor kartu) di chat Flowku AI.
+    Pemrosesan oleh Google tunduk pada <a href="https://ai.google.dev/gemini-api/terms" rel="noopener">Ketentuan Gemini API</a>
+    dan <a href="https://policies.google.com/privacy" rel="noopener">Kebijakan Privasi Google</a>.
+  </div>
+  <p>Fitur AI sepenuhnya opsional. Jika kamu tidak ingin data ini dikirim ke Google, cukup jangan gunakan fitur-fitur itu;
+  semua fitur lain tetap berjalan tanpa AI. Jika Flowku nanti pindah ke layanan Gemini berbayar (yang tidak memakai data
+  untuk melatih produk Google), bagian ini akan kami perbarui.</p>
 
   <h2>4. Pihak yang membantu kami</h2>
   <ul>
@@ -89,7 +100,8 @@
     <li><strong>Google</strong> — login dengan Google (jika kamu memilihnya) dan Gemini API untuk fitur AI.</li>
     <li><strong>Expo (EAS)</strong> — hosting versi web dan pengiriman pembaruan aplikasi.</li>
   </ul>
-  <p>Mereka memproses data hanya untuk menjalankan layanan tersebut. Kami tidak membagikan datamu ke pihak lain, kecuali jika diwajibkan oleh hukum yang berlaku.</p>
+  <p>Supabase, Expo, dan login Google memproses data hanya untuk menjalankan layanan tersebut. Untuk Gemini, berlaku
+  ketentuan di bagian 3. Selain itu, kami tidak membagikan datamu ke pihak lain, kecuali jika diwajibkan oleh hukum yang berlaku.</p>
 
   <h2>5. Keamanan</h2>
   <ul>
