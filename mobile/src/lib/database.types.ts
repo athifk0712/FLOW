@@ -50,12 +50,14 @@ export type Database = {
           amount: number | null
           asset_id: string
           cost_allocated: number | null
+          cost_known: boolean
           created_at: string
           fee: number
           id: string
           kind: string
           note: string | null
           occurred_at: string
+          opening: boolean
           quantity: number | null
           request_id: string | null
           tax: number
@@ -67,12 +69,14 @@ export type Database = {
           amount?: number | null
           asset_id: string
           cost_allocated?: number | null
+          cost_known?: boolean
           created_at?: string
           fee?: number
           id?: string
           kind: string
           note?: string | null
           occurred_at?: string
+          opening?: boolean
           quantity?: number | null
           request_id?: string | null
           tax?: number
@@ -84,12 +88,14 @@ export type Database = {
           amount?: number | null
           asset_id?: string
           cost_allocated?: number | null
+          cost_known?: boolean
           created_at?: string
           fee?: number
           id?: string
           kind?: string
           note?: string | null
           occurred_at?: string
+          opening?: boolean
           quantity?: number | null
           request_id?: string | null
           tax?: number
@@ -919,6 +925,7 @@ export type Database = {
         Row: {
           category: string | null
           cost_basis: number | null
+          cost_known: boolean | null
           created_at: string | null
           current_value: number | null
           description: string | null
@@ -926,6 +933,7 @@ export type Database = {
           first_bought_at: string | null
           id: string | null
           invested: number | null
+          is_opening: boolean | null
           name: string | null
           net_proceeds: number | null
           quantity: number | null
@@ -1084,6 +1092,22 @@ export type Database = {
       }
     }
     Functions: {
+      add_existing_asset: {
+        Args: {
+          p_acquired_at?: string
+          p_category: string
+          p_cost: number | null
+          p_description?: string
+          p_divisible: boolean
+          p_name: string
+          p_note?: string
+          p_quantity: number
+          p_request_id?: string
+          p_unit: string | null
+          p_value: number
+        }
+        Returns: string
+      }
       bump_streak: { Args: { p_user_id: string }; Returns: undefined }
       buy_asset: {
         Args: {

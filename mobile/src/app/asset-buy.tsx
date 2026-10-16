@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { AssetCategoryPicker } from '@/components/asset-category-picker';
 import { DateTimeField } from '@/components/date-time-field';
 import { ChipRow, Field, MoneyField, PrimaryButton, TextField } from '@/components/form-fields';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { type AssetCategory, ASSET_CATEGORIES, assetCategory } from '@/constants/asset-categories';
+import { type AssetCategory, assetCategory } from '@/constants/asset-categories';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { digitsToAmount } from '@/lib/amount-input';
@@ -116,28 +117,12 @@ export default function AssetBuyScreen() {
 
   return (
     <SubScreen
-      title={existing ? `Beli lagi: ${existing.name}` : 'Beli aset'}
-      intro="Uangnya pindah dari dompet ke aset, jadi ini tidak dihitung sebagai pengeluaran harian.">
+      title={existing ? `Beli lagi: ${existing.name}` : 'Beli aset baru'}
+      intro="Untuk pembelian sekarang: saldo dompet berkurang. Uangnya pindah ke aset, jadi bukan pengeluaran harian. Sudah punya asetnya dari dulu? Pakai Catat aset lama.">
       {!existing && (
         <>
           <Field label="Jenis aset">
-            <View style={styles.categories}>
-              {ASSET_CATEGORIES.map((c) => {
-                const on = c.value === category;
-                return (
-                  <Pressable
-                    key={c.value}
-                    onPress={() => pickCategory(c.value)}
-                    accessibilityState={{ selected: on }}
-                    style={[styles.category, { backgroundColor: on ? theme.primary : theme.backgroundElement }]}>
-                    <AppSymbol material={c.material} sf={c.sf} size={20} color={on ? theme.onPrimary : c.color} />
-                    <ThemedText type="small" style={{ color: on ? theme.onPrimary : theme.text }}>
-                      {c.label}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <AssetCategoryPicker value={category} onChange={pickCategory} />
           </Field>
           <Field label="Nama">
             <TextField value={name} onChangeText={setName} placeholder={info.example} maxLength={80} />
@@ -235,25 +220,17 @@ export default function AssetBuyScreen() {
         </ThemedText>
       )}
       {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-      <PrimaryButton label="Simpan pembelian" onPress={save} disabled={!!missing} busy={saving} />
+      <PrimaryButton
+        label={!missing && total > 0 ? `Bayar ${formatMoney(total)} dari ${accountName}` : 'Simpan pembelian'}
+        onPress={save}
+        disabled={!!missing}
+        busy={saving}
+      />
     </SubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  categories: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  category: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    minHeight: 44,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.five,
-  },
   row: {
     flexDirection: 'row',
     gap: Spacing.two,

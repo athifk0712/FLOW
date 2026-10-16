@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { DateTimeField } from '@/components/date-time-field';
 import { ChipRow, Field, MoneyField, PrimaryButton, TextField } from '@/components/form-fields';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
@@ -21,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 type Panel = 'value' | 'sell' | null;
 
 const dateFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+const whenFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const SOURCE_LABEL: Record<string, string> = {
   MANUAL: 'Estimasi kamu',
@@ -85,6 +87,7 @@ export default function AssetScreen() {
   const quantity = Number(asset.quantity ?? 0);
   const active = asset.status === 'ACTIVE';
   const cost = asset.cost_basis ?? 0;
+  const costKnown = asset.cost_known !== false;
   const unrealized = asset.unrealized_pl ?? 0;
   const pct = plPercent(unrealized, cost);
   const realized = asset.realized_pl ?? 0;
@@ -106,6 +109,7 @@ export default function AssetScreen() {
               {info.label}
               {asset.divisible ? ` · ${formatQuantity(quantity, asset.unit)}` : ''}
               {active ? '' : ' · sudah terjual'}
+              {asset.is_opening ? ' · aset lama' : ''}
             </ThemedText>
           </View>
         </View>
@@ -123,12 +127,18 @@ export default function AssetScreen() {
                 {asset.valued_at ? ` · ${dateFormat.format(new Date(asset.valued_at))}` : ''}
               </ThemedText>
             </View>
-            <Line label="Modal (harga + biaya beli)" value={formatMoney(cost)} />
-            <Line
-              label="Potensi untung/rugi"
-              value={`${unrealized >= 0 ? '+' : ''}${formatMoney(unrealized)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}`}
-              tone={unrealized > 0 ? 'positive' : unrealized < 0 ? 'danger' : undefined}
-            />
+            <Line label="Modal (harga + biaya beli)" value={costKnown ? formatMoney(cost) : 'Tidak diketahui'} />
+            {costKnown ? (
+              <Line
+                label="Potensi untung/rugi"
+                value={`${unrealized >= 0 ? '+' : ''}${formatMoney(unrealized)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}`}
+                tone={unrealized > 0 ? 'positive' : unrealized < 0 ? 'danger' : undefined}
+              />
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                Modalnya tidak diketahui, jadi untung-rugi tidak dihitung.
+              </ThemedText>
+            )}
           </>
         ) : (
           <Line label="Hasil bersih penjualan" value={formatMoney(asset.net_proceeds ?? 0)} />
@@ -228,6 +238,7 @@ export default function AssetScreen() {
 
 function eventTitle(e: AssetEvent, asset: Asset) {
   const qty = asset.divisible && e.quantity ? ` ${formatQuantity(Number(e.quantity), asset.unit)}` : '';
+  if (e.kind === 'BUY' && e.opening) return `Mulai dimiliki${qty} (aset lama)`;
   if (e.kind === 'BUY') return `Beli${qty}`;
   if (e.kind === 'SELL') return `Jual${qty}`;
   return 'Perbarui nilai';
@@ -238,16 +249,20 @@ function eventDetail(e: AssetEvent, asset: Asset) {
     const v = Math.round(Number(e.unit_value ?? 0));
     return asset.divisible ? `Estimasi ${formatMoney(v)} per ${asset.unit ?? 'unit'}` : `Estimasi ${formatMoney(v)}`;
   }
+  if (e.kind === 'BUY' && e.opening) {
+    return `${e.cost_known ? `Modal ${formatMoney(e.amount ?? 0)}` : 'Modal tidak diketahui'} · dicatat tanpa memotong saldo`;
+  }
   if (e.kind === 'BUY') {
     return `Harga ${formatMoney(e.amount ?? 0)}${e.fee ? ` + biaya ${formatMoney(e.fee)}` : ''} = keluar ${formatMoney((e.amount ?? 0) + e.fee)}`;
   }
   const net = (e.amount ?? 0) - e.fee - e.tax;
   const pl = net - (e.cost_allocated ?? 0);
-  return (
+  const sale =
     `Harga jual ${formatMoney(e.amount ?? 0)}` +
     `${e.fee ? ` − biaya ${formatMoney(e.fee)}` : ''}${e.tax ? ` − pajak ${formatMoney(e.tax)}` : ''}` +
-    ` = masuk ${formatMoney(net)} · modal ${formatMoney(e.cost_allocated ?? 0)} · ${pl >= 0 ? 'untung' : 'rugi'} ${formatMoney(Math.abs(pl))}`
-  );
+    ` = masuk ${formatMoney(net)}`;
+  if (!e.cost_known) return `${sale} · modal tidak diketahui`;
+  return `${sale} · modal ${formatMoney(e.cost_allocated ?? 0)} · ${pl >= 0 ? 'untung' : 'rugi'} ${formatMoney(Math.abs(pl))}`;
 }
 
 function Line({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'danger' }) {
@@ -308,7 +323,16 @@ function SellPanel({
 }: {
   asset: Asset;
   busy: boolean;
-  onSell: (input: { quantity: number; gross: number; fee: number; tax: number; accountId: string; note: string; requestId: string }) => void;
+  onSell: (input: {
+    quantity: number;
+    gross: number;
+    fee: number;
+    tax: number;
+    accountId: string;
+    occurredAt: Date | null;
+    note: string;
+    requestId: string;
+  }) => void;
 }) {
   const held = Number(asset.quantity ?? 0);
   const [quantityText, setQuantityText] = useState(asset.divisible ? '' : '1');
@@ -316,6 +340,10 @@ function SellPanel({
   const [fee, setFee] = useState('');
   const [tax, setTax] = useState('');
   const [note, setNote] = useState('');
+  const [soldAt, setSoldAt] = useState<Date | null>(null);
+  const [pickingDate, setPickingDate] = useState(false);
+  const theme = useTheme();
+  const costKnown = asset.cost_known !== false;
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [requestId] = useState(newRequestId);
@@ -382,18 +410,41 @@ function SellPanel({
       <Field label="Uangnya masuk ke">
         <ChipRow options={accounts.map((a) => ({ value: a.id, label: a.name }))} value={accountId} onChange={setAccountId} />
       </Field>
+      <Field label="Tanggal jual">
+        <Pressable
+          onPress={() => setPickingDate((p) => !p)}
+          style={[styles.when, { backgroundColor: theme.backgroundSelected }]}
+          accessibilityRole="button">
+          <AppSymbol material="calendar_month" sf="calendar" size={18} color={theme.primary} />
+          <ThemedText type="small" style={styles.flex}>
+            {soldAt ? whenFormat.format(soldAt) : 'Sekarang'}
+          </ThemedText>
+          <ThemedText type="smallBold" themeColor="primary">
+            {pickingDate ? 'Selesai' : 'Ubah'}
+          </ThemedText>
+        </Pressable>
+        {pickingDate && <DateTimeField value={soldAt ?? new Date()} onChange={setSoldAt} />}
+      </Field>
       <TextField value={note} onChangeText={setNote} placeholder="Catatan (opsional), mis. dijual ke pembeli di grup" maxLength={200} />
 
       {grossAmount > 0 && !!quantity && !preview.problem && (
         <View style={styles.preview}>
           <Line label={`Masuk ke ${wallet}`} value={formatMoney(preview.net)} />
-          <Line label="Modal unit yang dijual" value={formatMoney(preview.costOfSold)} />
-          <Line
-            label={preview.realized >= 0 ? 'Untung' : 'Rugi'}
-            value={`${preview.realized >= 0 ? '+' : '−'}${formatMoney(Math.abs(preview.realized))}`}
-            tone={preview.realized > 0 ? 'positive' : preview.realized < 0 ? 'danger' : undefined}
-          />
-          {preview.realized < 0 && (
+          {costKnown ? (
+            <>
+              <Line label="Modal unit yang dijual" value={formatMoney(preview.costOfSold)} />
+              <Line
+                label={preview.realized >= 0 ? 'Untung' : 'Rugi'}
+                value={`${preview.realized >= 0 ? '+' : '−'}${formatMoney(Math.abs(preview.realized))}`}
+                tone={preview.realized > 0 ? 'positive' : preview.realized < 0 ? 'danger' : undefined}
+              />
+            </>
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              Modal aset ini tidak diketahui, jadi untung-ruginya tidak dicatat.
+            </ThemedText>
+          )}
+          {costKnown && preview.realized < 0 && (
             <ThemedText type="small" themeColor="danger">
               Penjualan ini rugi {formatMoney(-preview.realized)} dari modal. Tetap bisa disimpan kalau memang begitu.
             </ThemedText>
@@ -406,14 +457,23 @@ function SellPanel({
         </ThemedText>
       )}
       <PrimaryButton
-        label={preview.realized < 0 && ready ? 'Jual walau rugi' : 'Jual sekarang'}
-        tone={preview.realized < 0 ? 'danger' : 'primary'}
+        label={costKnown && preview.realized < 0 && ready ? 'Jual walau rugi' : 'Simpan penjualan'}
+        tone={costKnown && preview.realized < 0 ? 'danger' : 'primary'}
         disabled={!ready}
         busy={busy}
         onPress={() =>
           accountId &&
           quantity &&
-          onSell({ quantity, gross: grossAmount, fee: digitsToAmount(fee), tax: digitsToAmount(tax), accountId, note, requestId })
+          onSell({
+            quantity,
+            gross: grossAmount,
+            fee: digitsToAmount(fee),
+            tax: digitsToAmount(tax),
+            accountId,
+            occurredAt: soldAt,
+            note,
+            requestId,
+          })
         }
       />
     </ThemedView>
@@ -466,6 +526,14 @@ const styles = StyleSheet.create({
   },
   preview: {
     gap: Spacing.one,
+  },
+  when: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.three,
   },
   event: {
     gap: Spacing.one,

@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { PrimaryButton } from '@/components/form-fields';
+import { SalePeriodPicker } from '@/components/sale-period-picker';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -12,11 +13,10 @@ import { Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { type Asset, listAssets, listSales } from '@/lib/asset-data';
-import { formatQuantity, plPercent, realizedBetween, type SaleEvent, summarizeAssets } from '@/lib/assets';
-import { cycleRange } from '@/lib/cycle';
+import { type CustomPeriod, customLabel, loadSavedPeriods, PERIOD_OPTIONS, type PeriodKey, periodRange } from '@/lib/asset-periods';
+import { formatQuantity, plPercent, salesIn, type SaleEvent, summarizeAssets } from '@/lib/assets';
+import { cycleLabel } from '@/lib/cycle';
 import { formatMoney } from '@/lib/money';
-
-type Period = 'cycle' | 'all';
 
 // Aset: what the user owns besides cash (game accounts, gold, stocks, crypto, ...). Values are estimates; they never
 // count as spendable money, and buying or selling moves cash without counting as spending or income.
@@ -26,7 +26,10 @@ export default function AssetsScreen() {
   const [assets, setAssets] = useState<Asset[] | null>(null);
   const [sales, setSales] = useState<SaleEvent[]>([]);
   const [filter, setFilter] = useState<AssetCategory | 'ALL'>('ALL');
-  const [period, setPeriod] = useState<Period>('cycle');
+  const [period, setPeriod] = useState<PeriodKey>('cycle');
+  const [custom, setCustom] = useState<CustomPeriod | null>(null);
+  const [savedPeriods, setSavedPeriods] = useState<CustomPeriod[]>(loadSavedPeriods);
+  const [adding, setAdding] = useState(false);
   const [showSold, setShowSold] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +54,16 @@ export default function AssetsScreen() {
 
   const summary = summarizeAssets(assets);
   const pct = plPercent(summary.unrealized, summary.cost);
-  const range = cycleRange(new Date(), cycleDay);
-  const realized = period === 'all' ? summary.realized : realizedBetween(sales, range.start, range.end);
+  const range = periodRange(period, new Date(), cycleDay, custom);
+  const periodSales = salesIn(sales, range);
+  const realized = period === 'all' ? summary.realized : periodSales.realized;
+  const rangeText =
+    period === 'custom' && custom
+      ? customLabel(custom)
+      : (period === 'cycle' || period === 'prev_cycle') && range.start
+        ? cycleLabel(range.start, cycleDay)
+        : null;
+  const periodName = period === 'custom' ? (custom?.name ?? 'Periode khusus') : PERIOD_OPTIONS.find((o) => o.key === period)?.label;
   const shown = assets.filter((a) => filter === 'ALL' || a.category === filter);
   const active = shown.filter((a) => a.status === 'ACTIVE');
   const sold = shown.filter((a) => a.status !== 'ACTIVE');
@@ -77,39 +88,103 @@ export default function AssetsScreen() {
             Estimasi nilai aset aktif
           </ThemedText>
           <ThemedText style={styles.big}>{formatMoney(summary.value)}</ThemedText>
-          <Line label="Modal aset aktif" value={formatMoney(summary.cost)} />
-          <Line
-            label="Potensi untung/rugi"
-            value={`${summary.unrealized >= 0 ? '+' : ''}${formatMoney(summary.unrealized)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}`}
-            tone={summary.unrealized > 0 ? 'positive' : summary.unrealized < 0 ? 'danger' : undefined}
-          />
-          <View style={styles.line}>
-            <View style={styles.flex}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Untung/rugi dari penjualan
-              </ThemedText>
-              <View style={styles.periods}>
-                {(['cycle', 'all'] as const).map((p) => (
-                  <Pressable key={p} onPress={() => setPeriod(p)} hitSlop={6}>
-                    <ThemedText type="small" themeColor={period === p ? 'primary' : 'textSecondary'} style={period === p && styles.bold}>
-                      {p === 'cycle' ? 'Bulan ini' : 'Semua'}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <ThemedText type="smallBold" themeColor={realized > 0 ? 'positive' : realized < 0 ? 'danger' : undefined}>
-              {realized >= 0 ? '+' : ''}
-              {formatMoney(realized)}
+          {summary.active > summary.unknownCost && (
+            <>
+              <Line label="Modal aset aktif" value={formatMoney(summary.cost)} />
+              <Line
+                label="Potensi untung/rugi"
+                value={`${summary.unrealized >= 0 ? '+' : ''}${formatMoney(summary.unrealized)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}`}
+                tone={summary.unrealized > 0 ? 'positive' : summary.unrealized < 0 ? 'danger' : undefined}
+              />
+            </>
+          )}
+          {summary.unknownCost > 0 && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {summary.unknownCost === summary.active
+                ? 'Modal asetmu belum diketahui, jadi untung/rugi belum bisa dihitung.'
+                : `${summary.unknownCost} aset tanpa modal tidak ikut dihitung di modal dan untung/rugi.`}
             </ThemedText>
-          </View>
+          )}
           <ThemedText type="small" themeColor="textSecondary">
             Estimasi, bukan uang yang siap dipakai: tidak dihitung di &quot;Aman dibelanjakan&quot;.
           </ThemedText>
         </ThemedView>
       )}
 
-      <PrimaryButton label="+ Beli / tambah aset" onPress={() => router.push('/asset-buy')} />
+      {sales.length > 0 && (
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <View style={styles.line}>
+            <View style={styles.flex}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Untung/rugi dari penjualan · {periodName}
+              </ThemedText>
+              {rangeText && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {rangeText}
+                </ThemedText>
+              )}
+            </View>
+            <ThemedText type="smallBold" themeColor={realized > 0 ? 'positive' : realized < 0 ? 'danger' : undefined}>
+              {realized >= 0 ? '+' : ''}
+              {formatMoney(realized)}
+            </ThemedText>
+          </View>
+          {period !== 'all' && periodSales.sales === 0 && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Belum ada penjualan di periode ini.
+            </ThemedText>
+          )}
+          {periodSales.unknownCost > 0 && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {periodSales.unknownCost} penjualan aset tanpa modal tidak dihitung untung/ruginya.
+            </ThemedText>
+          )}
+          <SalePeriodPicker
+            period={period}
+            custom={custom}
+            saved={savedPeriods}
+            onChange={(p, c) => {
+              setPeriod(p);
+              setCustom(c);
+            }}
+            onSavedChange={setSavedPeriods}
+          />
+        </ThemedView>
+      )}
+
+      {adding ? (
+        <View style={styles.choices}>
+          <Choice
+            material="inventory_2"
+            sf="archivebox.fill"
+            title="Sudah punya aset?"
+            action="Catat aset lama"
+            detail="Saldo dompet tidak berubah"
+            onPress={() => {
+              setAdding(false);
+              router.push('/asset-existing');
+            }}
+          />
+          <Choice
+            material="shopping_bag"
+            sf="bag.fill"
+            title="Baru membeli aset?"
+            action="Beli aset baru"
+            detail="Dibayar dari dompet, saldo berkurang"
+            onPress={() => {
+              setAdding(false);
+              router.push('/asset-buy');
+            }}
+          />
+          <Pressable onPress={() => setAdding(false)} hitSlop={8} style={styles.center}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Batal
+            </ThemedText>
+          </Pressable>
+        </View>
+      ) : (
+        <PrimaryButton label="+ Tambah aset" onPress={() => setAdding(true)} />
+      )}
 
       {usedCategories.length > 1 && (
         <View style={styles.filters}>
@@ -148,18 +223,59 @@ export default function AssetsScreen() {
   );
 }
 
+function Choice({
+  material,
+  sf,
+  title,
+  action,
+  detail,
+  onPress,
+}: {
+  material: string;
+  sf: string;
+  title: string;
+  action: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${action}. ${detail}`}>
+      {({ pressed }) => (
+        <ThemedView type="backgroundElement" style={[styles.item, pressed && styles.pressed]}>
+          <View style={[styles.icon, { backgroundColor: theme.backgroundSelected }]}>
+            <AppSymbol material={material} sf={sf} size={20} color={theme.primary} />
+          </View>
+          <View style={styles.flex}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {title}
+            </ThemedText>
+            <ThemedText type="smallBold">{action}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {detail}
+            </ThemedText>
+          </View>
+          <AppSymbol material="chevron_right" sf="chevron.right" size={18} color={theme.textSecondary} />
+        </ThemedView>
+      )}
+    </Pressable>
+  );
+}
+
 // What each kind needs on its card: a game account its cost and estimated selling price; gold, stocks and crypto
 // the amount held and the price per unit as well.
 function AssetCard({ asset }: { asset: Asset }) {
   const theme = useTheme();
   const info = assetCategory(asset.category);
   const active = asset.status === 'ACTIVE';
+  const costKnown = asset.cost_known !== false;
   const pl = active ? (asset.unrealized_pl ?? 0) : (asset.realized_pl ?? 0);
   const pct = plPercent(pl, active ? (asset.cost_basis ?? 0) : (asset.invested ?? 0));
+  const cost = costKnown ? `modal ${formatMoney(asset.cost_basis ?? 0)}` : 'modal tidak diketahui';
   const detail = active
     ? asset.divisible
-      ? `${formatQuantity(Number(asset.quantity ?? 0), asset.unit)} · ${formatMoney(Math.round(asset.unit_value ?? 0))}/${asset.unit ?? 'unit'} · modal ${formatMoney(asset.cost_basis ?? 0)}`
-      : `Modal ${formatMoney(asset.cost_basis ?? 0)} · ${asset.value_source === 'MANUAL' ? 'estimasi jual' : 'belum dinilai ulang'}`
+      ? `${formatQuantity(Number(asset.quantity ?? 0), asset.unit)} · ${formatMoney(Math.round(asset.unit_value ?? 0))}/${asset.unit ?? 'unit'} · ${cost}`
+      : `${cost.charAt(0).toUpperCase()}${cost.slice(1)} · ${asset.value_source === 'MANUAL' ? 'estimasi jual' : 'belum dinilai ulang'}`
     : `Terjual · hasil bersih ${formatMoney(asset.net_proceeds ?? 0)}`;
   return (
     <Pressable
@@ -179,11 +295,17 @@ function AssetCard({ asset }: { asset: Asset }) {
         </View>
         <View style={styles.right}>
           <ThemedText type="smallBold">{formatMoney(active ? (asset.current_value ?? 0) : (asset.net_proceeds ?? 0))}</ThemedText>
-          <ThemedText type="small" style={{ color: pl > 0 ? theme.positive : pl < 0 ? theme.danger : theme.textSecondary }}>
-            {pl >= 0 ? '+' : ''}
-            {formatMoney(pl)}
-            {pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}
-          </ThemedText>
+          {costKnown ? (
+            <ThemedText type="small" style={{ color: pl > 0 ? theme.positive : pl < 0 ? theme.danger : theme.textSecondary }}>
+              {pl >= 0 ? '+' : ''}
+              {formatMoney(pl)}
+              {pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}
+            </ThemedText>
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              Untung/rugi —
+            </ThemedText>
+          )}
         </View>
       </ThemedView>
     </Pressable>
@@ -223,12 +345,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
-  periods: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  bold: {
-    fontWeight: 700,
+  choices: {
+    gap: Spacing.two,
   },
   flex: {
     flex: 1,

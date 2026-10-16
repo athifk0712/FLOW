@@ -7,10 +7,24 @@ import { supabase } from '@/lib/supabase';
 export type Asset = Tables<'v_assets'>;
 export type AssetEvent = Pick<
   Tables<'asset_events'>,
-  'id' | 'kind' | 'occurred_at' | 'quantity' | 'amount' | 'fee' | 'tax' | 'cost_allocated' | 'unit_value' | 'note' | 'transaction_id' | 'created_at'
+  | 'id'
+  | 'kind'
+  | 'occurred_at'
+  | 'quantity'
+  | 'amount'
+  | 'fee'
+  | 'tax'
+  | 'cost_allocated'
+  | 'unit_value'
+  | 'note'
+  | 'transaction_id'
+  | 'created_at'
+  | 'opening'
+  | 'cost_known'
 >;
 
-const EVENT_SELECT = 'id, kind, occurred_at, quantity, amount, fee, tax, cost_allocated, unit_value, note, transaction_id, created_at';
+const EVENT_SELECT =
+  'id, kind, occurred_at, quantity, amount, fee, tax, cost_allocated, unit_value, note, transaction_id, created_at, opening, cost_known';
 
 function fail(error: { message: string } | null) {
   if (error) throw new Error(error.message);
@@ -26,7 +40,7 @@ export async function listAssets() {
 export async function listSales() {
   const { data, error } = await supabase
     .from('asset_events')
-    .select('kind, occurred_at, amount, fee, tax, cost_allocated')
+    .select('kind, occurred_at, amount, fee, tax, cost_allocated, cost_known')
     .eq('kind', 'SELL');
   fail(error);
   return data ?? [];
@@ -80,6 +94,40 @@ export async function buyAsset(input: BuyInput) {
   return data!;
 }
 
+export type ExistingInput = {
+  name: string;
+  category: string;
+  unit: string | null;
+  divisible: boolean;
+  quantity: number;
+  /** Historical cost of all of it; null when the user does not remember. */
+  cost: number | null;
+  /** What all of it is worth today. */
+  value: number;
+  /** When it started being theirs; null = not remembered (today is used). */
+  acquiredAt: Date | null;
+  note: string;
+  requestId: string;
+};
+
+/** Records an asset the user already owned. No wallet changes and no transaction is created. Returns the asset id. */
+export async function addExistingAsset(input: ExistingInput) {
+  const { data, error } = await supabase.rpc('add_existing_asset', {
+    p_name: input.name,
+    p_category: input.category,
+    p_unit: input.unit,
+    p_divisible: input.divisible,
+    p_quantity: input.quantity,
+    p_cost: input.cost,
+    p_value: input.value,
+    p_acquired_at: input.acquiredAt?.toISOString(),
+    p_note: input.note.trim() || undefined,
+    p_request_id: input.requestId,
+  });
+  fail(error);
+  return data!;
+}
+
 export async function valueAsset(assetId: string, unitValue: number, note: string, requestId: string) {
   const { error } = await supabase.rpc('value_asset', {
     p_asset_id: assetId,
@@ -97,6 +145,8 @@ export type SellInput = {
   fee: number;
   tax: number;
   accountId: string;
+  /** When it was sold; null = now. */
+  occurredAt: Date | null;
   note: string;
   requestId: string;
 };
@@ -109,6 +159,7 @@ export async function sellAsset(input: SellInput) {
     p_fee: input.fee,
     p_tax: input.tax,
     p_account_id: input.accountId,
+    p_occurred_at: input.occurredAt?.toISOString(),
     p_note: input.note.trim() || undefined,
     p_request_id: input.requestId,
   });

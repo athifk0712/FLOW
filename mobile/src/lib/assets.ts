@@ -6,6 +6,12 @@
 //   realized P/L    = net proceeds - cost of the units sold
 //   unrealized P/L  = current estimate - cost basis      (no money moves)
 // Net worth = cash in accounts + estimated assets + receivables - debts. Safe to Spend never includes assets.
+//
+// An asset owned before it was recorded ("aset lama") has no cash row at all: wallets, spending, budgets and Safe to
+// Spend stay as they were; only its value joins net worth. Its cost may be unknown (cost_known = false): then it has
+// no unrealized P/L, and selling it records no realized P/L, rather than pretending everything was profit.
+
+import { inRange, type Range } from '@/lib/asset-periods';
 
 export type AssetRow = {
   status: string | null;
@@ -13,6 +19,7 @@ export type AssetRow = {
   cost_basis: number | null;
   unrealized_pl: number | null;
   realized_pl: number | null;
+  cost_known?: boolean | null;
 };
 
 const MAX_DECIMALS = 8;
@@ -75,32 +82,76 @@ export function previewSale(input: {
   return { net, costOfSold, realized: net - costOfSold, problem };
 }
 
-export type AssetSummary = { value: number; cost: number; unrealized: number; realized: number; active: number };
+export type AssetSummary = {
+  value: number;
+  cost: number;
+  unrealized: number;
+  realized: number;
+  active: number;
+  /** Active assets whose cost is unknown: in `value`, but not in `cost` or `unrealized`. */
+  unknownCost: number;
+};
 
 /** Totals over the user's assets; only active holdings count towards value, cost and unrealized P/L. */
 export function summarizeAssets(rows: AssetRow[]): AssetSummary {
   const active = rows.filter((r) => r.status === 'ACTIVE');
-  const sum = (list: AssetRow[], key: keyof Omit<AssetRow, 'status'>) => list.reduce((s, r) => s + (r[key] ?? 0), 0);
+  const known = active.filter((r) => r.cost_known !== false);
+  type MoneyKey = 'current_value' | 'cost_basis' | 'unrealized_pl' | 'realized_pl';
+  const sum = (list: AssetRow[], key: MoneyKey) => list.reduce((s, r) => s + (r[key] ?? 0), 0);
   return {
     value: sum(active, 'current_value'),
-    cost: sum(active, 'cost_basis'),
-    unrealized: sum(active, 'unrealized_pl'),
+    cost: sum(known, 'cost_basis'),
+    unrealized: sum(known, 'unrealized_pl'),
     realized: sum(rows, 'realized_pl'),
     active: active.length,
+    unknownCost: active.length - known.length,
   };
 }
 
-export type SaleEvent = { kind: string; occurred_at: string; amount: number | null; fee: number; tax: number; cost_allocated: number | null };
+export type SaleEvent = {
+  kind: string;
+  occurred_at: string;
+  amount: number | null;
+  fee: number;
+  tax: number;
+  cost_allocated: number | null;
+  cost_known?: boolean | null;
+};
+
+export type PeriodSales = { realized: number; sales: number; unknownCost: number };
+
+/** Realized P/L of the sales inside `range`; sales of assets with an unknown cost are counted but add no P/L. */
+export function salesIn(events: SaleEvent[], range: Range): PeriodSales {
+  const inside = events.filter((e) => e.kind === 'SELL' && inRange(new Date(e.occurred_at), range));
+  const known = inside.filter((e) => e.cost_known !== false);
+  return {
+    realized: known.reduce((s, e) => s + (e.amount ?? 0) - e.fee - e.tax - (e.cost_allocated ?? 0), 0),
+    sales: inside.length,
+    unknownCost: inside.length - known.length,
+  };
+}
 
 /** Realized P/L of the sales that happened in [from, to). */
 export function realizedBetween(events: SaleEvent[], from: Date, to: Date) {
-  return events
-    .filter((e) => e.kind === 'SELL')
-    .filter((e) => {
-      const at = new Date(e.occurred_at);
-      return at >= from && at < to;
-    })
-    .reduce((s, e) => s + (e.amount ?? 0) - e.fee - e.tax - (e.cost_allocated ?? 0), 0);
+  return salesIn(events, { start: from, end: to }).realized;
+}
+
+export type OpeningPreview = {
+  /** Potential P/L if the cost is known, else null (never guessed from the value). */
+  unrealized: number | null;
+  percent: number | null;
+  problem: string | null;
+};
+
+/** Recording an asset already owned: nothing moves in any wallet; this is only what the record will show. */
+export function previewOpening(input: { cost: number | null; value: number; quantity: number | null }): OpeningPreview {
+  const { cost, value, quantity } = input;
+  let problem: string | null = null;
+  if (!quantity || quantity <= 0) problem = 'Isi jumlahnya (mis. 2,5).';
+  else if (cost !== null && cost <= 0) problem = 'Isi modalnya, atau pilih "Tidak ingat modalnya".';
+  else if (value <= 0) problem = 'Isi perkiraan nilainya sekarang.';
+  if (cost === null || cost <= 0) return { unrealized: null, percent: null, problem };
+  return { unrealized: value - cost, percent: plPercent(value - cost, cost), problem };
 }
 
 export type NetWorth = { cash: number; assets: number; receivables: number; debts: number; total: number };

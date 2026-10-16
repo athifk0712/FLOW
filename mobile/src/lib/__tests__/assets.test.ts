@@ -1,4 +1,13 @@
-import { formatQuantity, netWorth, parseQuantity, plPercent, previewSale, realizedBetween, summarizeAssets } from '@/lib/assets';
+import {
+  formatQuantity,
+  netWorth,
+  parseQuantity,
+  plPercent,
+  previewOpening,
+  previewSale,
+  realizedBetween,
+  summarizeAssets,
+} from '@/lib/assets';
 
 describe('parseQuantity', () => {
   it('reads Indonesian and plain decimals', () => {
@@ -63,7 +72,7 @@ describe('summaries', () => {
       { status: 'ACTIVE', current_value: 15_000_000, cost_basis: 10_100_000, unrealized_pl: 4_900_000, realized_pl: 0 },
       { status: 'SOLD', current_value: 0, cost_basis: 0, unrealized_pl: 0, realized_pl: -2_000_000 },
     ]);
-    expect(s).toEqual({ value: 15_000_000, cost: 10_100_000, unrealized: 4_900_000, realized: -2_000_000, active: 1 });
+    expect(s).toEqual({ value: 15_000_000, cost: 10_100_000, unrealized: 4_900_000, realized: -2_000_000, active: 1, unknownCost: 0 });
   });
 
   it('realized P/L in a period', () => {
@@ -85,5 +94,49 @@ describe('summaries', () => {
   it('percent', () => {
     expect(plPercent(5_000_000, 10_000_000)).toBe(50);
     expect(plPercent(1, 0)).toBeNull();
+  });
+});
+
+describe('existing assets (aset lama)', () => {
+  it('Free Fire account: cost 3.610.000, worth 4.000.000 -> potential profit 390.000', () => {
+    expect(previewOpening({ cost: 3_610_000, value: 4_000_000, quantity: 1 })).toEqual({
+      unrealized: 390_000,
+      percent: 10.8,
+      problem: null,
+    });
+  });
+
+  it('an unknown cost gives no P/L and no percentage, never value as profit', () => {
+    expect(previewOpening({ cost: null, value: 4_000_000, quantity: 1 })).toEqual({ unrealized: null, percent: null, problem: null });
+  });
+
+  it('explains what is missing', () => {
+    expect(previewOpening({ cost: 0, value: 1, quantity: 1 }).problem).toMatch(/modal/);
+    expect(previewOpening({ cost: 1, value: 0, quantity: 1 }).problem).toMatch(/nilai/);
+    expect(previewOpening({ cost: 1, value: 1, quantity: null }).problem).toMatch(/jumlah/);
+  });
+
+  it('wallet and net worth: recording it changes no cash, only adds its value once', () => {
+    const cash = 5_000_000;
+    const before = netWorth({ cash, assets: 0, receivables: 0, debts: 0 });
+    const rows = [{ status: 'ACTIVE', current_value: 4_000_000, cost_basis: 3_610_000, unrealized_pl: 390_000, realized_pl: 0 }];
+    const after = netWorth({ cash, assets: summarizeAssets(rows).value, receivables: 0, debts: 0 });
+    expect(after.cash).toBe(before.cash);
+    expect(after.total - before.total).toBe(4_000_000);
+  });
+
+  it('summary keeps unknown-cost assets out of cost and unrealized P/L, but in value', () => {
+    const s = summarizeAssets([
+      { status: 'ACTIVE', current_value: 4_000_000, cost_basis: 3_610_000, unrealized_pl: 390_000, realized_pl: 0, cost_known: true },
+      { status: 'ACTIVE', current_value: 7_500_000, cost_basis: 0, unrealized_pl: null, realized_pl: 0, cost_known: false },
+    ]);
+    expect(s).toEqual({ value: 11_500_000, cost: 3_610_000, unrealized: 390_000, realized: 0, active: 2, unknownCost: 1 });
+  });
+
+  it('a sale of an unknown-cost asset adds no realized P/L', () => {
+    const events = [
+      { kind: 'SELL', occurred_at: '2026-10-10T10:00:00Z', amount: 3_200_000, fee: 0, tax: 0, cost_allocated: 0, cost_known: false },
+    ];
+    expect(realizedBetween(events, new Date('2026-10-01'), new Date('2026-11-01'))).toBe(0);
   });
 });
