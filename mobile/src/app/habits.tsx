@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { streakText, WeekDots } from '@/components/dashboard/habit-card';
 import { ThemedText } from '@/components/themed-text';
@@ -37,7 +38,7 @@ export default function HabitsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
         <View style={styles.header}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             KEBIASAAN

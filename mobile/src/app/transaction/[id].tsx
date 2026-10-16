@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { DateTimeField } from '@/components/date-time-field';
 import { ReceiptPhoto } from '@/components/receipt-photo';
@@ -188,7 +189,7 @@ export default function TransactionScreen() {
   return (
     <ThemedView style={styles.container}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+        <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
           <View style={styles.header}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               {type ? `EDIT ${TYPE_LABEL[type]}` : 'TRANSAKSI'}

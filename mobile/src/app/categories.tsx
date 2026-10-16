@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { CategoryIcon } from '@/components/category-icon';
 import { IconPicker } from '@/components/icon-picker';
@@ -170,7 +171,7 @@ export default function CategoriesScreen() {
   return (
     <ThemedView style={styles.container}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+        <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
           <View style={styles.header}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               KATEGORI

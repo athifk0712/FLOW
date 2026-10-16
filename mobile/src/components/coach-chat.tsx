@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { Companion } from '@/components/companion';
@@ -177,7 +178,7 @@ export function CoachChat({ coachMode, embedded = false }: Props) {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <SafeAreaView
           style={[styles.safeArea, embedded && styles.embedded]}
-          edges={embedded ? ['top', 'left', 'right'] : ['bottom', 'left', 'right']}>
+          edges={embedded ? ['top', 'left', 'right'] : ModalEdges}>
           <View style={styles.header}>
             <View style={styles.headerTitle}>
               {embedded ? (

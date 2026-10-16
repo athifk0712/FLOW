@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { SpendingMix } from '@/components/dashboard/spending-mix';
 import { ThemedText } from '@/components/themed-text';
@@ -67,7 +68,7 @@ export default function ReportScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
         <View style={styles.header}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             LAPORAN BULANAN

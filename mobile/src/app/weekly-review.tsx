@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { RegretInsight } from '@/components/dashboard/regret-insight';
 import { ThemedText } from '@/components/themed-text';
@@ -80,7 +81,7 @@ export default function WeeklyReviewScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
         <View style={styles.header}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             REFLEKSI MINGGUAN{items && !done ? ` · ${index + 1} DARI ${items.length}` : ''}

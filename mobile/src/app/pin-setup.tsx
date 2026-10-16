@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalEdges } from '@/constants/safe-area';
 
 import { PinPad } from '@/components/pin-pad';
 import { ThemedText } from '@/components/themed-text';
@@ -88,7 +89,7 @@ export default function PinSetupScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safe} edges={ModalEdges}>
         <View style={styles.header}>
           <ThemedText type="subtitle">{TITLE[step]}</ThemedText>
           <Pressable onPress={closeModal} hitSlop={12}>
