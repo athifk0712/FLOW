@@ -83,6 +83,10 @@ export const Spacing = {
   six: 64,
 } as const;
 
+// The whole UI's text is drawn at this fraction of the sizes written in code (see ThemedText), so screens feel
+// roomy instead of zoomed in. 1 is the original, larger look.
+export const TextScale: number = 0.88;
+
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 // Desktop layout (sidebar + two columns), see hooks/use-wide.
