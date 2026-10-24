@@ -4,6 +4,7 @@ import { createContext, useContext } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppSymbol } from './app-symbol';
+import { FeatureIcon } from './feature-icon';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { Wordmark } from './wordmark';
@@ -17,8 +18,8 @@ const WideContext = createContext(false);
 const TABS = [
   { name: 'home', href: '/', label: 'Beranda', icon: 'home' },
   { name: 'history', href: '/history', label: 'Riwayat', icon: 'history' },
-  { name: 'flowku', href: '/flowku', label: 'Flowku', icon: 'forum' },
   { name: 'charts', href: '/charts', label: 'Diagram', icon: 'pie_chart' },
+  { name: 'settings', href: '/settings', label: 'Pengaturan', icon: 'settings' },
 ] as const;
 
 // Web: on a phone, a bottom bar in normal layout flow (not overlaid), so screens never sit underneath it.
@@ -109,11 +110,11 @@ function Sidebar(props: TabListProps) {
       </Pressable>
       <View style={styles.sideNav}>{props.children}</View>
       <Pressable
-        onPress={() => router.push('/settings')}
+        onPress={() => router.push('/coach?mode=chat')}
         style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}>
-        <AppSymbol material="settings" sf="gearshape" size={22} color={theme.textSecondary} />
+        <FeatureIcon name="ai" size={24} />
         <ThemedText type="small" themeColor="textSecondary">
-          Pengaturan
+          Flowku AI
         </ThemedText>
       </Pressable>
     </ThemedView>

@@ -7,6 +7,7 @@ import { AppSymbol } from '@/components/app-symbol';
 import { Avatar } from '@/components/avatar';
 import { BudgetCard } from '@/components/dashboard/budget-card';
 import { FEATURES } from '@/components/dashboard/features';
+import { FeatureIcon } from '@/components/feature-icon';
 import { MenuGrid } from '@/components/dashboard/menu-grid';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
 import { GoalProgress } from '@/components/goal-progress';
@@ -278,11 +279,14 @@ export default function HomeScreen() {
               <StreakBadge streak={streak} color={onBand} onPress={() => router.push('/habits')} />
               {!wide && (
                 <Pressable
-                  onPress={() => router.push('/settings')}
+                  onPress={() => router.push('/coach?mode=chat')}
                   hitSlop={8}
-                  accessibilityLabel="Pengaturan"
-                  style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-                  <AppSymbol material="settings" sf="gearshape" size={20} color={onBand} />
+                  accessibilityLabel="Ngobrol dengan Flowku AI"
+                  style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}>
+                  <FeatureIcon name="ai" size={30} />
+                  <ThemedText type="smallBold" style={{ color: onBand }}>
+                    AI
+                  </ThemedText>
                 </Pressable>
               )}
             </View>
@@ -658,12 +662,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 26,
   },
-  headerButton: {
-    width: 38,
+  aiButton: {
     height: 38,
-    borderRadius: 19,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingLeft: Spacing.one,
+    paddingRight: Spacing.two + 2,
+    borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
   body: {

@@ -23,18 +23,15 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="clock" md="history" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="flowku">
-        <NativeTabs.Trigger.Label>Flowku</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }}
-          md="forum"
-        />
-      </NativeTabs.Trigger>
-
-
       <NativeTabs.Trigger name="charts">
         <NativeTabs.Trigger.Label>Diagram</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'chart.pie', selected: 'chart.pie.fill' }} md="pie_chart" />
+      </NativeTabs.Trigger>
+
+      {/* Flowku AI lives in Beranda's top-right button; Pengaturan takes its old place in the bar. */}
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Label>Pengaturan</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

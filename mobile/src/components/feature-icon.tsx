@@ -26,7 +26,8 @@ export type FeatureIconName =
   | 'report'
   | 'reflection'
   | 'checkin'
-  | 'settings';
+  | 'settings'
+  | 'ai';
 
 /** Each feature's circle colour; neighbours in the grid differ in hue and lightness. */
 const BACKGROUND: Record<FeatureIconName, string> = {
@@ -42,6 +43,7 @@ const BACKGROUND: Record<FeatureIconName, string> = {
   reflection: '#D45D8C',
   checkin: '#2A8FA8',
   settings: '#5E6B69',
+  ai: '#FFFCF6',
 };
 
 /** The little chick from the Flowku mark, centred on 0,0 and about 12 units wide; place it with `transform`. */
@@ -212,6 +214,9 @@ function Glyph({ name, bg }: { name: FeatureIconName; bg: string }) {
           <Chick transform="translate(35 32) scale(0.85)" />
         </>
       );
+    case 'ai':
+      // Flowku AI is the chick itself, big, on a light circle.
+      return <Chick transform="translate(22 27.5) scale(1.9)" />;
     case 'settings':
       return (
         <>
