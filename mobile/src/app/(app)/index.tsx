@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppSymbol } from '@/components/app-symbol';
 import { Avatar } from '@/components/avatar';
 import { BudgetCard } from '@/components/dashboard/budget-card';
-import { type MenuItem, QuickActions } from '@/components/dashboard/menu-grid';
+import { HOME_FEATURES } from '@/components/dashboard/features';
+import { FeatureIcon } from '@/components/feature-icon';
+import { MenuGrid } from '@/components/dashboard/menu-grid';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
 import { GoalProgress } from '@/components/goal-progress';
 import { StreakBadge } from '@/components/streak-badge';
@@ -41,19 +43,13 @@ type Balance = Tables<'v_account_balances'>;
 type Budget = Tables<'v_budget_remaining'>;
 // Riwayat and Diagram are already in the tab bar; these are the next most used places. Everything else is under
 // "Semua menu", so nothing is lost by keeping Beranda short.
-const SHORTCUTS: MenuItem[] = [
-  { label: 'Dompet', href: '/accounts', material: 'account_balance_wallet', sf: 'wallet.bifold' },
-  { label: 'Anggaran', href: '/budgets', material: 'donut_large', sf: 'chart.pie' },
-  { label: 'Aset', href: '/portfolio', material: 'savings', sf: 'dollarsign.circle' },
-  { label: 'Semua', href: '/menu', material: 'apps', sf: 'square.grid.2x2' },
-];
 const BUDGETS_ON_HOME = 3;
 
 // How far the first card reaches up into the band.
-const BAND_OVERLAP = 64;
+const BAND_OVERLAP = 56;
 // Header row (avatar, greeting, streak, settings) and the Pribadi/Grup switch under it.
-const HEADER_HEIGHT = 56;
-const SWITCH_HEIGHT = 40;
+const HEADER_HEIGHT = 48;
+const SWITCH_HEIGHT = 34;
 const HIDDEN_KEY = 'flowku.hideBalance';
 const SPACE_KEY = 'flowku.space';
 
@@ -241,7 +237,6 @@ export default function HomeScreen() {
         hidden={hidden}
         onToggleHidden={toggleHidden}>
         <LogButton />
-        <QuickActions items={SHORTCUTS} soft />
       </SafeToSpendCard>
     ) : (
       <ThemedView type="backgroundElement" style={styles.card}>
@@ -250,7 +245,6 @@ export default function HomeScreen() {
         </ThemedText>
         <ThemedText style={styles.total}>{formatMoney(total)}</ThemedText>
         <LogButton />
-        <QuickActions items={SHORTCUTS} soft />
       </ThemedView>
     );
 
@@ -272,7 +266,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/profile')}
                 accessibilityLabel="Profil: ubah nama dan foto"
                 style={({ pressed }) => [styles.who, pressed && styles.pressed]}>
-                <Avatar name={name} size={44} ringColor={onBand} />
+                <Avatar name={name} size={38} ringColor={onBand} />
                 <View style={styles.flex}>
                   <ThemedText type="small" style={[styles.greetingSmall, { color: onBand }]} numberOfLines={1}>
                     {greeting()}
@@ -285,11 +279,14 @@ export default function HomeScreen() {
               <StreakBadge streak={streak} color={onBand} onPress={() => router.push('/habits')} />
               {!wide && (
                 <Pressable
-                  onPress={() => router.push('/settings')}
+                  onPress={() => router.push('/coach?mode=chat')}
                   hitSlop={8}
-                  accessibilityLabel="Pengaturan"
-                  style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-                  <AppSymbol material="settings" sf="gearshape" size={24} color={onBand} />
+                  accessibilityLabel="Ngobrol dengan Flowku AI"
+                  style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}>
+                  <FeatureIcon name="ai" size={30} />
+                  <ThemedText type="smallBold" style={{ color: onBand }}>
+                    AI
+                  </ThemedText>
                 </Pressable>
               )}
             </View>
@@ -349,6 +346,10 @@ export default function HomeScreen() {
                 onPress={() => router.push('/weekly-review')}
               />
             )}
+
+            <ThemedView type="backgroundElement" style={styles.features}>
+              <MenuGrid items={HOME_FEATURES} />
+            </ThemedView>
           </View>
 
           <View style={[styles.column, wide && styles.rightColumn]}>
@@ -655,15 +656,17 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   greeting: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 20,
+    lineHeight: 26,
   },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  aiButton: {
+    height: 38,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingLeft: Spacing.one,
+    paddingRight: Spacing.two + 2,
+    borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
   body: {
@@ -691,8 +694,8 @@ const styles = StyleSheet.create({
     paddingTop: BAND_OVERLAP + Spacing.two,
   },
   total: {
-    fontSize: 36,
-    lineHeight: 44,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: 700,
   },
   section: {
@@ -708,7 +711,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
-    minHeight: 52,
+    minHeight: 46,
     borderRadius: Spacing.three,
   },
   tiles: {
@@ -721,13 +724,20 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.four,
   },
   tileValue: {
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: 700,
   },
   card: {
     gap: Spacing.three,
     padding: Spacing.three,
+    borderRadius: Spacing.four,
+  },
+  features: {
+    gap: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+    paddingHorizontal: Spacing.two,
     borderRadius: Spacing.four,
   },
   todo: {

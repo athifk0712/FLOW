@@ -8,14 +8,13 @@ import { AppSymbol } from '@/components/app-symbol';
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
 import { displayName } from '@/lib/display-name';
 import { useLockSettings } from '@/lib/app-lock';
 import { APPEARANCE_OPTIONS, useAppearance } from '@/lib/appearance';
 import { useCurrency } from '@/lib/money';
-import { closeModal } from '@/lib/navigation';
 import { useSession } from '@/providers/session-provider';
 
 type Row = {
@@ -100,9 +99,6 @@ export default function SettingsScreen() {
           <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
           <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
           <SafeAreaView edges={['top', 'left', 'right']} style={styles.heroInner}>
-            <Pressable onPress={closeModal} hitSlop={12} style={styles.back} accessibilityLabel="Kembali">
-              <AppSymbol material="arrow_back" sf="chevron.left" size={24} color={theme.onPrimary} />
-            </Pressable>
             <ThemedText type="subtitle" style={{ color: theme.onPrimary }}>
               Pengaturan
             </ThemedText>
@@ -193,7 +189,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
-    paddingBottom: Spacing.five,
+    // A tab now, so the last rows clear the tab bar.
+    paddingBottom: BottomTabInset + Spacing.four,
   },
   hero: {
     height: 150,
@@ -208,9 +205,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.four,
-  },
-  back: {
-    padding: Spacing.one,
   },
   // Soft shapes in the band, echoing the sun-over-waves mark.
   bubble: {

@@ -149,8 +149,8 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   amount: {
-    fontSize: 36,
-    lineHeight: 44,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: 700,
   },
   today: {

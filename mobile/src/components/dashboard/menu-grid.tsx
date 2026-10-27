@@ -1,57 +1,24 @@
-import { type Href, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AppSymbol } from '@/components/app-symbol';
+import type { Feature } from '@/components/dashboard/features';
+import { FeatureIcon } from '@/components/feature-icon';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
-export type MenuItem = { label: string; href: Href; material: string; sf: string; badge?: string };
-
-/** Round icons with a label under each, four to a row, like the service grid of a banking app. */
-export function MenuGrid({ items, columns = 4 }: { items: MenuItem[]; columns?: number }) {
-  const theme = useTheme();
+/** Colourful round icons with a label under each, four to a row, like the service grid of Gojek. */
+export function MenuGrid({ items, columns = 4 }: { items: Feature[]; columns?: number }) {
   return (
     <View style={styles.grid}>
       {items.map((item) => (
         <Pressable
           key={item.label}
           onPress={() => router.push(item.href)}
+          accessibilityRole="button"
+          accessibilityLabel={item.label}
           style={({ pressed }) => [styles.item, { width: `${100 / columns}%` }, pressed && styles.pressed]}>
-          <View style={[styles.circle, { backgroundColor: theme.backgroundSelected }]}>
-            <AppSymbol material={item.material} sf={item.sf} size={24} color={theme.primary} />
-            {item.badge && (
-              <View style={[styles.badge, { backgroundColor: theme.accent }]}>
-                <ThemedText type="smallBold" style={[styles.badgeText, { color: theme.onAccent }]}>
-                  {item.badge}
-                </ThemedText>
-              </View>
-            )}
-          </View>
-          <ThemedText type="small" style={styles.label} numberOfLines={2}>
-            {item.label}
-          </ThemedText>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-/** A row of round action buttons inside a card (Catat, Riwayat, ...). */
-export function QuickActions({ items, soft = false }: { items: MenuItem[]; soft?: boolean }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.actions, { borderTopColor: theme.backgroundSelected }]}>
-      {items.map((item) => (
-        <Pressable
-          key={item.label}
-          onPress={() => router.push(item.href)}
-          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          {/* Soft circles next to a primary button, so only that button reads as the main action. */}
-          <View style={[styles.actionCircle, { backgroundColor: soft ? theme.backgroundSelected : theme.primary }]}>
-            <AppSymbol material={item.material} sf={item.sf} size={22} color={soft ? theme.primary : theme.onPrimary} />
-          </View>
-          <ThemedText type="small" numberOfLines={1}>
+          <FeatureIcon name={item.icon} />
+          <ThemedText type="smallBold" style={styles.label} numberOfLines={1}>
             {item.label}
           </ThemedText>
         </Pressable>
@@ -68,53 +35,17 @@ const styles = StyleSheet.create({
   },
   item: {
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.one + 2,
     paddingHorizontal: Spacing.half,
-  },
-  circle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    minWidth: 20,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontSize: 11,
-    lineHeight: 18,
   },
   label: {
     textAlign: 'center',
     fontSize: 13,
-    lineHeight: 17,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: Spacing.three,
-  },
-  action: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  actionCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    lineHeight: 16,
+    fontWeight: 600,
   },
   pressed: {
     opacity: 0.7,
+    transform: [{ scale: 0.96 }],
   },
 });
