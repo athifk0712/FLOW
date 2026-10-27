@@ -1,206 +1,145 @@
-import { useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ModalEdges } from '@/constants/safe-area';
 
+import {
+  type Budget,
+  type BudgetStatus,
+  BudgetRow,
+  budgetStatus,
+  sortBudgets,
+} from '@/components/dashboard/budget-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ModalEdges } from '@/constants/safe-area';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { Enums } from '@/lib/database.types';
-import { formatDigits, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
-type Period = Enums<'budget_period'>;
-type Row = {
-  categoryId: string;
-  name: string;
-  budgetId: string | null;
-  digits: string;
-  period: Period;
-  // What is stored now, to skip unchanged rows on save.
-  saved: { digits: string; period: Period };
-};
+type Filter = BudgetStatus | 'ALL';
 
-const PERIODS: { value: Period; label: string }[] = [
-  { value: 'WEEKLY', label: 'Mingguan' },
-  { value: 'MONTHLY', label: 'Bulanan' },
+const STATUSES: { value: BudgetStatus; label: string }[] = [
+  { value: 'OVER', label: 'Lewat batas' },
+  { value: 'NEAR', label: 'Hampir habis' },
+  { value: 'OK', label: 'Aman' },
 ];
 
-// One optional limit per expense category, weekly or monthly. Empty = no budget.
+const EMPTY_FILTER: Record<BudgetStatus, string> = {
+  OVER: 'Tidak ada budget yang lewat batas. Mantap!',
+  NEAR: 'Tidak ada budget yang hampir habis.',
+  OK: 'Belum ada budget yang masih aman.',
+};
+
+// Every current budget with its bar, the ones that need attention first. Editing lives on /budget-edit and
+// /weekly-budget so this page stays a calm read.
 export default function BudgetsScreen() {
   const theme = useTheme();
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [budgets, setBudgets] = useState<Budget[] | null>(null);
+  const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
+  const [filter, setFilter] = useState<Filter>('ALL');
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const [cats, buds] = await Promise.all([
-      supabase.from('categories').select('id, name').eq('kind', 'EXPENSE').order('created_at'),
-      supabase
-        .from('budgets')
-        .select('id, category_id, period, limit_amount')
-        .eq('scope', 'CATEGORY')
-        .is('active_to', null),
-    ]);
-    const failed = cats.error ?? buds.error;
-    if (failed) return setError(failed.message);
-    const byCategory = new Map((buds.data ?? []).map((b) => [b.category_id, b]));
-    setRows(
-      (cats.data ?? []).map((c) => {
-        const b = byCategory.get(c.id);
-        const digits = b ? String(b.limit_amount) : '';
-        const period = b?.period ?? 'MONTHLY';
-        return { categoryId: c.id, name: c.name, budgetId: b?.id ?? null, digits, period, saved: { digits, period } };
-      }),
-    );
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      Promise.all([supabase.from('v_budget_remaining').select('*'), supabase.from('categories').select('id, name')]).then(
+        ([bud, cats]) => {
+          const failed = bud.error ?? cats.error;
+          if (failed) return setError(failed.message);
+          setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
+          setBudgets(sortBudgets(bud.data ?? []));
+        },
+      );
+    }, []),
   );
 
-  function update(categoryId: string, change: Partial<Pick<Row, 'digits' | 'period'>>) {
-    setMessage(null);
-    setRows((current) => current?.map((r) => (r.categoryId === categoryId ? { ...r, ...change } : r)) ?? null);
-  }
-
-  async function save() {
-    if (!rows) return;
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    for (const r of rows) {
-      if (r.digits === r.saved.digits && r.period === r.saved.period) continue;
-      const amount = Number(r.digits || '0');
-      const { error } =
-        amount > 0
-          ? r.budgetId
-            ? await supabase.from('budgets').update({ limit_amount: amount, period: r.period }).eq('id', r.budgetId)
-            : await supabase
-                .from('budgets')
-                .insert({ scope: 'CATEGORY', category_id: r.categoryId, period: r.period, limit_amount: amount })
-          : r.budgetId
-            ? await supabase.from('budgets').delete().eq('id', r.budgetId)
-            : { error: null };
-      if (error) {
-        setSaving(false);
-        return setError(`${r.name}: ${error.message}`);
-      }
-    }
-    await load();
-    setSaving(false);
-    setMessage('Budget kategori tersimpan');
-  }
+  const count = (s: BudgetStatus) => budgets?.filter((b) => budgetStatus(b) === s).length ?? 0;
+  const shown = budgets?.filter((b) => filter === 'ALL' || budgetStatus(b) === filter) ?? [];
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
-          <View style={styles.header}>
+      <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
+        <View style={styles.header}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            ANGGARAN
+          </ThemedText>
+          <Pressable onPress={closeModal} hitSlop={12}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              BUDGET PER KATEGORI
+              Tutup
             </ThemedText>
-            <Pressable onPress={closeModal} hitSlop={12}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                Tutup
-              </ThemedText>
-            </Pressable>
-          </View>
+          </Pressable>
+        </View>
 
-          {rows === null ? (
-            error ? (
-              <ThemedText themeColor="danger">{error}</ThemedText>
-            ) : (
-              <ActivityIndicator style={styles.flex} />
-            )
+        {budgets === null ? (
+          error ? (
+            <ThemedText themeColor="danger">{error}</ThemedText>
           ) : (
-            <>
-              <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-                <ThemedText type="small" themeColor="textSecondary">
-                  Isi batas untuk kategori yang mau dipantau, misal Kopi Rp150.000 per bulan. Kosongkan untuk
-                  menghapus.
-                </ThemedText>
-                {rows.map((r) => (
-                  <ThemedView key={r.categoryId} type="backgroundElement" style={styles.row}>
-                    <View style={styles.rowTop}>
-                      <ThemedText type="smallBold" style={styles.flex}>
-                        {r.name}
+            <ActivityIndicator style={styles.flex} />
+          )
+        ) : (
+          <ScrollView contentContainerStyle={styles.list}>
+            {budgets.length > 0 && (
+              <View style={styles.tiles}>
+                {STATUSES.map((s) => {
+                  const selected = filter === s.value;
+                  return (
+                    <Pressable
+                      key={s.value}
+                      onPress={() => setFilter(selected ? 'ALL' : s.value)}
+                      style={[styles.tile, { backgroundColor: selected ? theme.primary : theme.backgroundElement }]}>
+                      <ThemedText
+                        type="subtitle"
+                        style={{
+                          color: selected ? theme.onPrimary : s.value !== 'OK' && count(s.value) > 0 ? theme.warning : theme.text,
+                        }}>
+                        {count(s.value)}
                       </ThemedText>
-                      <View style={styles.periods}>
-                        {PERIODS.map((p) => {
-                          const selected = p.value === r.period;
-                          return (
-                            <Pressable
-                              key={p.value}
-                              onPress={() => update(r.categoryId, { period: p.value })}
-                              style={[
-                                styles.period,
-                                { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
-                              ]}>
-                              <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
-                                {p.label}
-                              </ThemedText>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-                    <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                      <TextInput
-                        style={[styles.priceInput, { color: theme.text }]}
-                        value={formatDigits(r.digits)}
-                        onChangeText={(t) => update(r.categoryId, { digits: toDigits(t) })}
-                        placeholder="Tanpa budget"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
-                      />
-                    </View>
-                  </ThemedView>
-                ))}
-                {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-                {message && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {message}
-                  </ThemedText>
-                )}
-              </ScrollView>
+                      <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.textSecondary }}>
+                        {s.label}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
 
-              <Pressable
-                disabled={saving}
-                onPress={save}
-                style={({ pressed }) => [
-                  styles.save,
-                  { backgroundColor: theme.primary },
-                  (pressed || saving) && styles.pressed,
-                ]}>
-                {saving ? (
-                  <ActivityIndicator color={theme.onPrimary} />
-                ) : (
+            {budgets.length === 0 ? (
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <ThemedText type="smallBold">Belum ada budget</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Mulai dari budget mingguan untuk keinginan dan kebutuhan, lalu tambah batas per kategori kalau perlu.
+                </ThemedText>
+              </ThemedView>
+            ) : shown.length === 0 ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+                {filter !== 'ALL' && EMPTY_FILTER[filter]}
+              </ThemedText>
+            ) : (
+              <ThemedView type="backgroundElement" style={styles.card}>
+                {shown.map((b) => (
+                  <BudgetRow key={b.budget_id} budget={b} categoryNames={categoryNames} detailed />
+                ))}
+              </ThemedView>
+            )}
+
+            <View style={styles.actions}>
+              <Link href="/weekly-budget" asChild>
+                <Pressable style={[styles.action, { backgroundColor: theme.backgroundSelected }]}>
+                  <ThemedText type="smallBold">Atur budget mingguan</ThemedText>
+                </Pressable>
+              </Link>
+              <Link href="/budget-edit" asChild>
+                <Pressable style={[styles.action, { backgroundColor: theme.primary }]}>
                   <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                    Simpan budget
+                    Atur budget kategori
                   </ThemedText>
-                )}
-              </Pressable>
-            </>
-          )}
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+                </Pressable>
+              </Link>
+            </View>
+          </ScrollView>
+        )}
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -213,7 +152,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-    maxWidth: MaxContentWidth,
   },
   safeArea: {
     flex: 1,
@@ -227,48 +165,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   list: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.four,
   },
-  row: {
+  tiles: {
+    flexDirection: 'row',
     gap: Spacing.two,
+  },
+  tile: {
+    flex: 1,
+    gap: Spacing.half,
     padding: Spacing.three,
     borderRadius: Spacing.three,
   },
-  rowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  periods: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-  },
-  period: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
+  card: {
+    gap: Spacing.four,
+    padding: Spacing.three,
     borderRadius: Spacing.three,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
+  empty: {
+    textAlign: 'center',
+    paddingVertical: Spacing.four,
   },
-  priceInput: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 600,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.two,
+  actions: {
+    gap: Spacing.two,
   },
-  save: {
+  action: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
-    marginBottom: Spacing.two,
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });
