@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppSymbol } from '@/components/app-symbol';
 import { Avatar } from '@/components/avatar';
 import { BudgetCard } from '@/components/dashboard/budget-card';
-import { FEATURES } from '@/components/dashboard/features';
+import { HOME_FEATURES } from '@/components/dashboard/features';
 import { FeatureIcon } from '@/components/feature-icon';
 import { MenuGrid } from '@/components/dashboard/menu-grid';
 import { SafeToSpendCard } from '@/components/dashboard/safe-to-spend-card';
@@ -348,10 +348,7 @@ export default function HomeScreen() {
             )}
 
             <ThemedView type="backgroundElement" style={styles.features}>
-              <ThemedText type="smallBold" style={styles.featuresTitle}>
-                Semua fitur
-              </ThemedText>
-              <MenuGrid items={FEATURES} />
+              <MenuGrid items={HOME_FEATURES} />
             </ThemedView>
           </View>
 
@@ -742,9 +739,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.three,
     paddingHorizontal: Spacing.two,
     borderRadius: Spacing.four,
-  },
-  featuresTitle: {
-    paddingHorizontal: Spacing.two,
   },
   todo: {
     flexDirection: 'row',
