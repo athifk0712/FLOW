@@ -12,8 +12,8 @@ type Props = {
   onPress?: () => void;
 };
 
-// 🔥 and the number of days in a row. Dimmed while today hasn't counted yet; a small pop when it just did
-// (skipped when the phone asks for reduced motion).
+// 🔥 and the number of days in a row (🛟 when one day was missed and logging today saves it). Dimmed while today hasn't
+// counted yet; a small pop when it just did (skipped when the phone asks for reduced motion).
 export function StreakBadge({ streak, color, onPress }: Props) {
   const [scale] = useState(() => new Animated.Value(1));
   const wasActive = useRef(streak.activeToday);
@@ -35,7 +35,9 @@ export function StreakBadge({ streak, color, onPress }: Props) {
 
   const label = streak.days === 0
     ? 'Belum ada hari beruntun. Catat transaksi untuk memulai.'
-    : `${streak.days} hari beruntun${streak.activeToday ? '' : ', catat hari ini supaya tidak putus'}`;
+    : streak.atRisk
+      ? `${streak.days} hari beruntun, terancam karena kemarin terlewat. Catat hari ini untuk menyelamatkannya.`
+      : `${streak.days} hari beruntun${streak.activeToday ? '' : ', catat hari ini supaya tidak putus'}`;
 
   return (
     <Pressable
@@ -44,7 +46,7 @@ export function StreakBadge({ streak, color, onPress }: Props) {
       accessibilityRole="button"
       accessibilityLabel={label}
       style={({ pressed }) => [styles.badge, !streak.activeToday && styles.dim, pressed && styles.pressed]}>
-      <Animated.Text style={[styles.flame, { transform: [{ scale }] }]}>🔥</Animated.Text>
+      <Animated.Text style={[styles.flame, { transform: [{ scale }] }]}>{streak.atRisk ? '🛟' : '🔥'}</Animated.Text>
       <ThemedText type="smallBold" style={{ color }}>
         {streak.days}
       </ThemedText>

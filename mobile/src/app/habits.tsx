@@ -62,10 +62,18 @@ export default function HabitsScreen() {
               <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
                 {habits.streak === 0
                   ? streakText(habits)
-                  : habits.loggedToday
-                    ? 'Hari ini sudah tercatat. Sampai besok.'
-                    : 'Belum ada catatan hari ini. Catat supaya berlanjut.'}
+                  : habits.atRisk
+                    ? 'Kemarin terlewat, tapi streak-mu masih bisa selamat. Catat hari ini untuk memakai satu kesempatan.'
+                    : habits.loggedToday
+                      ? 'Hari ini sudah tercatat. Sampai besok.'
+                      : 'Belum ada catatan hari ini. Catat supaya berlanjut.'}
               </ThemedText>
+              {habits.saves !== null && (
+                <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+                  🛟 Sisa {habits.saves} kesempatan bulan ini. Kalau terlewat sehari, streak otomatis diselamatkan saat
+                  kamu mencatat lagi keesokan harinya.
+                </ThemedText>
+              )}
             </View>
 
             <ThemedView type="backgroundElement" style={styles.card}>
@@ -85,7 +93,7 @@ export default function HabitsScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 {habits.reviewedShare === null
                   ? 'Belum ada pengeluaran minggu ini.'
-                  : `${Math.round(habits.reviewedShare * 100)}% pengeluaran minggu ini sudah dinilai. Yang belum, dibahas di obrolan malam.`}
+                  : `${Math.round(habits.reviewedShare * 100)}% pengeluaran minggu ini sudah kamu nilai sendiri. Opsional, budget tetap terhitung.`}
               </ThemedText>
             </ThemedView>
 

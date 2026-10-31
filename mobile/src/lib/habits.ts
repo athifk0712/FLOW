@@ -1,5 +1,5 @@
 import type { Enums } from '@/lib/database.types';
-import { streakView } from '@/lib/streak';
+import { STREAK_COLUMNS, streakFromProfile, type StreakView } from '@/lib/streak';
 import { supabase } from '@/lib/supabase';
 
 export type HabitTransaction = {
@@ -13,7 +13,9 @@ export type HabitInput = {
   chatCount: number; // finished nightly chats
   goalReached: boolean;
   /** The server's win streak (profiles.streak_count), which wins over the count derived from transaction dates. */
-  serverStreak?: { days: number; activeToday: boolean } | null;
+  serverStreak?: StreakView | null;
+  /** Streak saves left this month. */
+  saves?: number;
 };
 
 export type Milestone = { key: string; title: string; hint: string; done: boolean };
@@ -21,6 +23,8 @@ export type Milestone = { key: string; title: string; hint: string; done: boolea
 export type Habits = {
   streak: number; // consecutive days with a log, ending today (or yesterday if today is still empty)
   loggedToday: boolean;
+  atRisk: boolean; // one day was missed; logging today uses a save
+  saves: number | null; // streak saves left this month, null when the server's streak isn't known
   lastSeven: boolean[]; // oldest first, today last
   reviewedShare: number | null; // share of the last 7 days' expenses that are judged, null if none
   milestones: Milestone[];
@@ -101,7 +105,15 @@ export function computeHabits(input: HabitInput, now = new Date()): Habits {
     { key: 'goal', title: 'Target tercapai', hint: 'Satu target tabungan terkumpul penuh.', done: input.goalReached },
   ];
 
-  return { streak, loggedToday, lastSeven, reviewedShare, milestones };
+  return {
+    streak,
+    loggedToday,
+    atRisk: !!input.serverStreak?.atRisk,
+    saves: input.saves ?? null,
+    lastSeven,
+    reviewedShare,
+    milestones,
+  };
 }
 
 /** Loads what computeHabits needs: 90 days of transactions, finished nightly chats, and whether any goal is reached. */
@@ -111,16 +123,18 @@ export async function fetchHabits(now = new Date()) {
     supabase.from('transactions').select('occurred_at, type, necessity').gte('occurred_at', since),
     supabase.from('coach_sessions').select('id', { count: 'exact', head: true }).not('summary', 'is', null),
     supabase.from('v_goal_progress').select('saved, target_amount'),
-    supabase.from('profiles').select('streak_count, last_active_date').maybeSingle(),
+    supabase.from('profiles').select(STREAK_COLUMNS).maybeSingle(),
   ]);
   const failed = tx.error ?? chats.error ?? goals.error ?? profile.error;
   if (failed) throw failed;
+  const server = profile.data ? streakFromProfile(profile.data) : null;
   return computeHabits(
     {
       transactions: tx.data ?? [],
       chatCount: chats.count ?? 0,
       goalReached: (goals.data ?? []).some((g) => (g.saved ?? 0) >= (g.target_amount ?? 1)),
-      serverStreak: profile.data ? streakView(profile.data.streak_count, profile.data.last_active_date) : null,
+      serverStreak: server?.view ?? null,
+      saves: server?.saves,
     },
     now,
   );

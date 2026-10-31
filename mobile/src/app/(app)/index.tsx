@@ -32,7 +32,7 @@ import { formatMoney, formatMoneyShort } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
 import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
-import { celebratedOn, markCelebrated, shouldCelebrate, streakView, type StreakView } from '@/lib/streak';
+import { celebratedOn, markCelebrated, shouldCelebrate, STREAK_COLUMNS, streakFromProfile, type StreakView } from '@/lib/streak';
 import { netWorth } from '@/lib/assets';
 import { supabase } from '@/lib/supabase';
 import { computeTimeInsight, type TimeInsight } from '@/lib/time-insight';
@@ -78,7 +78,6 @@ export default function HomeScreen() {
   const { day: cycleDay, loaded: cycleLoaded } = useCycleDay();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [unreviewed, setUnreviewed] = useState(0);
   const [weeklyDue, setWeeklyDue] = useState(0);
   const [categoryNames, setCategoryNames] = useState(new Map<string, string>());
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -108,7 +107,6 @@ export default function HomeScreen() {
         Promise.all([
           supabase.from('v_account_balances').select('*').is('archived_at', null).order('name'),
           supabase.from('v_budget_remaining').select('*'),
-          supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('needs_review', true),
           supabase
             .from('transactions')
             .select('id', { count: 'exact', head: true })
@@ -131,7 +129,7 @@ export default function HomeScreen() {
             .eq('type', 'EXPENSE')
             .not('necessity', 'is', null)
             .gte('occurred_at', insightSince),
-          supabase.from('profiles').select('streak_count, last_active_date').maybeSingle(),
+          supabase.from('profiles').select(STREAK_COLUMNS).maybeSingle(),
           supabase.from('v_assets').select('current_value').eq('status', 'ACTIVE'),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
@@ -144,11 +142,10 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, rev, due, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
+        .then(([bal, bud, due, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
           const failed =
             bal.error ??
             bud.error ??
-            rev.error ??
             due.error ??
             cats.error ??
             goalRows.error ??
@@ -163,7 +160,6 @@ export default function HomeScreen() {
           if ((bal.data ?? []).length === 0 && !isOnboarded()) router.push('/onboarding');
           setBalances(bal.data ?? []);
           setBudgets(bud.data ?? []);
-          setUnreviewed(rev.count ?? 0);
           setWeeklyDue(due.count ?? 0);
           setCategoryNames(new Map((cats.data ?? []).map((c) => [c.id, c.name])));
           setGoals(goalRows.data ?? []);
@@ -176,11 +172,15 @@ export default function HomeScreen() {
           setAssetCount(assetRows.data?.length ?? 0);
           // The streak is kept by the server; the day's first counted save is celebrated once, here.
           if (profileRow.data) {
-            const view = streakView(profileRow.data.streak_count, profileRow.data.last_active_date);
+            const { view, saves, savedToday } = streakFromProfile(profileRow.data);
             setStreak(view);
             if (shouldCelebrate(view, celebratedOn())) {
               markCelebrated();
               setCelebrate(view.days);
+              if (savedToday) {
+                const text = `Streak diselamatkan! Sisa ${saves} kesempatan bulan ini.`;
+                setToasts((list) => [...list, { text, icon: 'done' }]);
+              }
             }
           }
         });
@@ -327,16 +327,7 @@ export default function HomeScreen() {
               {hero}
             </View>
 
-            {/* At most two small to-do rows, worded as an invitation, not a backlog. */}
-            {unreviewed > 0 && (
-              <TodoRow
-                material="checklist"
-                sf="checklist"
-                title={`${unreviewed} transaksi perlu ditinjau`}
-                detail="Cek harian, cukup 1–2 menit"
-                onPress={() => router.push('/coach')}
-              />
-            )}
+            {/* A small to-do row, worded as an invitation, not a backlog. Judging each expense is optional (Cek harian). */}
             {weeklyDue > 0 && (
               <TodoRow
                 material="rate_review"
