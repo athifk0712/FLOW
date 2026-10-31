@@ -18,6 +18,7 @@ import { IconPicker } from '@/components/icon-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { guessIcon } from '@/constants/category-icons';
+import { NECESSITY } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Enums, Tables } from '@/lib/database.types';
@@ -25,7 +26,8 @@ import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Kind = Enums<'category_kind'>;
-type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
+type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon' | 'default_necessity'>;
+type Nature = 'NEED' | 'WANT';
 // Adding to a kind, or editing a category by id.
 type Editing = { kind: Kind; id?: string } | null;
 
@@ -43,12 +45,14 @@ export default function CategoriesScreen() {
   const [icon, setIcon] = useState('dots');
   // Until the user picks an icon themselves, it follows the name ("Bensin" -> fuel pump).
   const [iconTouched, setIconTouched] = useState(false);
+  // What this category usually is; the weekly budgets count expenses by it.
+  const [nature, setNature] = useState<Nature>('WANT');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from('categories').select('id, name, kind, icon').order('created_at');
+    const { data, error } = await supabase.from('categories').select('id, name, kind, icon, default_necessity').order('created_at');
     if (error) return setError(error.message);
     setCategories(data ?? []);
   }, []);
@@ -65,6 +69,7 @@ export default function CategoriesScreen() {
     setName(category?.name ?? '');
     setIcon(category?.icon ?? 'dots');
     setIconTouched(!!category);
+    setNature(category?.default_necessity === 'NEED' || category?.default_necessity === 'IMPORTANT' ? 'NEED' : 'WANT');
     setConfirmDelete(false);
     setError(null);
   }
@@ -83,10 +88,11 @@ export default function CategoriesScreen() {
   function save() {
     if (!editing) return;
     const trimmed = name.trim();
+    const values = { name: trimmed, icon, default_necessity: nature };
     run(() =>
       editing.id
-        ? supabase.from('categories').update({ name: trimmed, icon }).eq('id', editing.id)
-        : supabase.from('categories').insert({ name: trimmed, kind: editing.kind, icon }),
+        ? supabase.from('categories').update(values).eq('id', editing.id)
+        : supabase.from('categories').insert({ ...values, kind: editing.kind }),
     );
   }
 
@@ -123,6 +129,33 @@ export default function CategoriesScreen() {
             setIconTouched(true);
           }}
         />
+        {target.kind === 'EXPENSE' && (
+          <View style={styles.nature}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Sifatnya
+            </ThemedText>
+            <View style={styles.natureRow}>
+              {(['NEED', 'WANT'] as const).map((n) => {
+                const on = nature === n;
+                return (
+                  <Pressable
+                    key={n}
+                    onPress={() => setNature(n)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={[styles.natureChip, { backgroundColor: on ? theme.primary : theme.backgroundSelected }]}>
+                    <ThemedText type="small" style={{ color: on ? theme.onPrimary : theme.text }}>
+                      {NECESSITY[n].label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              Pengeluaran kategori ini langsung masuk ke budget {NECESSITY[nature].label} tanpa perlu dinilai satu per satu.
+            </ThemedText>
+          </View>
+        )}
         {target.id && (
           <ThemedText type="small" themeColor="textSecondary">
             Menghapus kategori tidak menghapus transaksinya; transaksi itu jadi tanpa kategori.
@@ -289,6 +322,18 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  nature: {
+    gap: Spacing.one,
+  },
+  natureRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  natureChip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
   },
   nameRow: {
     flexDirection: 'row',

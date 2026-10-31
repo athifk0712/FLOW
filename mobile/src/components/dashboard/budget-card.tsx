@@ -98,11 +98,6 @@ export function BudgetRow({
           </ThemedText>
         )}
       </View>
-      {detailed && (b.unreviewed_amount ?? 0) > 0 && (
-        <ThemedText type="small" themeColor="textSecondary">
-          + {formatMoney(b.unreviewed_amount ?? 0)} belum dinilai, belum dihitung di sini
-        </ThemedText>
-      )}
     </View>
   );
 }
@@ -121,7 +116,7 @@ export function BudgetCard({
 
   if (sorted.length === 0) {
     return (
-      <Link href="/weekly-budget" asChild>
+      <Link href="/budget-edit" asChild>
         <Pressable>
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold">Belum ada budget</ThemedText>

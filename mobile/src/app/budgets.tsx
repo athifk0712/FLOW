@@ -1,4 +1,4 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,8 +32,8 @@ const EMPTY_FILTER: Record<BudgetStatus, string> = {
   OK: 'Belum ada budget yang masih aman.',
 };
 
-// Every current budget with its bar, the ones that need attention first. Editing lives on /budget-edit and
-// /weekly-budget so this page stays a calm read.
+// Every current budget with its bar, the ones that need attention first. Editing lives on /budget-edit so this page
+// stays a calm read.
 export default function BudgetsScreen() {
   const theme = useTheme();
   const [budgets, setBudgets] = useState<Budget[] | null>(null);
@@ -124,18 +124,13 @@ export default function BudgetsScreen() {
             )}
 
             <View style={styles.actions}>
-              <Link href="/weekly-budget" asChild>
-                <Pressable style={[styles.action, { backgroundColor: theme.backgroundSelected }]}>
-                  <ThemedText type="smallBold">Atur budget mingguan</ThemedText>
-                </Pressable>
-              </Link>
-              <Link href="/budget-edit" asChild>
-                <Pressable style={[styles.action, { backgroundColor: theme.primary }]}>
-                  <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-                    Atur budget kategori
-                  </ThemedText>
-                </Pressable>
-              </Link>
+              <Pressable
+                onPress={() => router.push('/budget-edit')}
+                style={[styles.action, { backgroundColor: theme.primary }]}>
+                <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                  Atur budget
+                </ThemedText>
+              </Pressable>
             </View>
           </ScrollView>
         )}

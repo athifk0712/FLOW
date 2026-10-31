@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,61 +15,45 @@ import { ModalEdges } from '@/constants/safe-area';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { NECESSITY } from '@/constants/necessity';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { Enums } from '@/lib/database.types';
+import { loadBudgetPlan, saveBudgetRow } from '@/lib/budget-data';
+import { type BudgetPeriod, changedRows, type PlanRow } from '@/lib/budget-plan';
 import { formatDigits, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
-import { supabase } from '@/lib/supabase';
 
-type Period = Enums<'budget_period'>;
-type Row = {
-  categoryId: string;
-  name: string;
-  budgetId: string | null;
-  digits: string;
-  period: Period;
-  // What is stored now, to skip unchanged rows on save.
-  saved: { digits: string; period: Period };
-};
+type Plan = { weekly: PlanRow[]; perCategory: PlanRow[] };
 
-const PERIODS: { value: Period; label: string }[] = [
+const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'WEEKLY', label: 'Mingguan' },
   { value: 'MONTHLY', label: 'Bulanan' },
 ];
 
-// One optional limit per expense category, weekly or monthly. Empty = no budget.
+const WEEKLY_DOT: Record<string, string> = {
+  DISCRETIONARY: NECESSITY.WANT.color,
+  ESSENTIAL: NECESSITY.NEED.color,
+};
+
+// Every budget in one place: the two weekly limits, then one optional limit per expense category. Empty = no budget.
 // Categories that already have a budget come first; the rest wait behind one tap so the form stays short.
 export default function BudgetEditScreen() {
   const theme = useTheme();
-  const [rows, setRows] = useState<Row[] | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [showOthers, setShowOthers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [cats, buds] = await Promise.all([
-      supabase.from('categories').select('id, name').eq('kind', 'EXPENSE').order('created_at'),
-      supabase
-        .from('budgets')
-        .select('id, category_id, period, limit_amount')
-        .eq('scope', 'CATEGORY')
-        .is('active_to', null),
-    ]);
-    const failed = cats.error ?? buds.error;
-    if (failed) return setError(failed.message);
-    const byCategory = new Map((buds.data ?? []).map((b) => [b.category_id, b]));
-    setRows(
-      (cats.data ?? []).map((c) => {
-        const b = byCategory.get(c.id);
-        const digits = b ? String(b.limit_amount) : '';
-        const period = b?.period ?? 'MONTHLY';
-        return { categoryId: c.id, name: c.name, budgetId: b?.id ?? null, digits, period, saved: { digits, period } };
-      }),
-    );
-    // Nothing budgeted yet: there is nothing to hide the other categories behind.
-    if ((buds.data ?? []).length === 0) setShowOthers(true);
+    try {
+      const next = await loadBudgetPlan();
+      setPlan(next);
+      // Nothing budgeted yet: there is nothing to hide the other categories behind.
+      if (next.perCategory.every((r) => !r.budgetId)) setShowOthers(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal memuat budget.');
+    }
   }, []);
 
   useFocusEffect(
@@ -78,38 +62,44 @@ export default function BudgetEditScreen() {
     }, [load]),
   );
 
-  function update(categoryId: string, change: Partial<Pick<Row, 'digits' | 'period'>>) {
+  function update(key: string, change: Partial<Pick<PlanRow, 'digits' | 'period'>>) {
     setMessage(null);
-    setRows((current) => current?.map((r) => (r.categoryId === categoryId ? { ...r, ...change } : r)) ?? null);
+    const apply = (rows: PlanRow[]) => rows.map((r) => (r.key === key ? { ...r, ...change } : r));
+    setPlan((current) => current && { weekly: apply(current.weekly), perCategory: apply(current.perCategory) });
   }
 
   async function save() {
-    if (!rows) return;
+    if (!plan) return;
     setSaving(true);
     setError(null);
     setMessage(null);
-    for (const r of rows) {
-      if (r.digits === r.saved.digits && r.period === r.saved.period) continue;
-      const amount = Number(r.digits || '0');
-      const { error } =
-        amount > 0
-          ? r.budgetId
-            ? await supabase.from('budgets').update({ limit_amount: amount, period: r.period }).eq('id', r.budgetId)
-            : await supabase
-                .from('budgets')
-                .insert({ scope: 'CATEGORY', category_id: r.categoryId, period: r.period, limit_amount: amount })
-          : r.budgetId
-            ? await supabase.from('budgets').delete().eq('id', r.budgetId)
-            : { error: null };
-      if (error) {
-        setSaving(false);
-        return setError(`${r.name}: ${error.message}`);
-      }
+    try {
+      for (const r of changedRows([...plan.weekly, ...plan.perCategory])) await saveBudgetRow(r);
+      await load();
+      setMessage('Budget tersimpan');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal menyimpan.');
+    } finally {
+      setSaving(false);
     }
-    await load();
-    setSaving(false);
-    setMessage('Budget kategori tersimpan');
   }
+
+  const amountField = (r: PlanRow) => (
+    <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
+      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
+      <TextInput
+        style={[styles.priceInput, { color: theme.text }]}
+        value={formatDigits(r.digits)}
+        onChangeText={(t) => update(r.key, { digits: toDigits(t) })}
+        placeholder="Tanpa budget"
+        placeholderTextColor={theme.textSecondary}
+        keyboardType="number-pad"
+        accessibilityLabel={`Budget ${r.name}`}
+      />
+    </View>
+  );
+
+  const unbudgeted = plan?.perCategory.filter((r) => r.saved.digits === '') ?? [];
 
   return (
     <ThemedView style={styles.container}>
@@ -117,7 +107,7 @@ export default function BudgetEditScreen() {
         <SafeAreaView style={styles.safeArea} edges={ModalEdges}>
           <View style={styles.header}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              ATUR BUDGET KATEGORI
+              ATUR BUDGET
             </ThemedText>
             <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
@@ -126,7 +116,7 @@ export default function BudgetEditScreen() {
             </Pressable>
           </View>
 
-          {rows === null ? (
+          {plan === null ? (
             error ? (
               <ThemedText themeColor="danger">{error}</ThemedText>
             ) : (
@@ -135,55 +125,68 @@ export default function BudgetEditScreen() {
           ) : (
             <>
               <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+                <ThemedText type="smallBold">Batas mingguan</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Isi batas untuk kategori yang mau dipantau, misal Kopi Rp150.000 per bulan. Kosongkan untuk
-                  menghapus.
+                  Semua pengeluaran langsung terhitung sesuai sifat kategorinya, tanpa perlu dinilai satu per satu.
                 </ThemedText>
-                {rows
-                  .filter((r) => r.saved.digits !== '')
-                  .concat(showOthers ? rows.filter((r) => r.saved.digits === '') : [])
-                  .map((r) => (
-                  <ThemedView key={r.categoryId} type="backgroundElement" style={styles.row}>
+                <Pressable onPress={() => router.push('/categories')} hitSlop={8}>
+                  <ThemedText type="smallBold" themeColor="primary">
+                    Ubah sifat kategori →
+                  </ThemedText>
+                </Pressable>
+                {plan.weekly.map((r) => (
+                  <ThemedView key={r.key} type="backgroundElement" style={styles.row}>
                     <View style={styles.rowTop}>
+                      <View style={[styles.dot, { backgroundColor: WEEKLY_DOT[r.scope] }]} />
                       <ThemedText type="smallBold" style={styles.flex}>
                         {r.name}
                       </ThemedText>
-                      <View style={styles.periods}>
-                        {PERIODS.map((p) => {
-                          const selected = p.value === r.period;
-                          return (
-                            <Pressable
-                              key={p.value}
-                              onPress={() => update(r.categoryId, { period: p.value })}
-                              style={[
-                                styles.period,
-                                { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
-                              ]}>
-                              <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
-                                {p.label}
-                              </ThemedText>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
                     </View>
-                    <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                      <TextInput
-                        style={[styles.priceInput, { color: theme.text }]}
-                        value={formatDigits(r.digits)}
-                        onChangeText={(t) => update(r.categoryId, { digits: toDigits(t) })}
-                        placeholder="Tanpa budget"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
-                      />
-                    </View>
+                    {amountField(r)}
                   </ThemedView>
                 ))}
-                {!showOthers && rows.some((r) => r.saved.digits === '') && (
+
+                <ThemedText type="smallBold" style={styles.section}>
+                  Per kategori
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Isi batas untuk kategori yang mau dipantau, misal Kopi Rp150.000 per bulan. Kosongkan untuk menghapus.
+                </ThemedText>
+                {plan.perCategory
+                  .filter((r) => r.saved.digits !== '')
+                  .concat(showOthers ? unbudgeted : [])
+                  .map((r) => (
+                    <ThemedView key={r.key} type="backgroundElement" style={styles.row}>
+                      <View style={styles.rowTop}>
+                        <ThemedText type="smallBold" style={styles.flex}>
+                          {r.name}
+                        </ThemedText>
+                        <View style={styles.periods}>
+                          {PERIODS.map((p) => {
+                            const selected = p.value === r.period;
+                            return (
+                              <Pressable
+                                key={p.value}
+                                onPress={() => update(r.key, { period: p.value })}
+                                style={[
+                                  styles.period,
+                                  { backgroundColor: selected ? theme.primary : theme.backgroundSelected },
+                                ]}>
+                                <ThemedText type="small" style={{ color: selected ? theme.onPrimary : theme.text }}>
+                                  {p.label}
+                                </ThemedText>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      {amountField(r)}
+                    </ThemedView>
+                  ))}
+                {!showOthers && unbudgeted.length > 0 && (
                   <Pressable onPress={() => setShowOthers(true)} hitSlop={8} style={styles.more}>
                     <ThemedText type="smallBold" themeColor="primary">
-                      + Tambah budget kategori lain ({rows.filter((r) => r.saved.digits === '').length})
+                      + Tambah budget kategori lain ({unbudgeted.length})
                     </ThemedText>
                   </Pressable>
                 )}
@@ -244,6 +247,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingBottom: Spacing.three,
   },
+  section: {
+    marginTop: Spacing.three,
+  },
   row: {
     gap: Spacing.two,
     padding: Spacing.three,
@@ -253,6 +259,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   periods: {
     flexDirection: 'row',

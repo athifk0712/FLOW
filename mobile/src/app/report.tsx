@@ -40,7 +40,7 @@ export default function ReportScreen() {
       const range = cycleRange(now, day, offset);
       supabase
         .from('transactions')
-        .select('id, type, amount, necessity, merchant, occurred_at, category_id, categories(name)')
+        .select('id, type, amount, necessity, merchant, occurred_at, category_id, categories(name, default_necessity)')
         .gte('occurred_at', cycleRange(now, day, offset - 1).start.toISOString())
         .lt('occurred_at', range.end.toISOString())
         .then(({ data, error }) => {

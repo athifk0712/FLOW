@@ -2,7 +2,7 @@ import type { Enums, Tables } from '@/lib/database.types';
 
 export type ReportTransaction = Pick<Tables<'transactions'>, 'id' | 'type' | 'amount' | 'necessity' | 'merchant' | 'occurred_at'> & {
   category_id: string | null;
-  categories: { name: string } | null;
+  categories: { name: string; default_necessity?: Enums<'necessity_level'> } | null;
 };
 
 export type CategoryLine = { key: string; name: string; total: number; previous: number };
@@ -14,7 +14,7 @@ export type MonthReport = {
   previousExpense: number;
   categories: CategoryLine[];
   /** Shaped like v_spending_mix_monthly rows so SpendingMix can render them. */
-  mix: { necessity: Enums<'necessity_level'> | 'UNREVIEWED'; total: number }[];
+  mix: { necessity: Enums<'necessity_level'>; total: number }[];
   biggest: ReportTransaction[];
 };
 
@@ -50,7 +50,8 @@ export function buildReport(rows: ReportTransaction[], start: Date): MonthReport
   const mix = new Map<string, number>();
   for (const t of current) {
     if (t.type !== 'EXPENSE') continue;
-    const key = t.necessity ?? 'UNREVIEWED';
+    // Same rule as the budgets: what the user said, else what the category usually is.
+    const key = t.necessity ?? t.categories?.default_necessity ?? 'WANT';
     mix.set(key, (mix.get(key) ?? 0) + t.amount);
   }
 

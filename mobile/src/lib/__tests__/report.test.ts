@@ -54,15 +54,31 @@ describe('buildReport', () => {
     ]);
   });
 
-  it('splits spending by necessity, unjudged as UNREVIEWED', () => {
+  it('splits spending by necessity, unjudged by what the category usually is', () => {
     expect(report.mix).toHaveLength(3);
     expect(report.mix).toEqual(
       expect.arrayContaining([
         { necessity: 'NEED', total: 50_000 },
         { necessity: 'IMPULSE', total: 200_000 },
-        { necessity: 'UNREVIEWED', total: 30_000 },
+        { necessity: 'WANT', total: 30_000 },
       ]),
     );
+    const need = buildReport(
+      [
+        {
+          id: 'x',
+          type: 'EXPENSE',
+          amount: 10_000,
+          necessity: null,
+          merchant: null,
+          occurred_at: new Date(2026, 9, 2).toISOString(),
+          category_id: 'bill',
+          categories: { name: 'Tagihan', default_necessity: 'NEED' },
+        },
+      ],
+      new Date(2026, 9, 1),
+    );
+    expect(need.mix).toEqual([{ necessity: 'NEED', total: 10_000 }]);
   });
 
   it('keeps the biggest expenses, at most five', () => {
