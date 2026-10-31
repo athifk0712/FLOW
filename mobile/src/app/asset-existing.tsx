@@ -88,11 +88,11 @@ export default function ExistingAssetScreen() {
       {divisible && (
         <View style={styles.row}>
           <View style={styles.flex}>
-            <Field label="Jumlah dimiliki">
+            <Field label={info.trading ? 'Setoran di akun broker' : 'Jumlah dimiliki'}>
               <TextField
                 value={quantityText}
                 onChangeText={setQuantityText}
-                placeholder="mis. 2,5"
+                placeholder={info.trading ? 'mis. 100' : 'mis. 2,5'}
                 keyboardType="decimal-pad"
                 accessibilityLabel="Jumlah unit"
               />
@@ -107,8 +107,12 @@ export default function ExistingAssetScreen() {
       )}
 
       <Field
-        label={divisible ? 'Modal perolehan total' : 'Modal perolehan'}
-        hint="Harga yang dulu kamu bayar, termasuk biaya. Hanya untuk menghitung untung-rugi, tidak memotong saldo.">
+        label={info.trading ? 'Total modal yang sudah disetor' : divisible ? 'Modal perolehan total' : 'Modal perolehan'}
+        hint={
+          info.trading
+            ? 'Uang yang benar-benar kamu setor, bukan nilai kontrak atau lot. Hanya untuk menghitung untung-rugi, tidak memotong saldo.'
+            : 'Harga yang dulu kamu bayar, termasuk biaya. Hanya untuk menghitung untung-rugi, tidak memotong saldo.'
+        }>
         {!costUnknown && <MoneyField digits={cost} onChange={setCost} accessibilityLabel="Modal perolehan" />}
         <Pressable
           onPress={() => setCostUnknown((u) => !u)}
@@ -128,11 +132,13 @@ export default function ExistingAssetScreen() {
       </Field>
 
       <Field
-        label={divisible ? 'Perkiraan nilai total sekarang' : 'Perkiraan nilai sekarang'}
+        label={info.trading ? 'Equity sekarang' : divisible ? 'Perkiraan nilai total sekarang' : 'Perkiraan nilai sekarang'}
         hint={
-          divisible && quantity && valueAmount > 0
-            ? `≈ ${formatMoney(Math.round(valueAmount / quantity))} per ${unitLabel ?? 'unit'}`
-            : 'Kira-kira laku berapa kalau dijual hari ini.'
+          info.trading
+            ? 'Lihat angka equity di aplikasi broker, lalu tulis nilainya dalam mata uang Flowku.'
+            : divisible && quantity && valueAmount > 0
+              ? `≈ ${formatMoney(Math.round(valueAmount / quantity))} per ${unitLabel ?? 'unit'}`
+              : 'Kira-kira laku berapa kalau dijual hari ini.'
         }>
         <MoneyField digits={value} onChange={setValue} accessibilityLabel="Perkiraan nilai sekarang" />
       </Field>

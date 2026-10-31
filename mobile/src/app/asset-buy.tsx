@@ -117,8 +117,12 @@ export default function AssetBuyScreen() {
 
   return (
     <SubScreen
-      title={existing ? `Beli lagi: ${existing.name}` : 'Beli aset baru'}
-      intro="Untuk pembelian sekarang: saldo dompet berkurang. Uangnya pindah ke aset, jadi bukan pengeluaran harian. Sudah punya asetnya dari dulu? Pakai Catat aset lama.">
+      title={existing ? `${info.trading ? 'Setor lagi' : 'Beli lagi'}: ${existing.name}` : 'Beli aset baru'}
+      intro={
+        info.trading
+          ? 'Catat uang yang kamu setor ke broker: saldo dompet berkurang dan modalnya masuk ke akun trading ini. Isi uang yang benar-benar disetor, bukan nilai kontrak atau lot.'
+          : 'Untuk pembelian sekarang: saldo dompet berkurang. Uangnya pindah ke aset, jadi bukan pengeluaran harian. Sudah punya asetnya dari dulu? Pakai Catat aset lama.'
+      }>
       {!existing && (
         <>
           <Field label="Jenis aset">
@@ -133,11 +137,11 @@ export default function AssetBuyScreen() {
       {divisible && (
         <View style={styles.row}>
           <View style={styles.flex}>
-            <Field label="Jumlah">
+            <Field label={info.trading ? 'Setoran di akun broker' : 'Jumlah'}>
               <TextField
                 value={quantityText}
                 onChangeText={setQuantityText}
-                placeholder="mis. 2,5"
+                placeholder={info.trading ? 'mis. 100' : 'mis. 2,5'}
                 keyboardType="decimal-pad"
                 accessibilityLabel="Jumlah unit"
               />
@@ -154,7 +158,7 @@ export default function AssetBuyScreen() {
       )}
 
       <Field
-        label={divisible ? 'Harga beli total' : 'Harga beli'}
+        label={info.trading ? 'Uang yang keluar dari dompet' : divisible ? 'Harga beli total' : 'Harga beli'}
         hint={
           divisible && quantity && priceAmount > 0
             ? `≈ ${formatMoney(Math.round(priceAmount / quantity))} per ${unitLabel ?? 'unit'}`
@@ -166,7 +170,7 @@ export default function AssetBuyScreen() {
         <MoneyField digits={fee} onChange={setFee} accessibilityLabel="Biaya tambahan" />
       </Field>
 
-      <Field label="Bayar pakai">
+      <Field label={info.trading ? 'Setor dari' : 'Bayar pakai'}>
         {accounts.length === 0 ? (
           <ThemedText type="small" themeColor="textSecondary">
             Belum ada dompet. Tambahkan dulu di Akun & dompet.
@@ -176,7 +180,7 @@ export default function AssetBuyScreen() {
         )}
       </Field>
 
-      <Field label="Tanggal beli">
+      <Field label={info.trading ? 'Tanggal setor' : 'Tanggal beli'}>
         <Pressable
           onPress={() => setPickingDate((p) => !p)}
           style={[styles.when, { backgroundColor: theme.backgroundElement }]}
@@ -221,7 +225,13 @@ export default function AssetBuyScreen() {
       )}
       {error && <ThemedText themeColor="danger">{error}</ThemedText>}
       <PrimaryButton
-        label={!missing && total > 0 ? `Bayar ${formatMoney(total)} dari ${accountName}` : 'Simpan pembelian'}
+        label={
+          !missing && total > 0
+            ? `${info.trading ? 'Setor' : 'Bayar'} ${formatMoney(total)} dari ${accountName}`
+            : info.trading
+              ? 'Simpan setoran'
+              : 'Simpan pembelian'
+        }
         onPress={save}
         disabled={!!missing}
         busy={saving}

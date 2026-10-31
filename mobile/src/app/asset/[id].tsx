@@ -108,7 +108,7 @@ export default function AssetScreen() {
             <ThemedText type="small" themeColor="textSecondary">
               {info.label}
               {asset.divisible ? ` · ${formatQuantity(quantity, asset.unit)}` : ''}
-              {active ? '' : ' · sudah terjual'}
+              {active ? '' : info.trading ? ' · sudah ditarik' : ' · sudah terjual'}
               {asset.is_opening ? ' · aset lama' : ''}
             </ThemedText>
           </View>
@@ -118,7 +118,7 @@ export default function AssetScreen() {
           <>
             <View>
               <ThemedText type="small" themeColor="textSecondary">
-                Estimasi nilai sekarang
+                {info.trading ? 'Equity terakhir' : 'Estimasi nilai sekarang'}
               </ThemedText>
               <ThemedText style={styles.big}>{formatMoney(asset.current_value ?? 0)}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
@@ -127,7 +127,7 @@ export default function AssetScreen() {
                 {asset.valued_at ? ` · ${dateFormat.format(new Date(asset.valued_at))}` : ''}
               </ThemedText>
             </View>
-            <Line label="Modal (harga + biaya beli)" value={costKnown ? formatMoney(cost) : 'Tidak diketahui'} />
+            <Line label={info.trading ? 'Modal disetor' : 'Modal (harga + biaya beli)'} value={costKnown ? formatMoney(cost) : 'Tidak diketahui'} />
             {costKnown ? (
               <Line
                 label="Potensi untung/rugi"
@@ -141,7 +141,7 @@ export default function AssetScreen() {
             )}
           </>
         ) : (
-          <Line label="Hasil bersih penjualan" value={formatMoney(asset.net_proceeds ?? 0)} />
+          <Line label={info.trading ? 'Total dana ditarik' : 'Hasil bersih penjualan'} value={formatMoney(asset.net_proceeds ?? 0)} />
         )}
         {realized !== 0 && (
           <Line
@@ -151,18 +151,19 @@ export default function AssetScreen() {
           />
         )}
         <ThemedText type="small" themeColor="textSecondary">
-          Nilai ini estimasi, belum tentu bisa langsung dicairkan, dan tidak ikut dihitung di &quot;Aman dibelanjakan&quot;.
-          Harga belum diperbarui otomatis dari pasar; perbarui sendiri bila perlu.
+          {info.trading
+            ? 'Ini catatanmu sendiri, tidak terhubung ke broker dan bisa berubah cepat mengikuti pasar. Perbarui dari angka equity di aplikasi broker. Tidak ikut dihitung di "Aman dibelanjakan".'
+            : 'Nilai ini estimasi, belum tentu bisa langsung dicairkan, dan tidak ikut dihitung di "Aman dibelanjakan". Harga belum diperbarui otomatis dari pasar; perbarui sendiri bila perlu.'}
         </ThemedText>
       </ThemedView>
 
       {active && (
         <View style={styles.actions}>
-          <Action label="Perbarui nilai" material="edit" sf="pencil" on={panel === 'value'} onPress={() => setPanel(panel === 'value' ? null : 'value')} />
-          <Action label="Jual" material="sell" sf="tag.fill" on={panel === 'sell'} onPress={() => setPanel(panel === 'sell' ? null : 'sell')} />
+          <Action label={info.trading ? 'Perbarui equity' : 'Perbarui nilai'} material="edit" sf="pencil" on={panel === 'value'} onPress={() => setPanel(panel === 'value' ? null : 'value')} />
+          <Action label={info.trading ? 'Tarik dana' : 'Jual'} material="sell" sf="tag.fill" on={panel === 'sell'} onPress={() => setPanel(panel === 'sell' ? null : 'sell')} />
           {asset.divisible && (
             <Action
-              label="Beli lagi"
+              label={info.trading ? 'Setor lagi' : 'Beli lagi'}
               material="add"
               sf="plus"
               on={false}
@@ -238,13 +239,15 @@ export default function AssetScreen() {
 
 function eventTitle(e: AssetEvent, asset: Asset) {
   const qty = asset.divisible && e.quantity ? ` ${formatQuantity(Number(e.quantity), asset.unit)}` : '';
+  const trading = assetCategory(asset.category).trading;
   if (e.kind === 'BUY' && e.opening) return `Mulai dimiliki${qty} (aset lama)`;
-  if (e.kind === 'BUY') return `Beli${qty}`;
-  if (e.kind === 'SELL') return `Jual${qty}`;
-  return 'Perbarui nilai';
+  if (e.kind === 'BUY') return `${trading ? 'Setor' : 'Beli'}${qty}`;
+  if (e.kind === 'SELL') return `${trading ? 'Tarik' : 'Jual'}${qty}`;
+  return trading ? 'Perbarui equity' : 'Perbarui nilai';
 }
 
 function eventDetail(e: AssetEvent, asset: Asset) {
+  const trading = assetCategory(asset.category).trading;
   if (e.kind === 'VALUATION') {
     const v = Math.round(Number(e.unit_value ?? 0));
     return asset.divisible ? `Estimasi ${formatMoney(v)} per ${asset.unit ?? 'unit'}` : `Estimasi ${formatMoney(v)}`;
@@ -253,12 +256,12 @@ function eventDetail(e: AssetEvent, asset: Asset) {
     return `${e.cost_known ? `Modal ${formatMoney(e.amount ?? 0)}` : 'Modal tidak diketahui'} · dicatat tanpa memotong saldo`;
   }
   if (e.kind === 'BUY') {
-    return `Harga ${formatMoney(e.amount ?? 0)}${e.fee ? ` + biaya ${formatMoney(e.fee)}` : ''} = keluar ${formatMoney((e.amount ?? 0) + e.fee)}`;
+    return `${trading ? 'Setoran' : 'Harga'} ${formatMoney(e.amount ?? 0)}${e.fee ? ` + biaya ${formatMoney(e.fee)}` : ''} = keluar ${formatMoney((e.amount ?? 0) + e.fee)}`;
   }
   const net = (e.amount ?? 0) - e.fee - e.tax;
   const pl = net - (e.cost_allocated ?? 0);
   const sale =
-    `Harga jual ${formatMoney(e.amount ?? 0)}` +
+    `${trading ? 'Ditarik' : 'Harga jual'} ${formatMoney(e.amount ?? 0)}` +
     `${e.fee ? ` − biaya ${formatMoney(e.fee)}` : ''}${e.tax ? ` − pajak ${formatMoney(e.tax)}` : ''}` +
     ` = masuk ${formatMoney(net)}`;
   if (!e.cost_known) return `${sale} · modal tidak diketahui`;
@@ -300,18 +303,26 @@ function ValuePanel({ asset, busy, onSave }: { asset: Asset; busy: boolean; onSa
   const [requestId] = useState(newRequestId);
   const value = digitsToAmount(digits);
   const quantity = Number(asset.quantity ?? 0);
+  const trading = assetCategory(asset.category).trading;
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <Field
-        label={asset.divisible ? `Harga per ${asset.unit ?? 'unit'} sekarang` : 'Perkiraan harga jual sekarang'}
-        hint={asset.divisible && value > 0 ? `Total ${formatQuantity(quantity, asset.unit)} ≈ ${formatMoney(Math.round(value * quantity))}` : undefined}>
+        label={trading ? 'Equity akun sekarang' : asset.divisible ? `Harga per ${asset.unit ?? 'unit'} sekarang` : 'Perkiraan harga jual sekarang'}
+        hint={
+          trading
+            ? 'Total equity dalam mata uang Flowku, bukan per unit.'
+            : asset.divisible && value > 0
+              ? `Total ${formatQuantity(quantity, asset.unit)} ≈ ${formatMoney(Math.round(value * quantity))}`
+              : undefined
+        }>
         <MoneyField digits={digits} onChange={setDigits} accessibilityLabel="Nilai baru" />
       </Field>
-      <TextField value={note} onChangeText={setNote} placeholder="Sumber harga (opsional), mis. cek di grup jual beli" maxLength={200} />
+      <TextField value={note} onChangeText={setNote} placeholder={trading ? 'Catatan (opsional), mis. setelah tutup posisi' : 'Sumber harga (opsional), mis. cek di grup jual beli'} maxLength={200} />
       <ThemedText type="small" themeColor="textSecondary">
         Hanya mengubah estimasi. Saldo dompet tidak berubah dan tidak dicatat sebagai pemasukan.
       </ThemedText>
-      <PrimaryButton label="Simpan nilai" onPress={() => onSave(value, note, requestId)} disabled={value <= 0} busy={busy} />
+      {/* The database keeps a price per unit; a trading account is entered as its total. */}
+      <PrimaryButton label="Simpan nilai" onPress={() => onSave(trading ? value / quantity : value, note, requestId)} disabled={value <= 0} busy={busy} />
     </ThemedView>
   );
 }
@@ -375,11 +386,12 @@ function SellPanel({
   const grossAmount = digitsToAmount(gross);
   const ready = !preview.problem && grossAmount > 0 && !!accountId;
   const wallet = accounts.find((a) => a.id === accountId)?.name ?? '';
+  const trading = assetCategory(asset.category).trading;
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       {asset.divisible && (
-        <Field label={`Jumlah dijual (punya ${formatQuantity(held, asset.unit)})`}>
+        <Field label={`${trading ? 'Jumlah ditarik' : 'Jumlah dijual'} (punya ${formatQuantity(held, asset.unit)})`}>
           <View style={styles.row}>
             <View style={styles.flex}>
               <TextField value={quantityText} onChangeText={setQuantityText} placeholder="mis. 1,5" keyboardType="decimal-pad" />
@@ -392,12 +404,12 @@ function SellPanel({
           </View>
         </Field>
       )}
-      <Field label="Harga jual (kotor)">
+      <Field label={trading ? 'Uang yang ditarik (kotor)' : 'Harga jual (kotor)'}>
         <MoneyField digits={gross} onChange={setGross} accessibilityLabel="Harga jual" />
       </Field>
       <View style={styles.row}>
         <View style={styles.flex}>
-          <Field label="Biaya jual">
+          <Field label={trading ? 'Biaya tarik' : 'Biaya jual'}>
             <MoneyField digits={fee} onChange={setFee} accessibilityLabel="Biaya jual" />
           </Field>
         </View>
@@ -410,7 +422,7 @@ function SellPanel({
       <Field label="Uangnya masuk ke">
         <ChipRow options={accounts.map((a) => ({ value: a.id, label: a.name }))} value={accountId} onChange={setAccountId} />
       </Field>
-      <Field label="Tanggal jual">
+      <Field label={trading ? 'Tanggal tarik' : 'Tanggal jual'}>
         <Pressable
           onPress={() => setPickingDate((p) => !p)}
           style={[styles.when, { backgroundColor: theme.backgroundSelected }]}
@@ -425,7 +437,7 @@ function SellPanel({
         </Pressable>
         {pickingDate && <DateTimeField value={soldAt ?? new Date()} onChange={setSoldAt} />}
       </Field>
-      <TextField value={note} onChangeText={setNote} placeholder="Catatan (opsional), mis. dijual ke pembeli di grup" maxLength={200} />
+      <TextField value={note} onChangeText={setNote} placeholder={trading ? 'Catatan (opsional), mis. withdraw ke bank' : 'Catatan (opsional), mis. dijual ke pembeli di grup'} maxLength={200} />
 
       {grossAmount > 0 && !!quantity && !preview.problem && (
         <View style={styles.preview}>
@@ -446,7 +458,7 @@ function SellPanel({
           )}
           {costKnown && preview.realized < 0 && (
             <ThemedText type="small" themeColor="danger">
-              Penjualan ini rugi {formatMoney(-preview.realized)} dari modal. Tetap bisa disimpan kalau memang begitu.
+              {trading ? 'Penarikan' : 'Penjualan'} ini rugi {formatMoney(-preview.realized)} dari modal. Tetap bisa disimpan kalau memang begitu.
             </ThemedText>
           )}
         </View>
@@ -457,7 +469,15 @@ function SellPanel({
         </ThemedText>
       )}
       <PrimaryButton
-        label={costKnown && preview.realized < 0 && ready ? 'Jual walau rugi' : 'Simpan penjualan'}
+        label={
+          costKnown && preview.realized < 0 && ready
+            ? trading
+              ? 'Tarik walau rugi'
+              : 'Jual walau rugi'
+            : trading
+              ? 'Simpan penarikan'
+              : 'Simpan penjualan'
+        }
         tone={costKnown && preview.realized < 0 ? 'danger' : 'primary'}
         disabled={!ready}
         busy={busy}
