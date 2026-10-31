@@ -1,4 +1,20 @@
-import { mainBalance, moveProblem, pocketActivity, pocketNameProblem } from '@/lib/pockets';
+import { categoryForPocket, mainBalance, moveProblem, pocketActivity, pocketNameProblem } from '@/lib/pockets';
+
+describe('categoryForPocket', () => {
+  const categories = [{ name: 'Kopi' }, { name: 'Makan Siang' }, { name: 'Lainnya' }];
+
+  it('finds the category with the same name, whatever the case', () => {
+    expect(categoryForPocket(' kopi ', categories)).toEqual({ name: 'Kopi' });
+  });
+
+  it('wants the whole name, not part of it', () => {
+    expect(categoryForPocket('Makan', categories)).toBeNull();
+  });
+
+  it('does not treat Lainnya as a match', () => {
+    expect(categoryForPocket('Lainnya', categories)).toBeNull();
+  });
+});
 
 describe('mainBalance', () => {
   it('is what is left of the account after its pockets', () => {

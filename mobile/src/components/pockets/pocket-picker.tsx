@@ -9,7 +9,7 @@ import { usePockets } from '@/lib/pocket-data';
 type Props = {
   accountId: string | null;
   value: string | null;
-  onChange: (pocketId: string | null) => void;
+  onChange: (pocketId: string | null, pocketName: string | null) => void;
   direction: 'out' | 'in';
   amount: number;
 };
@@ -36,7 +36,7 @@ export function PocketPicker({ accountId, value, onChange, direction, amount }: 
           return (
             <Pressable
               key={o.id ?? 'main'}
-              onPress={() => onChange(o.id)}
+              onPress={() => onChange(o.id, pockets.find((p) => p.id === o.id)?.name ?? null)}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               style={[styles.chip, { backgroundColor: on ? theme.primary : theme.backgroundElement }]}>

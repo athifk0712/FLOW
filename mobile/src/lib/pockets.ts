@@ -28,6 +28,13 @@ export function mainBalance(accountBalance: number, pockets: Pick<Pocket, 'balan
   return pockets.reduce((rest, p) => rest - p.balance, accountBalance);
 }
 
+/** The category named exactly like this pocket, so picking "Kopi" as both takes one tap. "Lainnya" says nothing. */
+export function categoryForPocket<T extends { name: string }>(pocketName: string, categories: T[]): T | null {
+  const name = pocketName.trim().toLowerCase();
+  if (name === 'lainnya') return null;
+  return categories.find((c) => c.name.trim().toLowerCase() === name) ?? null;
+}
+
 /** Why this name can't be used, or null. Names repeat only across accounts. */
 export function pocketNameProblem(name: string, others: Pick<Pocket, 'name'>[]) {
   const trimmed = name.trim();

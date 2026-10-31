@@ -336,7 +336,7 @@ export default function TransactionScreen() {
                         .map((c) => (
                           <Pressable
                             key={c.id}
-                            onPress={() => setCategoryId(c.id === categoryId ? null : c.id)}
+                            onPress={() => setCategoryId(c.id)}
                             style={[chip(c.id === categoryId), styles.iconChip]}>
                             <CategoryIcon icon={c.icon} size={24} />
                             <ThemedText type="small" style={chipText(c.id === categoryId)}>

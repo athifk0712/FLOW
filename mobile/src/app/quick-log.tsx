@@ -32,6 +32,7 @@ import type { Tables, TablesInsert } from '@/lib/database.types';
 import { formatDigits, formatMoney, fromWhole, useCurrency } from '@/lib/money';
 import { announceSaved } from '@/lib/last-saved';
 import { closeModal } from '@/lib/navigation';
+import { categoryForPocket } from '@/lib/pockets';
 import { deleteReceipt, receiptFileProblem, scanReceipt, scanToDraft, uploadReceipt } from '@/lib/receipts';
 import { isAlreadySaved, newRequestId } from '@/lib/request-id';
 import { supabase } from '@/lib/supabase';
@@ -96,6 +97,8 @@ export default function QuickLogScreen() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
   const [pocketId, setPocketId] = useState<string | null>(null);
+  // Set while the category was filled in from a pocket of the same name; holds that name.
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
   const [feeDigits, setFeeDigits] = useState('');
   const [guess, setGuess] = useState<string | null>(null);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
@@ -213,19 +216,36 @@ export default function QuickLogScreen() {
     setError(null);
     // The time-of-day guess only applies to expenses.
     setCategoryId(next === 'EXPENSE' ? guess : null);
+    setFilledFrom(null);
+    setPocketId(null);
     setSuggestedId(null);
   }
 
   function pickFrom(id: string) {
     setAccountId(id);
-    setPocketId(null); // pockets belong to one account
+    pickPocket(null, null); // pockets belong to one account
     // Keep a transfer valid: move the destination off the account just picked as source.
     if (id === toAccountId) setToAccountId(accounts.find((a) => a.id !== id)?.id ?? null);
+  }
+
+  // A pocket named like a category fills that category in, but never over one the user chose.
+  function pickPocket(id: string | null, name: string | null) {
+    setPocketId(id);
+    if (categoryId && categoryId !== guess && !filledFrom) return;
+    const match = name ? categoryForPocket(name, visibleCategories) : null;
+    if (match) {
+      setCategoryId(match.id);
+      setFilledFrom(match.name);
+    } else if (filledFrom) {
+      setCategoryId(mode === 'EXPENSE' ? guess : null);
+      setFilledFrom(null);
+    }
   }
 
   function pickCategory(c: Category) {
     const on = c.id === categoryId;
     setCategoryId(on ? null : c.id);
+    setFilledFrom(null);
     setSuggestedId(null);
     setAdding(false);
     // "Lainnya" needs a note, so open the section where the note lives.
@@ -271,6 +291,7 @@ export default function QuickLogScreen() {
       const existing = visibleCategories.find((c) => c.name.toLowerCase() === name.toLowerCase());
       if (error.code === '23505' && existing) {
         setCategoryId(existing.id);
+        setFilledFrom(null);
         setAdding(false);
         return;
       }
@@ -278,6 +299,7 @@ export default function QuickLogScreen() {
     }
     setCategories((list) => [...list, data]);
     setCategoryId(data.id);
+    setFilledFrom(null);
     setAdding(false);
   }
 
@@ -325,6 +347,7 @@ export default function QuickLogScreen() {
       if (mode !== 'EXPENSE') setMode('EXPENSE');
       if (draft.categoryId) {
         setCategoryId(draft.categoryId);
+        setFilledFrom(null);
         read.push('kategori');
       }
       setSuggestedId(draft.suggestedCategoryId);
@@ -555,7 +578,12 @@ export default function QuickLogScreen() {
             {!isTransfer && (
               <>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Kategori{guessed ? ' (tebakan dari jam ini)' : ' · yang sering dipakai di depan'}
+                  Kategori
+                  {filledFrom
+                    ? ` · ${filledFrom}, sama dengan kantongnya`
+                    : guessed
+                      ? ' (tebakan dari jam ini)'
+                      : ' · yang sering dipakai di depan'}
                 </ThemedText>
                 <ScrollView
                   horizontal
@@ -677,7 +705,7 @@ export default function QuickLogScreen() {
               <PocketPicker
                 accountId={accountId}
                 value={pocketId}
-                onChange={setPocketId}
+                onChange={pickPocket}
                 direction={mode === 'INCOME' ? 'in' : 'out'}
                 amount={amount}
               />

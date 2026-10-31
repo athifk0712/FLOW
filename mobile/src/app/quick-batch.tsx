@@ -57,7 +57,8 @@ export default function QuickBatchScreen() {
     return { ...entry, key, category };
   });
   const total = rows.reduce((sum, r) => sum + r.amount, 0);
-  const canSave = rows.length > 0 && !!accountId && !saving;
+  const uncategorized = rows.some((r) => !r.category);
+  const canSave = rows.length > 0 && !uncategorized && !!accountId && !saving;
 
   async function save() {
     if (!canSave) return;
@@ -139,6 +140,12 @@ export default function QuickBatchScreen() {
             </View>
           ))}
         </ThemedView>
+      )}
+
+      {uncategorized && (
+        <ThemedText type="small" themeColor="warning">
+          Pilih kategori untuk semua pengeluaran dulu, supaya anggaran dan diagramnya tetap akurat.
+        </ThemedText>
       )}
 
       {parsed.skipped.length > 0 && (
