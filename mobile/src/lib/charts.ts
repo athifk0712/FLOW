@@ -96,6 +96,35 @@ export function monthlyFlow(rows: ChartTransaction[], starts: Date[], end: Date)
   return flows;
 }
 
+/** Whole percent of the income that was not spent; null without income or when more went out than came in. */
+export function savingsRate(income: number, expense: number) {
+  if (income <= 0 || expense > income) return null;
+  return Math.round(((income - expense) / income) * 100);
+}
+
+/** Up to three short, plain lines about a period. No amounts, so they can be read over a shoulder or shared. */
+export function monthInsights(input: {
+  income: number;
+  expense: number;
+  /** Spending of the period before; null when it isn't known. */
+  previousExpense: number | null;
+  top: Pick<Slice, 'name' | 'share'> | null;
+}) {
+  const { income, expense, previousExpense, top } = input;
+  const lines: string[] = [];
+  const rate = savingsRate(income, expense);
+  if (rate !== null) lines.push(`${rate}% pemasukanmu berhasil disisihkan`);
+  else if (income > 0) lines.push('Pengeluaran lebih besar dari pemasukan di periode ini');
+  if (previousExpense && previousExpense > 0 && expense > 0) {
+    const change = Math.round(((expense - previousExpense) / previousExpense) * 100);
+    if (change < 0) lines.push(`Pengeluaran ${-change}% lebih hemat dari periode lalu`);
+    else if (change > 0) lines.push(`Pengeluaran naik ${change}% dari periode lalu`);
+    else lines.push('Pengeluaran sama dengan periode lalu');
+  }
+  if (top && top.share > 0) lines.push(`Paling banyak untuk ${top.name} (${Math.round(top.share * 100)}%)`);
+  return lines;
+}
+
 /** A "nice" axis maximum (1, 2, 2.5 or 5 × 10^n) at or above `value`, so gridlines land on round numbers. */
 export function niceMax(value: number) {
   if (value <= 0) return 1;

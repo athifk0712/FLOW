@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,19 +11,21 @@ type Props = {
   slices: Slice[];
   total: number;
   label: string;
-  selected: string | null;
-  onSelect: (key: string | null) => void;
+  selected?: string | null;
+  onSelect?: (key: string | null) => void;
   size?: number;
+  /** What the center says instead of the total, e.g. on a shared picture that hides amounts. */
+  centerValue?: string;
 };
 
-const THICKNESS = 22;
 const GAP = 2; // px of card surface between segments
 
 // Part-to-whole for one month, at most six segments. The center shows the total, or the tapped segment.
-export function Donut({ slices, total, label, selected, onSelect, size = 200 }: Props) {
+export function Donut({ slices, total, label, selected = null, onSelect, size = 200, centerValue }: Props) {
   const theme = useTheme();
   const colors = useChartColors();
-  const r = (size - THICKNESS) / 2;
+  const thickness = Math.round(size * 0.13);
+  const r = (size - thickness - 6) / 2;
   const circumference = 2 * Math.PI * r;
   const active = slices.find((s) => s.key === selected) ?? null;
   const gap = slices.length > 1 ? GAP : 0;
@@ -41,7 +43,7 @@ export function Donut({ slices, total, label, selected, onSelect, size = 200 }: 
       <Svg width={size} height={size}>
         <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
           {total === 0 ? (
-            <Circle cx={size / 2} cy={size / 2} r={r} stroke={theme.backgroundSelected} strokeWidth={THICKNESS} fill="none" />
+            <Circle cx={size / 2} cy={size / 2} r={r} stroke={theme.backgroundSelected} strokeWidth={thickness} fill="none" />
           ) : (
             arcs.map(({ slice, length, offset: start }) => (
               <Circle
@@ -51,22 +53,23 @@ export function Donut({ slices, total, label, selected, onSelect, size = 200 }: 
                 r={r}
                 fill="none"
                 stroke={colors.slot(slice.slot)}
-                strokeWidth={slice.key === selected ? THICKNESS + 6 : THICKNESS}
-                strokeOpacity={active && slice.key !== selected ? 0.35 : 1}
+                strokeWidth={slice.key === selected ? thickness + 6 : thickness}
+                strokeOpacity={active && slice.key !== selected ? 0.3 : 1}
                 strokeDasharray={`${length} ${circumference}`}
                 strokeDashoffset={-start}
-                onPress={() => onSelect(slice.key === selected ? null : slice.key)}
+                // Browsers can't press an SVG shape here; the category rows below the chart select on every platform.
+                onPress={onSelect && Platform.OS !== 'web' ? () => onSelect(slice.key === selected ? null : slice.key) : undefined}
               />
             ))
           )}
         </G>
       </Svg>
-      <View style={styles.center} pointerEvents="none">
+      <View style={[styles.center, { paddingHorizontal: thickness + 12 }]} pointerEvents="none">
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
           {active ? active.name : label}
         </ThemedText>
         <ThemedText type="smallBold" style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
-          {formatMoney(active ? active.total : total)}
+          {centerValue ?? formatMoney(active ? active.total : total)}
         </ThemedText>
         {active && (
           <ThemedText type="small" themeColor="textSecondary">
@@ -87,10 +90,9 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: THICKNESS + 12,
   },
   total: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
   },
 });

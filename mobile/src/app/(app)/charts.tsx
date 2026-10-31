@@ -1,9 +1,10 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CategoryIcon } from '@/components/category-icon';
+import { AppSymbol } from '@/components/app-symbol';
+import { CategoryRows } from '@/components/charts/category-rows';
 import { Donut } from '@/components/charts/donut';
 import { FlowBars } from '@/components/charts/flow-bars';
 import { ReflectionSection } from '@/components/dashboard/reflection-section';
@@ -13,15 +14,15 @@ import { useChartColors } from '@/constants/chart-colors';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useTheme } from '@/hooks/use-theme';
-import { assignSlots, type ChartTransaction, type Kind, monthlyFlow, monthSlices } from '@/lib/charts';
+import { CHART_WINDOW, useChartRows } from '@/lib/chart-data';
+import { assignSlots, type Kind, monthInsights, monthlyFlow, monthSlices } from '@/lib/charts';
 import { cycleLabel, cycleRange } from '@/lib/cycle';
 import { formatMoney } from '@/lib/money';
-import { supabase } from '@/lib/supabase';
 
-// How far back the tab can go. Colors are assigned over this whole window, so they hold between months.
-const WINDOW = 12;
 // Bars shown at once: the selected month and the five before it.
 const BARS = 6;
+// How far the first card reaches up into the band.
+const BAND_OVERLAP = 28;
 
 const shortMonth = new Intl.DateTimeFormat('id-ID', { month: 'short' });
 const shortDay = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
@@ -31,39 +32,18 @@ const KINDS: { value: Kind; label: string }[] = [
   { value: 'INCOME', label: 'Pemasukan' },
 ];
 
-// "Catatan keuangan": one month as a donut by category with the list beneath it, and six months of
-// money in vs out as bars. Tapping a bar picks that month for the donut too.
+// A month at a glance, like a bank's money summary: what is left with money in and out on the band, a few plain lines
+// about it, where the money went, and six months side by side. Tapping a bar picks that month for everything above.
 export default function ChartsScreen() {
   const theme = useTheme();
   const colors = useChartColors();
+  const insets = useSafeAreaInsets();
   const { day } = useCycleDay();
   const now = useMemo(() => new Date(), []);
   const [offset, setOffset] = useState(0); // 0 = this cycle, -1 = the one before, ...
   const [kind, setKind] = useState<Kind>('EXPENSE');
   const [selected, setSelected] = useState<string | null>(null);
-  const [rows, setRows] = useState<ChartTransaction[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      supabase
-        .from('transactions')
-        .select('type, amount, occurred_at, category_id, categories(name, icon)')
-        .in('type', ['INCOME', 'EXPENSE'])
-        .gte('occurred_at', cycleRange(now, day, -(WINDOW - 1)).start.toISOString())
-        .lt('occurred_at', cycleRange(now, day, 0).end.toISOString())
-        .then(({ data, error }) => {
-          if (!active) return;
-          if (error) return setError(error.message);
-          setError(null);
-          setRows(data ?? []);
-        });
-      return () => {
-        active = false;
-      };
-    }, [now, day]),
-  );
+  const { rows, error } = useChartRows(now, day);
 
   const range = cycleRange(now, day, offset);
   const slots = useMemo(() => assignSlots(rows ?? [], kind), [rows, kind]);
@@ -71,62 +51,117 @@ export default function ChartsScreen() {
     const { start, end } = cycleRange(now, day, offset);
     return monthSlices(rows ?? [], kind, start, end, slots);
   }, [rows, kind, slots, now, day, offset]);
+  const topExpense = useMemo(() => {
+    const { start, end } = cycleRange(now, day, offset);
+    return monthSlices(rows ?? [], 'EXPENSE', start, end, assignSlots(rows ?? [], 'EXPENSE')).slices[0] ?? null;
+  }, [rows, now, day, offset]);
 
   // Bars: the selected month and the ones before it, keeping it near the right edge.
   const lastBar = Math.min(0, offset + 2);
-  const firstBar = Math.max(lastBar - (BARS - 1), -(WINDOW - 1));
+  const firstBar = Math.max(lastBar - (BARS - 1), -(CHART_WINDOW - 1));
   const barOffsets = Array.from({ length: lastBar - firstBar + 1 }, (_, i) => firstBar + i);
   const flows = useMemo(() => {
     const starts = Array.from({ length: lastBar - firstBar + 1 }, (_, i) => cycleRange(now, day, firstBar + i).start);
     return monthlyFlow(rows ?? [], starts, cycleRange(now, day, lastBar).end);
   }, [rows, now, day, firstBar, lastBar]);
   const barLabels = flows.map((f) => (day === 1 ? shortMonth : shortDay).format(f.start));
-  const current = flows[barOffsets.indexOf(offset)];
+  const index = barOffsets.indexOf(offset);
+  const current = flows[index];
+  const previous = flows[index - 1];
 
   function goTo(next: number) {
     setSelected(null);
-    setOffset(Math.min(0, Math.max(-(WINDOW - 1), next)));
+    setOffset(Math.min(0, Math.max(-(CHART_WINDOW - 1), next)));
   }
 
-  const net = current ? current.income - current.expense : 0;
+  const income = current?.income ?? 0;
+  const expense = current?.expense ?? 0;
+  const net = income - expense;
+  const insights = monthInsights({ income, expense, previousExpense: previous?.expense ?? null, top: topExpense });
+  const onBand = { color: theme.onPrimary };
+  const atOldest = offset <= -(CHART_WINDOW - 1);
+  const atNewest = offset >= 0;
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            DIAGRAM
-          </ThemedText>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={[styles.band, { backgroundColor: theme.primary, paddingTop: insets.top + Spacing.three }]}>
+          <View style={[styles.bubble, styles.bubbleOne, { backgroundColor: theme.accent }]} />
+          <View style={[styles.bubble, styles.bubbleTwo, { backgroundColor: theme.onPrimary }]} />
+          <View style={styles.bandInner}>
+            <View style={styles.bandHead}>
+              <ThemedText type="subtitle" style={[onBand, styles.bandTitle]}>
+                Diagram
+              </ThemedText>
+              <Pressable
+                onPress={() => router.push({ pathname: '/share-summary', params: { offset: String(offset) } })}
+                accessibilityRole="button"
+                accessibilityLabel="Bagikan rekap ke status"
+                style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
+                <AppSymbol material="ios_share" sf="square.and.arrow.up" size={16} color={theme.onPrimary} />
+                <ThemedText type="smallBold" style={onBand}>
+                  Bagikan
+                </ThemedText>
+              </Pressable>
+            </View>
 
-          <View style={styles.monthRow}>
-            <Pressable onPress={() => goTo(offset - 1)} disabled={offset <= -(WINDOW - 1)} hitSlop={12}>
-              <ThemedText type="subtitle" themeColor={offset <= -(WINDOW - 1) ? 'backgroundSelected' : 'text'}>
-                ‹
+            <View style={styles.monthRow}>
+              <Pressable
+                onPress={() => goTo(offset - 1)}
+                disabled={atOldest}
+                hitSlop={12}
+                accessibilityLabel="Periode sebelumnya"
+                style={atOldest && styles.faded}>
+                <AppSymbol material="chevron_left" sf="chevron.left" size={24} color={theme.onPrimary} />
+              </Pressable>
+              <ThemedText type="smallBold" style={onBand}>
+                {cycleLabel(range.start, day)}
               </ThemedText>
-            </Pressable>
-            <ThemedText type="smallBold">{cycleLabel(range.start, day)}</ThemedText>
-            <Pressable onPress={() => goTo(offset + 1)} disabled={offset >= 0} hitSlop={12}>
-              <ThemedText type="subtitle" themeColor={offset >= 0 ? 'backgroundSelected' : 'text'}>
-                ›
+              <Pressable
+                onPress={() => goTo(offset + 1)}
+                disabled={atNewest}
+                hitSlop={12}
+                accessibilityLabel="Periode berikutnya"
+                style={atNewest && styles.faded}>
+                <AppSymbol material="chevron_right" sf="chevron.right" size={24} color={theme.onPrimary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.hero}>
+              <ThemedText type="small" style={onBand}>
+                {net >= 0 ? 'Sisa periode ini' : 'Lebih dari pemasukan'}
               </ThemedText>
-            </Pressable>
+              <ThemedText numberOfLines={1} adjustsFontSizeToFit style={[onBand, styles.heroValue]}>
+                {formatMoney(net)}
+              </ThemedText>
+            </View>
+
+            <View style={styles.stats}>
+              <Stat label="Masuk" value={formatMoney(income)} material="south_west" sf="arrow.down.left" />
+              <View style={[styles.statDivider, { backgroundColor: theme.onPrimary }]} />
+              <Stat label="Keluar" value={formatMoney(expense)} material="north_east" sf="arrow.up.right" />
+            </View>
           </View>
+        </View>
 
+        <View style={styles.body}>
           {error && <ThemedText themeColor="danger">{error}</ThemedText>}
-          {rows === null && !error && <ActivityIndicator />}
+          {rows === null && !error && <ActivityIndicator style={styles.loading} />}
 
           {rows !== null && (
             <>
-              <View style={styles.tiles}>
-                <Tile label="Masuk" value={formatMoney(current?.income ?? 0)} color={colors.income} />
-                <Tile label="Keluar" value={formatMoney(current?.expense ?? 0)} color={colors.expense} />
-              </View>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-                {net >= 0 ? 'Sisa bulan ini ' : 'Lebih besar pasak daripada tiang: '}
-                <ThemedText type="smallBold" themeColor={net >= 0 ? 'text' : 'danger'}>
-                  {formatMoney(net)}
-                </ThemedText>
-              </ThemedText>
+              {insights.length > 0 && (
+                <ThemedView type="backgroundElement" style={styles.card}>
+                  {insights.map((line) => (
+                    <View key={line} style={styles.insight}>
+                      <View style={[styles.insightDot, { backgroundColor: theme.accent }]} />
+                      <ThemedText type="small" style={styles.flex}>
+                        {line}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </ThemedView>
+              )}
 
               <ThemedView type="backgroundElement" style={styles.card}>
                 <View style={[styles.segment, { backgroundColor: theme.backgroundSelected }]}>
@@ -137,6 +172,8 @@ export default function ChartsScreen() {
                         setKind(k.value);
                         setSelected(null);
                       }}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: k.value === kind }}
                       style={[styles.segmentItem, k.value === kind && { backgroundColor: theme.primary }]}>
                       <ThemedText type="smallBold" style={{ color: k.value === kind ? theme.onPrimary : theme.text }}>
                         {k.label}
@@ -152,6 +189,7 @@ export default function ChartsScreen() {
                     label={kind === 'EXPENSE' ? 'Total keluar' : 'Total masuk'}
                     selected={selected}
                     onSelect={setSelected}
+                    size={210}
                   />
                 </View>
 
@@ -160,53 +198,19 @@ export default function ChartsScreen() {
                     Belum ada {kind === 'EXPENSE' ? 'pengeluaran' : 'pemasukan'} di periode ini.
                   </ThemedText>
                 ) : (
-                  <View>
-                    {month.slices.map((s) => {
-                      const isSelected = s.key === selected;
-                      return (
-                        <Pressable
-                          key={s.key}
-                          onPress={() => setSelected(isSelected ? null : s.key)}
-                          style={({ pressed }) => [
-                            styles.legendRow,
-                            isSelected && { backgroundColor: theme.backgroundSelected },
-                            pressed && styles.pressed,
-                          ]}>
-                          <View style={[styles.swatch, { backgroundColor: colors.slot(s.slot) }]} />
-                          <CategoryIcon icon={s.icon} size={32} />
-                          <View style={styles.flex}>
-                            <ThemedText type="smallBold" numberOfLines={1}>
-                              {s.name}
-                            </ThemedText>
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {Math.round(s.share * 100)}%
-                            </ThemedText>
-                          </View>
-                          <ThemedText type="smallBold">{formatMoney(s.total)}</ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  <CategoryRows slices={month.slices} selected={selected} onSelect={setSelected} />
                 )}
               </ThemedView>
 
               <ThemedView type="backgroundElement" style={styles.card}>
                 <View style={styles.cardHead}>
-                  <ThemedText type="smallBold">Arus kas</ThemedText>
+                  <ThemedText type="smallBold">Arus kas 6 bulan</ThemedText>
                   <View style={styles.legend}>
                     <LegendKey color={colors.income} label="Masuk" />
                     <LegendKey color={colors.expense} label="Keluar" />
                   </View>
                 </View>
-                <FlowBars
-                  flows={flows}
-                  labels={barLabels}
-                  selected={barOffsets.indexOf(offset)}
-                  onSelect={(i) => goTo(barOffsets[i])}
-                />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Ketuk satu bulan untuk melihat rinciannya di atas.
-                </ThemedText>
+                <FlowBars flows={flows} labels={barLabels} selected={index} onSelect={(i) => goTo(barOffsets[i])} />
               </ThemedView>
 
               <ReflectionSection cycleDay={day} />
@@ -215,26 +219,30 @@ export default function ChartsScreen() {
                 onPress={() => router.push('/report')}
                 style={({ pressed }) => [styles.link, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
                 <ThemedText type="smallBold">Laporan bulanan lengkap</ThemedText>
-                <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                  →
-                </ThemedText>
+                <AppSymbol material="chevron_right" sf="chevron.right" size={20} color={theme.primary} />
               </Pressable>
             </>
           )}
-        </ScrollView>
-      </SafeAreaView>
+        </View>
+      </ScrollView>
     </ThemedView>
   );
 }
 
-function Tile({ label, value, color }: { label: string; value: string; color: string }) {
+function Stat({ label, value, material, sf }: { label: string; value: string; material: string; sf: string }) {
+  const theme = useTheme();
   return (
-    <ThemedView type="backgroundElement" style={styles.tile}>
-      <LegendKey color={color} label={label} />
-      <ThemedText type="smallBold" style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
+    <View style={styles.stat}>
+      <View style={styles.statLabel}>
+        <AppSymbol material={material} sf={sf} size={14} color={theme.onPrimary} />
+        <ThemedText type="small" style={{ color: theme.onPrimary }}>
+          {label}
+        </ThemedText>
+      </View>
+      <ThemedText type="smallBold" numberOfLines={1} adjustsFontSizeToFit style={[styles.statValue, { color: theme.onPrimary }]}>
         {value}
       </ThemedText>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -252,38 +260,110 @@ function LegendKey({ color, label }: { color: string; label: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
-  content: {
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
+  scroll: {
     paddingBottom: BottomTabInset + Spacing.four,
+  },
+  band: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingBottom: BAND_OVERLAP + Spacing.three,
+  },
+  bandInner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    gap: Spacing.three,
+  },
+  bubble: {
+    position: 'absolute',
+    borderRadius: 999,
+    opacity: 0.14,
+  },
+  bubbleOne: {
+    width: 220,
+    height: 220,
+    top: -70,
+    right: -60,
+  },
+  bubbleTwo: {
+    width: 150,
+    height: 150,
+    bottom: -60,
+    left: -50,
+  },
+  bandHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bandTitle: {
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    minHeight: 36,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   monthRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.two,
   },
-  tiles: {
+  faded: {
+    opacity: 0.3,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: Spacing.half,
+  },
+  heroValue: {
+    fontSize: 42,
+    lineHeight: 52,
+    fontWeight: 700,
+  },
+  stats: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    alignItems: 'center',
+    gap: Spacing.three,
   },
-  tile: {
+  stat: {
     flex: 1,
-    gap: Spacing.one,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    alignItems: 'center',
+    gap: Spacing.half,
   },
-  tileValue: {
-    fontSize: 18,
+  statLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  statValue: {
+    fontSize: 17,
     lineHeight: 24,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    opacity: 0.3,
+  },
+  body: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    marginTop: -BAND_OVERLAP,
+  },
+  loading: {
+    marginTop: BAND_OVERLAP + Spacing.four,
+  },
+  flex: {
+    flex: 1,
   },
   center: {
     textAlign: 'center',
@@ -292,6 +372,16 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.four,
+  },
+  insight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  insightDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   cardHead: {
     flexDirection: 'row',
@@ -312,14 +402,6 @@ const styles = StyleSheet.create({
   donut: {
     alignItems: 'center',
   },
-  legendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    borderRadius: Spacing.two,
-  },
   legend: {
     flexDirection: 'row',
     gap: Spacing.three,
@@ -334,12 +416,10 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 3,
   },
-  flex: {
-    flex: 1,
-  },
   link: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: Spacing.three,
     borderRadius: Spacing.three,
   },

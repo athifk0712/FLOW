@@ -1,4 +1,4 @@
-import { assignSlots, type ChartTransaction, compactAmount, monthlyFlow, monthSlices, niceMax } from '@/lib/charts';
+import { assignSlots, type ChartTransaction, compactAmount, monthInsights, monthlyFlow, monthSlices, niceMax, savingsRate } from '@/lib/charts';
 
 const tx = (type: 'INCOME' | 'EXPENSE', amount: number, day: number, cat: string | null, month = 9): ChartTransaction => ({
   type,
@@ -63,5 +63,37 @@ describe('charts', () => {
     expect(compactAmount(950_000)).toBe('950 rb');
     expect(compactAmount(1_250_000)).toBe('1,3 jt');
     expect(compactAmount(2_000_000_000)).toBe('2 M');
+  });
+});
+
+describe('savingsRate', () => {
+  it('is the share of income left, null without income or when overspent', () => {
+    expect(savingsRate(1_000_000, 750_000)).toBe(25);
+    expect(savingsRate(0, 100)).toBeNull();
+    expect(savingsRate(100, 200)).toBeNull();
+  });
+});
+
+describe('monthInsights', () => {
+  const top = { name: 'Makan', share: 0.34 };
+
+  it('says what was saved, how it compares, and where most went', () => {
+    expect(monthInsights({ income: 1000, expense: 750, previousExpense: 1000, top })).toEqual([
+      '25% pemasukanmu berhasil disisihkan',
+      'Pengeluaran 25% lebih hemat dari periode lalu',
+      'Paling banyak untuk Makan (34%)',
+    ]);
+  });
+
+  it('says so when spending rose or passed income', () => {
+    expect(monthInsights({ income: 100, expense: 200, previousExpense: 100, top: null })).toEqual([
+      'Pengeluaran lebih besar dari pemasukan di periode ini',
+      'Pengeluaran naik 100% dari periode lalu',
+    ]);
+  });
+
+  it('stays quiet about what it cannot know', () => {
+    expect(monthInsights({ income: 0, expense: 0, previousExpense: null, top: null })).toEqual([]);
+    expect(monthInsights({ income: 0, expense: 100, previousExpense: 0, top: null })).toEqual([]);
   });
 });
