@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -83,7 +83,8 @@ export default function QuickLogScreen() {
   const currency = useCurrency();
   const { session } = useSession();
   const [mode, setMode] = useState<Mode>('EXPENSE');
-  const [digits, setDigits] = useState('');
+  // ?amount= comes from the Kalkulator.
+  const [digits, setDigits] = useState(useLocalSearchParams<{ amount?: string }>().amount ?? '');
   // Which amount the keypad is typing into; it opens on the amount straight away. null = keypad hidden.
   const [keypad, setKeypad] = useState<'amount' | 'fee' | null>('amount');
   const [categories, setCategories] = useState<Category[]>([]);

@@ -15,6 +15,7 @@ export const FEATURES: Feature[] = [
   { label: 'Kategori', href: '/categories', icon: 'category' },
   { label: 'Kebiasaan', href: '/habits', icon: 'habit' },
   { label: 'Laporan', href: '/report', icon: 'report' },
+  { label: 'Kalkulator', href: '/calculator', icon: 'calculator' },
   { label: 'Refleksi', href: '/weekly-review', icon: 'reflection' },
   { label: 'Cek harian', href: '/coach', icon: 'checkin' },
   { label: 'Pengaturan', href: '/settings', icon: 'settings' },

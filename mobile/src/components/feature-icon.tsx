@@ -24,6 +24,7 @@ export type FeatureIconName =
   | 'category'
   | 'habit'
   | 'report'
+  | 'calculator'
   | 'reflection'
   | 'checkin'
   | 'settings'
@@ -41,6 +42,7 @@ const BACKGROUND: Record<FeatureIconName, string> = {
   category: '#C7772A',
   habit: '#3E9E8F',
   report: '#34508C',
+  calculator: '#4A6B73',
   reflection: '#D45D8C',
   checkin: '#2A8FA8',
   settings: '#5E6B69',
@@ -172,6 +174,17 @@ function Glyph({ name, bg }: { name: FeatureIconName; bg: string }) {
           <Path d="M13.5 29.5 H28.5 L26.5 38 H15.5 Z" fill={C.chick} />
           <Rect x={12.5} y={28.5} width={17} height={3.5} rx={1.5} fill={C.honey} />
           <Chick transform="translate(34 31.5) scale(0.82)" />
+        </>
+      );
+    case 'calculator':
+      return (
+        <>
+          <Rect x={13.5} y={10} width={21} height={29} rx={4} fill={C.white} />
+          <Rect x={16.5} y={13} width={15} height={6} rx={1.5} fill={C.mint} />
+          {[23, 28.5, 34].flatMap((y) =>
+            [18.5, 24, 29.5].map((x) => <Circle key={`${x}-${y}`} cx={x} cy={y} r={1.7} fill={x === 29.5 ? C.honey : C.teal} />),
+          )}
+          <Chick transform="translate(35 13) scale(0.62)" />
         </>
       );
     case 'report':
