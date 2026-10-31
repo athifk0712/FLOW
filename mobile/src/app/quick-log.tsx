@@ -419,6 +419,11 @@ export default function QuickLogScreen() {
             <ThemedText type="smallBold" themeColor="textSecondary">
               CATAT
             </ThemedText>
+            <Pressable onPress={() => router.replace('/quick-batch')} hitSlop={12}>
+              <ThemedText type="smallBold" themeColor="primary">
+                Catat cepat (banyak sekaligus)
+              </ThemedText>
+            </Pressable>
             <Pressable onPress={closeModal} hitSlop={12}>
               <ThemedText type="smallBold" themeColor="textSecondary">
                 Batal

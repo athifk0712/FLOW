@@ -58,6 +58,7 @@ function RootNavigator() {
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(app)" />
           <Stack.Screen name="quick-log" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="quick-batch" options={{ presentation: 'modal' }} />
           <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
           <Stack.Screen name="weekly-review" options={{ presentation: 'modal' }} />
           <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal' }} />
@@ -78,7 +79,6 @@ function RootNavigator() {
           <Stack.Screen name="habits" options={{ presentation: 'modal' }} />
           <Stack.Screen name="currency" options={{ presentation: 'modal' }} />
           <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="weekly-budget" options={{ presentation: 'modal' }} />
           <Stack.Screen name="cycle" options={{ presentation: 'modal' }} />
           <Stack.Screen name="appearance" options={{ presentation: 'modal' }} />
           <Stack.Screen name="reminders" options={{ presentation: 'modal' }} />
