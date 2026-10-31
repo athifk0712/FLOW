@@ -8,7 +8,7 @@ import { NECESSITY, UNREVIEWED_COLOR } from '@/constants/necessity';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/money';
-import { isAssetType, moneyDirection, transactionTitle, type TransactionRow } from '@/lib/transactions';
+import { isAssetType, isDebtType, moneyDirection, transactionTitle, type TransactionRow } from '@/lib/transactions';
 
 const timeFormat = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
 
@@ -31,7 +31,15 @@ export function TransactionItem({ item }: { item: TransactionRow }) {
       <ThemedView type="backgroundElement" style={styles.row}>
         <View>
           <CategoryIcon
-            icon={item.type === 'TRANSFER' ? 'transfer' : isAssetType(item.type) ? 'invest' : item.categories?.icon}
+            icon={
+              item.type === 'TRANSFER'
+                ? 'transfer'
+                : isAssetType(item.type)
+                  ? 'invest'
+                  : isDebtType(item.type)
+                    ? 'handshake'
+                    : item.categories?.icon
+            }
             size={38}
           />
           {dotColor && (

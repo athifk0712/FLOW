@@ -267,6 +267,7 @@ export type Database = {
       categories: {
         Row: {
           created_at: string
+          default_necessity: Database["public"]["Enums"]["necessity_level"]
           icon: string | null
           id: string
           kind: Database["public"]["Enums"]["category_kind"]
@@ -275,6 +276,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_necessity?: Database["public"]["Enums"]["necessity_level"]
           icon?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["category_kind"]
@@ -283,6 +285,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_necessity?: Database["public"]["Enums"]["necessity_level"]
           icon?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["category_kind"]
@@ -384,7 +387,9 @@ export type Database = {
           due_date: string | null
           id: string
           note: string | null
+          opening_transaction_id: string | null
           person: string
+          request_id: string | null
           user_id: string
         }
         Insert: {
@@ -394,7 +399,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           note?: string | null
+          opening_transaction_id?: string | null
           person: string
+          request_id?: string | null
           user_id?: string
         }
         Update: {
@@ -404,7 +411,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           note?: string | null
+          opening_transaction_id?: string | null
           person?: string
+          request_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -637,6 +646,9 @@ export type Database = {
           id: string
           last_active_date: string | null
           streak_count: number
+          streak_saved_on: string | null
+          streak_saves_month: string | null
+          streak_saves_used: number
           timezone: string
         }
         Insert: {
@@ -647,6 +659,9 @@ export type Database = {
           id: string
           last_active_date?: string | null
           streak_count?: number
+          streak_saved_on?: string | null
+          streak_saves_month?: string | null
+          streak_saves_used?: number
           timezone?: string
         }
         Update: {
@@ -657,6 +672,9 @@ export type Database = {
           id?: string
           last_active_date?: string | null
           streak_count?: number
+          streak_saved_on?: string | null
+          streak_saves_month?: string | null
+          streak_saves_used?: number
           timezone?: string
         }
         Relationships: []
@@ -1046,6 +1064,8 @@ export type Database = {
           remaining: number | null
           settled: boolean | null
           user_id: string | null
+          wallet_id: string | null
+          wallet_name: string | null
         }
         Relationships: []
       }
@@ -1145,6 +1165,18 @@ export type Database = {
       }
       cycle_start: { Args: { p_day: number; p_local: string }; Returns: string }
       delete_asset: { Args: { p_asset_id: string }; Returns: undefined }
+      create_debt: {
+        Args: {
+          p_account_id?: string
+          p_amount: number
+          p_direction: Database["public"]["Enums"]["debt_direction"]
+          p_due_date?: string
+          p_note?: string
+          p_person: string
+          p_request_id?: string
+        }
+        Returns: string
+      }
       delete_debt_payment: {
         Args: { p_payment_id: string }
         Returns: undefined
@@ -1183,6 +1215,10 @@ export type Database = {
       purchase_intent: {
         Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
         Returns: string
+      }
+      set_debt_wallet: {
+        Args: { p_account_id?: string; p_debt_id: string }
+        Returns: undefined
       }
       record_debt_payment: {
         Args: {
@@ -1236,7 +1272,7 @@ export type Database = {
       debt_direction: "OWED_TO_ME" | "I_OWE"
       intent_status: "PENDING" | "PURCHASED" | "CANCELLED"
       necessity_level: "NEED" | "IMPORTANT" | "WANT" | "IMPULSE"
-      transaction_type: "INCOME" | "EXPENSE" | "TRANSFER" | "ASSET_BUY" | "ASSET_SELL"
+      transaction_type: "INCOME" | "EXPENSE" | "TRANSFER" | "ASSET_BUY" | "ASSET_SELL" | "DEBT_OUT" | "DEBT_IN"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1354,7 +1390,7 @@ export const Constants = {
       debt_direction: ["OWED_TO_ME", "I_OWE"],
       intent_status: ["PENDING", "PURCHASED", "CANCELLED"],
       necessity_level: ["NEED", "IMPORTANT", "WANT", "IMPULSE"],
-      transaction_type: ["INCOME", "EXPENSE", "TRANSFER", "ASSET_BUY", "ASSET_SELL"],
+      transaction_type: ["INCOME", "EXPENSE", "TRANSFER", "ASSET_BUY", "ASSET_SELL", "DEBT_OUT", "DEBT_IN"],
     },
   },
 } as const

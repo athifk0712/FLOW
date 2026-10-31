@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { createDebt, setDebtWallet } from '@/lib/debt-data';
 import {
   dateFromToday,
   daysFromToday,
@@ -25,6 +26,8 @@ import {
   type DebtDirection,
   dueStatus,
   formatDay,
+  openingLine,
+  paymentLine,
   sortDebts,
 } from '@/lib/debts';
 import type { Tables } from '@/lib/database.types';
@@ -53,10 +56,10 @@ const DUE_SHORTCUTS = [
   { label: '1 bulan', days: 30 },
 ];
 
-// Who owes whom, with partial payments. A payment can also move the money: received into a wallet (piutang) or paid
-// from one (utang). The database writes the payment and its transaction together (record_debt_payment), refuses
-// more than what is left, and treats a repeated request as the same payment. Cancelling a payment takes the money
-// back out again.
+// Who owes whom, with partial payments. Writing down a debt and paying it can both move a wallet: lent from or borrowed
+// into one, repaid into or from one. None of it counts as income or spending. The database writes the row and its
+// wallet movement together, refuses paying more than what is left, and treats a repeated request as the same one.
+// Cancelling a payment or deleting a debt takes the money back out again.
 export default function DebtsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ direction?: DebtDirection }>();
@@ -74,6 +77,8 @@ export default function DebtsScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   // The wallet the money goes into / comes from; null = record the payment only (balances unchanged).
   const [walletId, setWalletId] = useState<string | null>(null);
+  // The wallet the debt itself moved (in the add / edit form); null = only a note.
+  const [openingWalletId, setOpeningWalletId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(newRequestId);
@@ -123,7 +128,9 @@ export default function DebtsScreen() {
     setConfirmUndo(null);
     setError(null);
     setPayments([]);
-    setWalletId((current) => current ?? accounts[0]?.id ?? null);
+    // A payment usually goes through the wallet the debt started in.
+    setWalletId(debt?.wallet_id ?? accounts[0]?.id ?? null);
+    setOpeningWalletId(target === 'new' ? (accounts[0]?.id ?? null) : (debt?.wallet_id ?? null));
     setRequestId(newRequestId());
     if (target && target !== 'new') loadPayments(target);
   }
@@ -154,11 +161,27 @@ export default function DebtsScreen() {
       note: note.trim() || null,
       due_date: dueDays === null ? null : dateFromToday(dueDays),
     };
-    run(() =>
-      open === 'new'
-        ? supabase.from('debts').insert({ ...values, direction })
-        : supabase.from('debts').update(values).eq('id', open!),
-    );
+    if (open === 'new') {
+      run(() =>
+        createDebt({
+          direction,
+          person: values.person,
+          amount: values.amount,
+          accountId: openingWalletId,
+          note: values.note,
+          dueDate: values.due_date,
+          requestId,
+        }),
+      );
+      return;
+    }
+    const id = open!;
+    const walletChanged = openingWalletId !== (debts?.find((d) => d.id === id)?.wallet_id ?? null);
+    run(async () => {
+      const { error } = await supabase.from('debts').update(values).eq('id', id);
+      if (error || !walletChanged) return { error };
+      return setDebtWallet(id, openingWalletId);
+    });
   }
 
   async function pay(debt: Debt, value: number) {
@@ -201,6 +224,24 @@ export default function DebtsScreen() {
   ];
   const chipText = (selected: boolean) => ({ color: selected ? theme.onPrimary : theme.text });
   const meta = DIRECTIONS.find((d) => d.value === direction)!;
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name ?? null;
+
+  const walletChips = (selected: string | null, onPick: (id: string | null) => void) => (
+    <View style={styles.chips}>
+      {accounts.map((a) => (
+        <Pressable key={a.id} onPress={() => onPick(a.id)} style={chip(selected === a.id)}>
+          <ThemedText type="small" style={chipText(selected === a.id)}>
+            {a.name}
+          </ThemedText>
+        </Pressable>
+      ))}
+      <Pressable onPress={() => onPick(null)} style={chip(selected === null)}>
+        <ThemedText type="small" style={chipText(selected === null)}>
+          Saldo tidak berubah
+        </ThemedText>
+      </Pressable>
+    </View>
+  );
 
   const form = (
     <View style={styles.form}>
@@ -224,6 +265,13 @@ export default function DebtsScreen() {
           keyboardType="number-pad"
         />
       </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        {direction === 'OWED_TO_ME' ? 'Uangnya keluar dari' : 'Uangnya masuk ke'}
+      </ThemedText>
+      {walletChips(openingWalletId, setOpeningWalletId)}
+      <ThemedText type="small" themeColor="textSecondary">
+        {openingLine(direction, accountName(openingWalletId))}
+      </ThemedText>
       <TextInput
         style={inputStyle}
         value={note}
@@ -270,7 +318,7 @@ export default function DebtsScreen() {
         {open !== 'new' ? (
           <Pressable onPress={() => remove(open!)} disabled={saving} hitSlop={8}>
             <ThemedText type="smallBold" themeColor="danger">
-              {confirmDelete ? 'Ketuk lagi untuk hapus' : 'Hapus'}
+              {confirmDelete ? 'Ketuk lagi: hapus & kembalikan saldonya' : 'Hapus'}
             </ThemedText>
           </Pressable>
         ) : (
@@ -323,6 +371,7 @@ export default function DebtsScreen() {
               (debt.paid ?? 0) > 0 && !debt.settled
                 ? `${settledVerb} ${formatMoney(debt.paid ?? 0)} dari ${formatMoney(debt.amount ?? 0)}`
                 : formatMoney(debt.amount ?? 0),
+              debt.wallet_name && `${direction === 'OWED_TO_ME' ? 'Dari' : 'Masuk ke'} ${debt.wallet_name}`,
               debt.note,
             ]
               .filter(Boolean)
@@ -345,22 +394,9 @@ export default function DebtsScreen() {
                   <ThemedText type="small" themeColor="textSecondary">
                     {direction === 'OWED_TO_ME' ? 'Uangnya masuk ke' : 'Dibayar dari'}
                   </ThemedText>
-                  <View style={styles.chips}>
-                    {accounts.map((a) => (
-                      <Pressable key={a.id} onPress={() => setWalletId(a.id)} style={chip(walletId === a.id)}>
-                        <ThemedText type="small" style={chipText(walletId === a.id)}>
-                          {a.name}
-                        </ThemedText>
-                      </Pressable>
-                    ))}
-                    <Pressable onPress={() => setWalletId(null)} style={chip(walletId === null)}>
-                      <ThemedText type="small" style={chipText(walletId === null)}>
-                        Saldo tidak berubah
-                      </ThemedText>
-                    </Pressable>
-                  </View>
+                  {walletChips(walletId, setWalletId)}
                   <ThemedText type="small" themeColor="textSecondary">
-                    {walletLine(direction, debt.person ?? '', accounts.find((a) => a.id === walletId)?.name ?? null)}
+                    {paymentLine(direction, accountName(walletId))}
                   </ThemedText>
                   <View style={styles.inline}>
                     <View style={[...priceRow, styles.flex]}>
@@ -509,8 +545,8 @@ export default function DebtsScreen() {
               )}
 
               <ThemedText type="small" themeColor="textSecondary">
-                Membuat catatan utang/piutang tidak mengubah saldo. Saat dibayar, pilih dompetnya supaya saldo ikut
-                berubah; membatalkan pembayaran mengembalikan saldonya.
+                Pilih dompetnya supaya saldo ikut berubah saat mencatat dan saat dibayar. Uang utang-piutang tidak
+                dihitung sebagai pemasukan atau pengeluaran. Membatalkan pembayaran mengembalikan saldonya.
               </ThemedText>
             </ScrollView>
           )}
@@ -518,14 +554,6 @@ export default function DebtsScreen() {
       </KeyboardAvoidingView>
     </ThemedView>
   );
-}
-
-/** What recording a payment will do, in one line. */
-function walletLine(direction: DebtDirection, person: string, wallet: string | null) {
-  if (!wallet) return 'Hanya mencatat pembayarannya. Pilih ini kalau uangnya sudah kamu catat sendiri di Catat.';
-  return direction === 'OWED_TO_ME'
-    ? `Dicatat sebagai pemasukan "Pelunasan Piutang: ${person}", saldo ${wallet} bertambah.`
-    : `Dicatat sebagai pengeluaran "Pelunasan Utang: ${person}", saldo ${wallet} berkurang.`;
 }
 
 const styles = StyleSheet.create({

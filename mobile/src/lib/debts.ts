@@ -37,6 +37,22 @@ export function dueStatus(debt: Pick<Debt, 'due_date' | 'settled'>) {
   return { overdue: false, text: `Jatuh tempo ${formatDay(debt.due_date)} (${days} hari lagi)` };
 }
 
+/** What writing down a debt does to the chosen wallet, in one line. */
+export function openingLine(direction: DebtDirection, wallet: string | null) {
+  if (!wallet) return 'Hanya dicatat, saldo tidak berubah. Pilih ini kalau uangnya sudah pindah sebelum dicatat di sini.';
+  return direction === 'OWED_TO_ME'
+    ? `Saldo ${wallet} berkurang. Uangnya dipinjamkan, jadi bukan pengeluaran.`
+    : `Saldo ${wallet} bertambah. Uangnya pinjaman, jadi bukan pemasukan.`;
+}
+
+/** What recording a payment does to the chosen wallet, in one line. */
+export function paymentLine(direction: DebtDirection, wallet: string | null) {
+  if (!wallet) return 'Hanya mencatat pembayarannya. Pilih ini kalau uangnya sudah kamu catat sendiri di Catat.';
+  return direction === 'OWED_TO_ME'
+    ? `Saldo ${wallet} bertambah. Uangmu kembali, jadi bukan pemasukan.`
+    : `Saldo ${wallet} berkurang. Ini pelunasan, jadi bukan pengeluaran harian.`;
+}
+
 /** Open debts first by due date (no date last), then settled ones by most recent payment. */
 export function sortDebts(debts: Debt[]) {
   const due = (d: Debt) => (d.due_date ? localDate(d.due_date).getTime() : Number.POSITIVE_INFINITY);

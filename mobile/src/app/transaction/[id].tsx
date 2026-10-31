@@ -26,7 +26,7 @@ import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { deleteReceipt, type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
-import { isAssetType, TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
+import { isAssetType, isDebtType, TRANSACTION_SELECT, type TransactionRow } from '@/lib/transactions';
 
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'kind' | 'icon'>;
 type Account = Pick<Tables<'accounts'>, 'id' | 'name' | 'archived_at'>;
@@ -37,6 +37,8 @@ const TYPE_LABEL: Record<TransactionRow['type'], string> = {
   TRANSFER: 'TRANSFER',
   ASSET_BUY: 'BELI ASET',
   ASSET_SELL: 'JUAL ASET',
+  DEBT_OUT: 'UTANG-PIUTANG',
+  DEBT_IN: 'UTANG-PIUTANG',
 };
 
 // Edit or delete one transaction. The type is fixed; to change it, delete and log it again.
@@ -228,6 +230,23 @@ export default function TransactionScreen() {
                 </Pressable>
               )}
             </ThemedView>
+          ) : isDebtType(tx.type) ? (
+            // Lending, borrowing or repaying: its amount and wallet belong to the debt.
+            <ThemedView type="backgroundElement" style={styles.assetCard}>
+              <ThemedText type="smallBold">{tx.merchant ?? 'Utang & piutang'}</ThemedText>
+              <ThemedText>{formatMoney(tx.amount)}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Uang {tx.type === 'DEBT_OUT' ? 'keluar' : 'masuk'} karena utang-piutang, jadi tidak dihitung sebagai
+                pengeluaran atau pemasukan. Nominal dan dompetnya diatur dari halaman Utang & Piutang.
+              </ThemedText>
+              <Pressable
+                onPress={() => router.replace('/debts')}
+                style={({ pressed }) => [styles.save, { backgroundColor: theme.primary }, pressed && styles.pressed]}>
+                <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
+                  Buka Utang & Piutang
+                </ThemedText>
+              </Pressable>
+            </ThemedView>
           ) : (
             <>
               <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
@@ -312,7 +331,7 @@ export default function TransactionScreen() {
                 {tx.type === 'EXPENSE' && (
                   <>
                     <ThemedText type="small" themeColor="textSecondary">
-                      Penilaian{necessity ? '' : ' (belum dinilai, dibahas di obrolan malam)'}
+                      Penilaian{necessity ? '' : ' (opsional, budget memakai sifat kategorinya)'}
                     </ThemedText>
                     <View style={styles.options}>
                       {NECESSITY_ORDER.map((n) => {

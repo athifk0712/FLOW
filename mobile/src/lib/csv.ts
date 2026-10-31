@@ -7,6 +7,8 @@ const TYPE_LABEL: Record<TransactionRow['type'], string> = {
   TRANSFER: 'Transfer',
   ASSET_BUY: 'Beli aset',
   ASSET_SELL: 'Jual aset',
+  DEBT_OUT: 'Utang-piutang (keluar)',
+  DEBT_IN: 'Utang-piutang (masuk)',
 };
 
 const HEADER = ['Tanggal', 'Jenis', 'Jumlah', 'Kategori', 'Dari akun', 'Ke akun', 'Merchant', 'Catatan', 'Kebutuhan'];
