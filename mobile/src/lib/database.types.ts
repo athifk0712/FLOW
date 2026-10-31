@@ -637,6 +637,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pocket_moves: {
+        Row: {
+          account_id: string
+          amount: number
+          created_at: string
+          from_pocket_id: string | null
+          id: string
+          request_id: string | null
+          to_pocket_id: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          created_at?: string
+          from_pocket_id?: string | null
+          id?: string
+          request_id?: string | null
+          to_pocket_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          created_at?: string
+          from_pocket_id?: string | null
+          id?: string
+          request_id?: string | null
+          to_pocket_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pockets: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -814,6 +871,7 @@ export type Database = {
           necessity: Database["public"]["Enums"]["necessity_level"] | null
           needs_review: boolean | null
           occurred_at: string
+          pocket_id: string | null
           receipt_id: string | null
           recurring_id: string | null
           regret: boolean | null
@@ -836,6 +894,7 @@ export type Database = {
           necessity?: Database["public"]["Enums"]["necessity_level"] | null
           needs_review?: boolean | null
           occurred_at?: string
+          pocket_id?: string | null
           receipt_id?: string | null
           recurring_id?: string | null
           regret?: boolean | null
@@ -858,6 +917,7 @@ export type Database = {
           necessity?: Database["public"]["Enums"]["necessity_level"] | null
           needs_review?: boolean | null
           occurred_at?: string
+          pocket_id?: string | null
           receipt_id?: string | null
           recurring_id?: string | null
           regret?: boolean | null
@@ -868,6 +928,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_pocket_id_user_id_fkey"
+            columns: ["pocket_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "pockets"
+            referencedColumns: ["id", "user_id"]
+          },
           {
             foreignKeyName: "transactions_category_id_user_id_fkey"
             columns: ["category_id", "user_id"]
@@ -1069,6 +1136,17 @@ export type Database = {
         }
         Relationships: []
       }
+      v_pocket_balances: {
+        Row: {
+          account_id: string | null
+          balance: number | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_goal_progress: {
         Row: {
           created_at: string | null
@@ -1219,6 +1297,16 @@ export type Database = {
       set_debt_wallet: {
         Args: { p_account_id?: string; p_debt_id: string }
         Returns: undefined
+      }
+      move_pocket_money: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_from: string
+          p_request_id?: string
+          p_to: string
+        }
+        Returns: string
       }
       record_debt_payment: {
         Args: {

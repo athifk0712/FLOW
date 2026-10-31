@@ -15,6 +15,7 @@ import { ModalEdges } from '@/constants/safe-area';
 
 import { AmountInput } from '@/components/amount-input';
 import { DateTimeField } from '@/components/date-time-field';
+import { PocketPicker } from '@/components/pockets/pocket-picker';
 import { ReceiptPhoto } from '@/components/receipt-photo';
 import { CategoryIcon } from '@/components/category-icon';
 import { ThemedText } from '@/components/themed-text';
@@ -53,6 +54,7 @@ export default function TransactionScreen() {
   const [digits, setDigits] = useState('');
   const [fromId, setFromId] = useState<string | null>(null);
   const [toId, setToId] = useState<string | null>(null);
+  const [pocketId, setPocketId] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [necessity, setNecessity] = useState<Necessity | null>(null);
   const [merchant, setMerchant] = useState('');
@@ -97,6 +99,7 @@ export default function TransactionScreen() {
       setDigits(String(row.amount));
       setFromId(row.from_account_id);
       setToId(row.to_account_id);
+      setPocketId(row.pocket_id);
       setCategoryId(row.category_id);
       setNecessity(row.necessity);
       setMerchant(row.merchant ?? '');
@@ -133,8 +136,8 @@ export default function TransactionScreen() {
       merchant: merchant.trim() || null,
       description: description.trim() || null,
     };
-    if (tx.type === 'EXPENSE') Object.assign(changes, { from_account_id: fromId, category_id: categoryId, necessity });
-    if (tx.type === 'INCOME') Object.assign(changes, { to_account_id: toId, category_id: categoryId });
+    if (tx.type === 'EXPENSE') Object.assign(changes, { from_account_id: fromId, category_id: categoryId, necessity, pocket_id: pocketId });
+    if (tx.type === 'INCOME') Object.assign(changes, { to_account_id: toId, category_id: categoryId, pocket_id: pocketId });
     if (tx.type === 'TRANSFER') Object.assign(changes, { from_account_id: fromId, to_account_id: toId });
     const { error } = await supabase.from('transactions').update(changes).eq('id', tx.id);
     setSaving(false);
@@ -290,6 +293,7 @@ export default function TransactionScreen() {
                     </ThemedText>
                     {accountChips(fromId, (a) => {
                       setFromId(a);
+                      if (a !== fromId) setPocketId(null); // pockets belong to one account
                       if (a === toId) setToId(null);
                     })}
                   </>
@@ -300,8 +304,25 @@ export default function TransactionScreen() {
                     <ThemedText type="small" themeColor="textSecondary">
                       {tx.type === 'TRANSFER' ? 'Ke akun' : 'Masuk ke akun'}
                     </ThemedText>
-                    {accountChips(toId, setToId, tx.type === 'TRANSFER' ? fromId : null)}
+                    {accountChips(
+                      toId,
+                      (a) => {
+                        if (a !== toId) setPocketId(null);
+                        setToId(a);
+                      },
+                      tx.type === 'TRANSFER' ? fromId : null,
+                    )}
                   </>
+                )}
+
+                {tx.type !== 'TRANSFER' && !linked.feeOf && (
+                  <PocketPicker
+                    accountId={tx.type === 'INCOME' ? toId : fromId}
+                    value={pocketId}
+                    onChange={setPocketId}
+                    direction={tx.type === 'INCOME' ? 'in' : 'out'}
+                    amount={0}
+                  />
                 )}
 
                 {tx.type !== 'TRANSFER' && (

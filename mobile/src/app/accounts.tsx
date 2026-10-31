@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -378,7 +378,20 @@ export default function AccountsScreen() {
               {fee ? ` · admin ${formatMoney(fee.amount)} tiap tgl ${fee.day_of_month}` : ''}
             </ThemedText>
           </View>
-          <ThemedText type="smallBold">{formatMoney(account.balance)}</ThemedText>
+          <View style={styles.rowEnd}>
+            <ThemedText type="smallBold">{formatMoney(account.balance)}</ThemedText>
+            {!account.archived_at && (
+              <Pressable
+                onPress={() => router.push({ pathname: '/pockets', params: { account: account.id } })}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Kantong ${account.name}`}>
+                <ThemedText type="small" themeColor="primary">
+                  Kantong
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
         </ThemedView>
       </Pressable>
     );
@@ -471,6 +484,10 @@ const styles = StyleSheet.create({
   list: {
     gap: Spacing.two,
     paddingBottom: Spacing.four,
+  },
+  rowEnd: {
+    alignItems: 'flex-end',
+    gap: Spacing.half,
   },
   row: {
     flexDirection: 'row',

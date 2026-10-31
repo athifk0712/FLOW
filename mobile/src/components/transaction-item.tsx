@@ -19,10 +19,11 @@ export function TransactionItem({ item }: { item: TransactionRow }) {
   const sign = direction === 'out' ? '-' : direction === 'in' ? '+' : '';
   const dotColor =
     item.type === 'EXPENSE' ? (item.necessity ? NECESSITY[item.necessity].color : UNREVIEWED_COLOR) : null;
-  const account =
+  const accountName =
     item.type === 'TRANSFER'
       ? `${item.from_account?.name ?? '-'} → ${item.to_account?.name ?? '-'}`
       : ((direction === 'in' ? item.to_account : item.from_account)?.name ?? '-');
+  const account = item.pockets ? `${accountName} · ${item.pockets.name}` : accountName;
 
   return (
     <Pressable

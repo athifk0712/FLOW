@@ -7,6 +7,7 @@ export type Feature = { label: string; href: Href; icon: FeatureIconName };
 // Everything Flowku can do, on the "Semua fitur" screen. Labels are short so each fits on one line under its icon.
 export const FEATURES: Feature[] = [
   { label: 'Dompet', href: '/accounts', icon: 'wallet' },
+  { label: 'Kantong', href: '/pockets', icon: 'pocket' },
   { label: 'Anggaran', href: '/budgets', icon: 'budget' },
   { label: 'Target', href: '/goals', icon: 'goal' },
   { label: 'Utang', href: '/debts', icon: 'debt' },

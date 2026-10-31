@@ -16,6 +16,7 @@ const C = {
 
 export type FeatureIconName =
   | 'wallet'
+  | 'pocket'
   | 'budget'
   | 'goal'
   | 'debt'
@@ -34,6 +35,7 @@ export type FeatureIconName =
 /** Each feature's circle colour; neighbours in the grid differ in hue and lightness. */
 const BACKGROUND: Record<FeatureIconName, string> = {
   wallet: '#0F5C55',
+  pocket: '#B5546E',
   budget: '#E9A23B',
   goal: '#E0604A',
   debt: '#3D7FC1',
@@ -174,6 +176,15 @@ function Glyph({ name, bg }: { name: FeatureIconName; bg: string }) {
           <Path d="M13.5 29.5 H28.5 L26.5 38 H15.5 Z" fill={C.chick} />
           <Rect x={12.5} y={28.5} width={17} height={3.5} rx={1.5} fill={C.honey} />
           <Chick transform="translate(34 31.5) scale(0.82)" />
+        </>
+      );
+    case 'pocket':
+      return (
+        <>
+          <Path d="M12 15 H36 V27 C36 34 30.5 38.5 24 38.5 C17.5 38.5 12 34 12 27 Z" fill={C.white} />
+          <Path d="M12 15 H36 V20 C31 24.5 17 24.5 12 20 Z" fill={C.mint} />
+          <Coin cx={24} cy={30} r={4.5} />
+          <Chick transform="translate(34 13) scale(0.62)" />
         </>
       );
     case 'calculator':

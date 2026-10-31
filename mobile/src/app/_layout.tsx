@@ -65,6 +65,7 @@ function RootNavigator() {
           <Stack.Screen name="weekly-review" options={{ presentation: 'modal' }} />
           <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="accounts" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="pockets" options={{ presentation: 'modal' }} />
           <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
           <Stack.Screen name="budgets" options={{ presentation: 'modal' }} />
           <Stack.Screen name="budget-edit" options={{ presentation: 'modal' }} />

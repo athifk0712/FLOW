@@ -20,6 +20,7 @@ import { AppSymbol } from '@/components/app-symbol';
 import { CategoryIcon } from '@/components/category-icon';
 import { DateTimeField } from '@/components/date-time-field';
 import { IconPicker } from '@/components/icon-picker';
+import { PocketPicker } from '@/components/pockets/pocket-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { guessIcon } from '@/constants/category-icons';
@@ -94,6 +95,7 @@ export default function QuickLogScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
+  const [pocketId, setPocketId] = useState<string | null>(null);
   const [feeDigits, setFeeDigits] = useState('');
   const [guess, setGuess] = useState<string | null>(null);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
@@ -216,6 +218,7 @@ export default function QuickLogScreen() {
 
   function pickFrom(id: string) {
     setAccountId(id);
+    setPocketId(null); // pockets belong to one account
     // Keep a transfer valid: move the destination off the account just picked as source.
     if (id === toAccountId) setToAccountId(accounts.find((a) => a.id !== id)?.id ?? null);
   }
@@ -360,6 +363,7 @@ export default function QuickLogScreen() {
           ? { type: mode, amount, from_account_id: accountId, category_id: categoryId }
           : { type: mode, amount, to_account_id: accountId, category_id: categoryId };
       row.client_request_id = requestId;
+      if (pocketId) row.pocket_id = pocketId;
       if (occurredAt) row.occurred_at = occurredAt.toISOString();
       if (note.trim()) row.description = note.trim();
       if (merchant.trim()) row.merchant = merchant.trim();
@@ -668,6 +672,16 @@ export default function QuickLogScreen() {
               </Pressable>
             )}
             {accountChips(accounts, accountId, pickFrom)}
+
+            {!isTransfer && (
+              <PocketPicker
+                accountId={accountId}
+                value={pocketId}
+                onChange={setPocketId}
+                direction={mode === 'INCOME' ? 'in' : 'out'}
+                amount={amount}
+              />
+            )}
 
             {isTransfer && (
               <>
