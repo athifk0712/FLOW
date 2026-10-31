@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalEdges } from '@/constants/safe-area';
 
+import { AmountInput } from '@/components/amount-input';
 import { DateTimeField } from '@/components/date-time-field';
 import { ReceiptPhoto } from '@/components/receipt-photo';
 import { CategoryIcon } from '@/components/category-icon';
@@ -22,7 +23,7 @@ import { NECESSITY, NECESSITY_ORDER, type Necessity } from '@/constants/necessit
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Tables, TablesUpdate } from '@/lib/database.types';
-import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
+import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { deleteReceipt, type ScanResult, scannedDate } from '@/lib/receipts';
 import { supabase } from '@/lib/supabase';
@@ -273,14 +274,12 @@ export default function TransactionScreen() {
 
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.prefix}>{getCurrency().symbol.trim()}</ThemedText>
-                  <TextInput
-                    editable={!linked.debtPayment}
+                  <AmountInput
+                    digits={digits}
+                    onChange={setDigits}
+                    label="Nominal"
+                    disabled={linked.debtPayment}
                     style={[styles.priceInput, { color: linked.debtPayment ? theme.textSecondary : theme.text }]}
-                    value={formatDigits(digits)}
-                    onChangeText={(t) => setDigits(toDigits(t))}
-                    placeholder="0"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="number-pad"
                   />
                 </View>
 

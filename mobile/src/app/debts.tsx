@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalEdges } from '@/constants/safe-area';
 
+import { AmountInput } from '@/components/amount-input';
 import { ProgressBar } from '@/components/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -31,7 +32,7 @@ import {
   sortDebts,
 } from '@/lib/debts';
 import type { Tables } from '@/lib/database.types';
-import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
+import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { syncDueReminders } from '@/lib/reminders';
 import { newRequestId } from '@/lib/request-id';
@@ -256,14 +257,7 @@ export default function DebtsScreen() {
       />
       <View style={priceRow}>
         <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-        <TextInput
-          style={[styles.priceInput, { color: theme.text }]}
-          value={formatDigits(amount)}
-          onChangeText={(t) => setAmount(toDigits(t))}
-          placeholder="Jumlah"
-          placeholderTextColor={theme.textSecondary}
-          keyboardType="number-pad"
-        />
+        <AmountInput digits={amount} onChange={setAmount} label="Jumlah" placeholder="Jumlah" style={styles.priceInput} />
       </View>
       <ThemedText type="small" themeColor="textSecondary">
         {direction === 'OWED_TO_ME' ? 'Uangnya keluar dari' : 'Uangnya masuk ke'}
@@ -401,13 +395,12 @@ export default function DebtsScreen() {
                   <View style={styles.inline}>
                     <View style={[...priceRow, styles.flex]}>
                       <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                      <TextInput
-                        style={[styles.priceInput, { color: theme.text }]}
-                        value={formatDigits(payment)}
-                        onChangeText={(t) => setPayment(toDigits(t))}
+                      <AmountInput
+                        digits={payment}
+                        onChange={setPayment}
+                        label="Dibayar sebagian"
                         placeholder="Dibayar sebagian"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
+                        style={styles.priceInput}
                       />
                     </View>
                     <Pressable

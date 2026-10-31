@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ModalEdges } from "@/constants/safe-area";
 
+import { AmountInput } from "@/components/amount-input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
@@ -24,7 +25,7 @@ import {
 import { MaxContentWidth, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import type { Tables } from "@/lib/database.types";
-import { formatDigits, formatMoney, getCurrency, toDigits } from "@/lib/money";
+import { formatMoney, getCurrency } from "@/lib/money";
 import { closeModal } from "@/lib/navigation";
 import { syncDueReminders } from "@/lib/reminders";
 import { supabase } from "@/lib/supabase";
@@ -215,14 +216,7 @@ export default function RecurringScreen() {
           ]}
         >
           <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-          <TextInput
-            style={[styles.priceInput, { color: theme.text }]}
-            value={formatDigits(digits)}
-            onChangeText={(t) => setDigits(toDigits(t))}
-            placeholder="0"
-            placeholderTextColor={theme.textSecondary}
-            keyboardType="number-pad"
-          />
+          <AmountInput digits={digits} onChange={setDigits} label="Nominal" style={styles.priceInput} />
         </View>
         <View
           style={[

@@ -1,10 +1,10 @@
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, type TextInputProps, View } from 'react-native';
 
+import { AmountInput } from '@/components/amount-input';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { MAX_AMOUNT_DIGITS } from '@/lib/amount-input';
-import { formatDigits, toDigits, useCurrency } from '@/lib/money';
+import { useCurrency } from '@/lib/money';
 
 // Small form pieces shared by the Aset forms: a labelled field, an amount field (digits in, formatted out),
 // a row of wallet chips, and the primary button.
@@ -55,14 +55,12 @@ export function MoneyField({
       <ThemedText type="smallBold" themeColor="textSecondary">
         {currency.symbol.trim()}
       </ThemedText>
-      <TextInput
-        value={formatDigits(digits)}
-        onChangeText={(t) => onChange(toDigits(t, MAX_AMOUNT_DIGITS))}
+      <AmountInput
+        digits={digits}
+        onChange={onChange}
+        label={accessibilityLabel ?? 'Nominal'}
         placeholder={placeholder}
-        placeholderTextColor={theme.textSecondary}
-        keyboardType="number-pad"
-        accessibilityLabel={accessibilityLabel}
-        style={[styles.moneyInput, { color: theme.text }]}
+        style={styles.moneyInput}
       />
     </View>
   );
@@ -152,8 +150,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 600,
     paddingVertical: Spacing.two + 2,
-    outlineWidth: 0,
-    outlineColor: 'transparent',
   },
   chips: {
     flexDirection: 'row',

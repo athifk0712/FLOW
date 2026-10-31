@@ -27,7 +27,8 @@ import {
   setTargetStatus,
   type Target,
 } from '@/lib/groups';
-import { formatDigits, formatMoney, toDigits } from '@/lib/money';
+import { AmountInput } from '@/components/amount-input';
+import { formatMoney } from '@/lib/money';
 import { shareText } from '@/lib/share-text';
 import { fallbackReminder, type MemberStatus, STATUS_LABEL, targetProgress } from '@/lib/together';
 
@@ -489,14 +490,14 @@ function TargetCard({
           <View style={styles.stackTight}>
             <View style={[styles.money, { backgroundColor: theme.backgroundSelected }]}>
               <ThemedText type="smallBold">{currency.symbol.trim()}</ThemedText>
-              <TextInput
-                value={formatDigits(digits, currency)}
-                onChangeText={(t) => setDigits(toDigits(t))}
+              <AmountInput
+                digits={digits}
+                onChange={setDigits}
+                label="Jumlah setoran"
                 placeholder="Jumlah setoran"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-                autoFocus
-                style={[styles.moneyInput, { color: theme.text }]}
+                currency={currency}
+                autoOpen
+                style={styles.moneyInput}
               />
             </View>
             <TextInput
@@ -720,13 +721,13 @@ function NewTarget({ groupId, currency, onDone, onCancel }: { groupId: string; c
       />
       <View style={[styles.money, { backgroundColor: theme.backgroundSelected }]}>
         <ThemedText type="smallBold">{currency.symbol.trim()}</ThemedText>
-        <TextInput
-          value={formatDigits(digits, currency)}
-          onChangeText={(t) => setDigits(toDigits(t))}
+        <AmountInput
+          digits={digits}
+          onChange={setDigits}
+          label="Total yang dikumpulkan"
           placeholder="Total yang dikumpulkan"
-          placeholderTextColor={theme.textSecondary}
-          keyboardType="number-pad"
-          style={[styles.moneyInput, { color: theme.text }]}
+          currency={currency}
+          style={styles.moneyInput}
         />
       </View>
       <View style={styles.wrap}>

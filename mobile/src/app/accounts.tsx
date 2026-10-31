@@ -16,6 +16,7 @@ import { ModalEdges } from '@/constants/safe-area';
 
 import { AccountBadge } from '@/components/account-badge';
 import { AccountPicker } from '@/components/account-picker';
+import { AmountInput } from '@/components/amount-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -23,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
 import { type AdminFee, adminFeeProblem, loadAdminFees, saveAdminFee } from '@/lib/admin-fee';
 import type { Enums, Tables } from '@/lib/database.types';
-import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
+import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -247,14 +248,7 @@ export default function AccountsScreen() {
         </ThemedText>
         <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
           <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-          <TextInput
-            style={[styles.priceInput, { color: theme.text }]}
-            value={formatDigits(opening)}
-            onChangeText={(t) => setOpening(toDigits(t))}
-            placeholder="0"
-            placeholderTextColor={theme.textSecondary}
-            keyboardType="number-pad"
-          />
+          <AmountInput digits={opening} onChange={setOpening} label="Saldo awal" style={styles.priceInput} />
         </View>
       </View>
 
@@ -282,13 +276,12 @@ export default function AccountsScreen() {
                 </ThemedText>
                 <View style={[styles.priceRow, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                  <TextInput
-                    style={[styles.priceInput, { color: theme.text }]}
-                    value={formatDigits(feeAmount)}
-                    onChangeText={(t) => setFeeAmount(toDigits(t))}
+                  <AmountInput
+                    digits={feeAmount}
+                    onChange={setFeeAmount}
+                    label="Biaya admin"
                     placeholder="15.000"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="number-pad"
+                    style={styles.priceInput}
                   />
                 </View>
               </View>

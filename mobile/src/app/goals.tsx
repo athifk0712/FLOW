@@ -14,12 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalEdges } from '@/constants/safe-area';
 
 import { GoalProgress } from '@/components/goal-progress';
+import { AmountInput } from '@/components/amount-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deadlineFromOffset, deadlineLabel, type Goal, offsetFromDeadline } from '@/lib/goals';
-import { formatDigits, formatMoney, getCurrency, toDigits } from '@/lib/money';
+import { formatMoney, getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -127,14 +128,7 @@ export default function GoalsScreen() {
       />
       <View style={priceRow}>
         <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-        <TextInput
-          style={[styles.priceInput, { color: theme.text }]}
-          value={formatDigits(target)}
-          onChangeText={(t) => setTarget(toDigits(t))}
-          placeholder="Target"
-          placeholderTextColor={theme.textSecondary}
-          keyboardType="number-pad"
-        />
+        <AmountInput digits={target} onChange={setTarget} label="Target" placeholder="Target" style={styles.priceInput} />
       </View>
       <View style={styles.inline}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -214,14 +208,13 @@ export default function GoalsScreen() {
               <View style={styles.inline}>
                 <View style={[...priceRow, styles.flex]}>
                   <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-                  <TextInput
-                    style={[styles.priceInput, { color: theme.text }]}
-                    value={formatDigits(deposit)}
-                    onChangeText={(t) => setDeposit(toDigits(t))}
+                  <AmountInput
+                    digits={deposit}
+                    onChange={setDeposit}
+                    label="Jumlah"
                     placeholder="Jumlah"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="number-pad"
-                    autoFocus
+                    style={styles.priceInput}
+                    autoOpen
                   />
                 </View>
                 <Pressable

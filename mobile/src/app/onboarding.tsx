@@ -17,6 +17,7 @@ import { AccountBadge } from '@/components/account-badge';
 import { AccountPicker } from '@/components/account-picker';
 import { CurrencyList } from '@/components/currency-list';
 import { CycleSection } from '@/components/settings/cycle-section';
+import { AmountInput } from '@/components/amount-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -25,7 +26,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { type CatalogEntry, GROUP_TYPE } from '@/lib/account-catalog';
 import type { Enums } from '@/lib/database.types';
 import { displayName, NAME_MAX, saveDisplayName } from '@/lib/display-name';
-import { formatDigits, formatMoney, toDigits, useCurrency } from '@/lib/money';
+import { formatMoney, useCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
@@ -267,15 +268,13 @@ export default function OnboardingScreen() {
                     </ThemedText>
                     <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
                       <ThemedText type="small">{currency.symbol.trim()}</ThemedText>
-                      <TextInput
-                        style={[styles.priceInput, { color: theme.text }]}
-                        value={formatDigits(p.digits)}
-                        onChangeText={(t) =>
-                          setPicked((list) => list.map((x) => (x.name === p.name ? { ...x, digits: toDigits(t) } : x)))
-                        }
+                      <AmountInput
+                        digits={p.digits}
+                        onChange={(digits) => setPicked((list) => list.map((x) => (x.name === p.name ? { ...x, digits } : x)))}
+                        label={`Saldo ${p.name}`}
                         placeholder="Saldo"
-                        placeholderTextColor={theme.textSecondary}
-                        keyboardType="number-pad"
+                        currency={currency}
+                        style={styles.priceInput}
                       />
                     </View>
                   </ThemedView>
@@ -299,15 +298,13 @@ export default function OnboardingScreen() {
                     { backgroundColor: theme.backgroundElement, borderColor: budgetFocused ? theme.primary : 'transparent' },
                   ]}>
                   <ThemedText type="smallBold">{currency.symbol.trim()}</ThemedText>
-                  <TextInput
-                    style={[styles.priceInput, styles.bigInput, { color: theme.text }]}
-                    value={formatDigits(budget)}
-                    onChangeText={(t) => setBudget(toDigits(t))}
-                    onFocus={() => setBudgetFocused(true)}
-                    onBlur={() => setBudgetFocused(false)}
-                    placeholder="0"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="number-pad"
+                  <AmountInput
+                    digits={budget}
+                    onChange={setBudget}
+                    label="Budget mingguan"
+                    currency={currency}
+                    onOpenChange={setBudgetFocused}
+                    style={[styles.priceInput, styles.bigInput]}
                   />
                 </View>
                 <View style={styles.chips}>

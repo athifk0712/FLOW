@@ -7,12 +7,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModalEdges } from '@/constants/safe-area';
 
+import { AmountInput } from '@/components/amount-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NECESSITY } from '@/constants/necessity';
@@ -20,7 +20,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { loadBudgetPlan, saveBudgetRow } from '@/lib/budget-data';
 import { type BudgetPeriod, changedRows, type PlanRow } from '@/lib/budget-plan';
-import { formatDigits, getCurrency, toDigits } from '@/lib/money';
+import { getCurrency } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 
 type Plan = { weekly: PlanRow[]; perCategory: PlanRow[] };
@@ -87,14 +87,12 @@ export default function BudgetEditScreen() {
   const amountField = (r: PlanRow) => (
     <View style={[styles.priceRow, { backgroundColor: theme.backgroundSelected }]}>
       <ThemedText type="smallBold">{getCurrency().symbol.trim()}</ThemedText>
-      <TextInput
-        style={[styles.priceInput, { color: theme.text }]}
-        value={formatDigits(r.digits)}
-        onChangeText={(t) => update(r.key, { digits: toDigits(t) })}
+      <AmountInput
+        digits={r.digits}
+        onChange={(digits) => update(r.key, { digits })}
+        label={`Budget ${r.name}`}
         placeholder="Tanpa budget"
-        placeholderTextColor={theme.textSecondary}
-        keyboardType="number-pad"
-        accessibilityLabel={`Budget ${r.name}`}
+        style={styles.priceInput}
       />
     </View>
   );
