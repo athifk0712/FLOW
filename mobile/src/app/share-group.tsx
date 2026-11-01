@@ -2,18 +2,17 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { SHARE_CAPTURE_WIDTH, SharePreview, sharePreviewWidth } from '@/components/charts/share-frame';
 import { PrimaryButton } from '@/components/form-fields';
 import { SwitchRow } from '@/components/switch-row';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { GroupShareCard } from '@/components/together/group-share-card';
-import { Spacing } from '@/constants/theme';
 import { findCurrency } from '@/lib/currencies';
 import { type GroupDetail, loadGroup } from '@/lib/groups';
-import { shareViewAsImage } from '@/lib/share-image';
+import { releaseSharedImage, shareViewAsImage } from '@/lib/share-image';
 import { targetProgress } from '@/lib/together';
 
-const MAX_CARD_WIDTH = 300;
 // Room left for the title and the two switches.
 const CONTROLS_HEIGHT = 320;
 
@@ -28,6 +27,8 @@ export default function ShareGroupScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => releaseSharedImage, []);
 
   useEffect(() => {
     let alive = true;
@@ -52,7 +53,6 @@ export default function ShareGroupScreen() {
         : null,
     [detail, target],
   );
-  const width = Math.min(MAX_CARD_WIDTH, window.width - Spacing.five * 2, ((window.height - CONTROLS_HEIGHT) * 9) / 16);
 
   async function share() {
     if (!target) return;
@@ -76,16 +76,22 @@ export default function ShareGroupScreen() {
       {detail && target && progress && (
         <>
           <View style={styles.center}>
-            <GroupShareCard
-              ref={card}
-              width={width}
-              groupName={detail.group.name}
-              targetName={target.name}
-              targetAmount={target.target_amount}
-              currency={findCurrency(detail.group.currency)}
-              progress={progress}
-              showAmounts={showAmounts}
-              showNames={showNames}
+            <SharePreview
+              width={sharePreviewWidth(window, CONTROLS_HEIGHT)}
+              cardRef={card}
+              renderCard={(ref) => (
+                <GroupShareCard
+                  ref={ref}
+                  width={SHARE_CAPTURE_WIDTH}
+                  groupName={detail.group.name}
+                  targetName={target.name}
+                  targetAmount={target.target_amount}
+                  currency={findCurrency(detail.group.currency)}
+                  progress={progress}
+                  showAmounts={showAmounts}
+                  showNames={showNames}
+                />
+              )}
             />
           </View>
 

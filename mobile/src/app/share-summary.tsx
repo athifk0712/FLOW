@@ -3,20 +3,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ShareCard } from '@/components/charts/share-card';
+import { SHARE_CAPTURE_WIDTH, SharePreview, sharePreviewWidth } from '@/components/charts/share-frame';
 import { PrimaryButton } from '@/components/form-fields';
 import { SwitchRow } from '@/components/switch-row';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
 import { useChartRows } from '@/lib/chart-data';
 import { assignSlots, monthSlices } from '@/lib/charts';
 import { cycleLabel, cycleRange } from '@/lib/cycle';
-import { shareViewAsImage } from '@/lib/share-image';
+import { releaseSharedImage, shareViewAsImage } from '@/lib/share-image';
 import { STREAK_COLUMNS, streakFromProfile } from '@/lib/streak';
 import { supabase } from '@/lib/supabase';
 
-const MAX_CARD_WIDTH = 300;
 // Room left for the title and the controls, so the whole picture fits without scrolling on most phones.
 const CONTROLS_HEIGHT = 240;
 
@@ -33,6 +32,8 @@ export default function ShareSummaryScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [streakDays, setStreakDays] = useState(0);
+
+  useEffect(() => releaseSharedImage, []);
 
   // Without it the card simply has no streak; never worth an error here.
   useEffect(() => {
@@ -57,7 +58,6 @@ export default function ShareSummaryScreen() {
     };
   }, [rows, now, day, offset]);
 
-  const width = Math.min(MAX_CARD_WIDTH, window.width - Spacing.five * 2, ((window.height - CONTROLS_HEIGHT) * 9) / 16);
   const period = cycleLabel(cycleRange(now, day, offset).start, day);
   const empty = expense.total === 0 && income === 0;
 
@@ -81,15 +81,21 @@ export default function ShareSummaryScreen() {
       {rows !== null && loaded && (
         <>
           <View style={styles.center}>
-            <ShareCard
-              ref={card}
-              width={width}
-              period={period}
-              income={income}
-              expense={expense.total}
-              slices={expense.slices}
-              showAmounts={showAmounts}
-              streakDays={streakDays}
+            <SharePreview
+              width={sharePreviewWidth(window, CONTROLS_HEIGHT)}
+              cardRef={card}
+              renderCard={(ref) => (
+                <ShareCard
+                  ref={ref}
+                  width={SHARE_CAPTURE_WIDTH}
+                  period={period}
+                  income={income}
+                  expense={expense.total}
+                  slices={expense.slices}
+                  showAmounts={showAmounts}
+                  streakDays={streakDays}
+                />
+              )}
             />
           </View>
 

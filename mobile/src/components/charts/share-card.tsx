@@ -2,15 +2,14 @@ import { forwardRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Donut } from '@/components/charts/donut';
-import { SHARE_BASE_WIDTH, ShareFrame } from '@/components/charts/share-frame';
-import { ThemedText } from '@/components/themed-text';
+import { SHARE_BASE_WIDTH, ShareFrame, ShareText } from '@/components/charts/share-frame';
 import { useChartColors } from '@/constants/chart-colors';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_SLICES, type Slice, savingsRate } from '@/lib/charts';
 import { formatMoney, formatMoneyShort } from '@/lib/money';
 
 type Props = {
-  /** Width on screen; the height follows the 9:16 of a status. */
+  /** Width the card is drawn at; the height follows the 9:16 of a status. */
   width: number;
   period: string;
   income: number;
@@ -50,26 +49,26 @@ export const ShareCard = forwardRef<View, Props>(function ShareCard({ width, per
     <ShareFrame ref={ref} width={width} footer="Dicatat pakai Flowku · flowku.expo.app">
       <View style={[styles.top, { gap: 12 * s }]}>
         <View style={[styles.flex, { gap: 2 * s }]}>
-          <ThemedText type="small" style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+          <ShareText type="small" style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
             Rekap {period}
-          </ThemedText>
-          <ThemedText
+          </ShareText>
+          <ShareText
             numberOfLines={1}
             adjustsFontSizeToFit
             style={[onCard, styles.headline, { fontSize: headlineSize, lineHeight: 56 * s }]}>
             {headline.value}
-          </ThemedText>
-          <ThemedText type="small" style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+          </ShareText>
+          <ShareText type="small" style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
             {headline.caption}
-          </ThemedText>
+          </ShareText>
         </View>
         {streakDays > 0 && (
           <View style={[styles.streak, { width: 88 * s, paddingVertical: 7 * s, borderRadius: 18 * s, backgroundColor: theme.backgroundElement }]}>
-            <Text style={{ fontSize: 26 * s, lineHeight: 32 * s }}>🔥</Text>
-            <ThemedText style={[styles.headline, { fontSize: 24 * s, lineHeight: 30 * s }]}>{streakDays}</ThemedText>
-            <ThemedText type="small" style={[styles.streakCaption, { fontSize: 11 * s, lineHeight: 14 * s }]}>
+            <Text allowFontScaling={false} style={{ fontSize: 26 * s, lineHeight: 32 * s }}>🔥</Text>
+            <ShareText style={[styles.headline, { fontSize: 24 * s, lineHeight: 30 * s }]}>{streakDays}</ShareText>
+            <ShareText type="small" style={[styles.streakCaption, { fontSize: 11 * s, lineHeight: 14 * s }]}>
               hari beruntun
-            </ThemedText>
+            </ShareText>
           </View>
         )}
       </View>
@@ -89,12 +88,12 @@ export const ShareCard = forwardRef<View, Props>(function ShareCard({ width, per
           {slices.slice(0, ROWS).map((slice) => (
             <View key={slice.key} style={[styles.row, { gap: 8 * s }]}>
               <View style={{ width: 10 * s, height: 10 * s, borderRadius: 3 * s, backgroundColor: colors.slot(slice.slot) }} />
-              <ThemedText type="small" numberOfLines={1} style={[styles.flex, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+              <ShareText type="small" numberOfLines={1} style={[styles.flex, { fontSize: 14 * s, lineHeight: 20 * s }]}>
                 {slice.name}
-              </ThemedText>
-              <ThemedText type="smallBold" style={{ fontSize: 14 * s, lineHeight: 20 * s }}>
+              </ShareText>
+              <ShareText type="smallBold" style={{ fontSize: 14 * s, lineHeight: 20 * s }}>
                 {showAmounts ? formatMoney(slice.total) : `${Math.round(slice.share * 100)}%`}
-              </ThemedText>
+              </ShareText>
             </View>
           ))}
         </View>

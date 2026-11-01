@@ -2,8 +2,7 @@ import { forwardRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-import { SHARE_BASE_WIDTH, ShareFrame } from '@/components/charts/share-frame';
-import { ThemedText } from '@/components/themed-text';
+import { SHARE_BASE_WIDTH, ShareFrame, ShareText } from '@/components/charts/share-frame';
 import { useTheme } from '@/hooks/use-theme';
 import type { Currency } from '@/lib/currencies';
 import { formatMoney } from '@/lib/money';
@@ -67,36 +66,36 @@ export const GroupShareCard = forwardRef<View, Props>(function GroupShareCard(
   return (
     <ShareFrame ref={ref} width={width} footer="Patungan bareng pakai Flowku · flowku.expo.app">
       <View style={{ gap: 2 * s }}>
-        <ThemedText type="small" numberOfLines={1} style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+        <ShareText type="small" numberOfLines={1} style={[onCard, { fontSize: 14 * s, lineHeight: 20 * s }]}>
           Patungan {groupName}
-        </ThemedText>
-        <ThemedText numberOfLines={2} style={[onCard, styles.bold, { fontSize: 22 * s, lineHeight: 28 * s }]}>
+        </ShareText>
+        <ShareText numberOfLines={2} style={[onCard, styles.bold, { fontSize: 22 * s, lineHeight: 28 * s }]}>
           {targetName}
-        </ThemedText>
+        </ShareText>
       </View>
 
       <View style={[styles.panel, { padding: 18 * s, gap: 14 * s, borderRadius: 22 * s, backgroundColor: theme.backgroundElement }]}>
         <View style={[styles.ring, { width: ringSize, height: ringSize }]}>
           <Ring size={ringSize} percent={progress.percent} track={theme.backgroundSelected} color={theme.primary} />
-          <ThemedText style={[styles.bold, { fontSize: ringSize * 0.25, lineHeight: ringSize * 0.31 }]}>{progress.percent}%</ThemedText>
-          <ThemedText type="small" style={{ fontSize: 12 * s, lineHeight: 16 * s }}>
+          <ShareText style={[styles.bold, { fontSize: ringSize * 0.25, lineHeight: ringSize * 0.31 }]}>{progress.percent}%</ShareText>
+          <ShareText type="small" style={{ fontSize: 12 * s, lineHeight: 16 * s }}>
             {progress.reached ? 'tercapai 🎉' : 'terkumpul'}
-          </ThemedText>
+          </ShareText>
         </View>
 
         <View style={[styles.summary, { gap: 2 * s }]}>
           {showAmounts && (
-            <ThemedText type="smallBold" style={[styles.middle, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+            <ShareText type="smallBold" style={[styles.middle, { fontSize: 14 * s, lineHeight: 20 * s }]}>
               {money(progress.verified)} dari {money(targetAmount)}
-            </ThemedText>
+            </ShareText>
           )}
-          <ThemedText type="smallBold" style={[styles.middle, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+          <ShareText type="smallBold" style={[styles.middle, { fontSize: 14 * s, lineHeight: 20 * s }]}>
             {paid} dari {total} anggota lunas
-          </ThemedText>
+          </ShareText>
           {progress.deadlineText && !progress.reached && (
-            <ThemedText type="small" themeColor="textSecondary" style={[styles.middle, { fontSize: 13 * s, lineHeight: 18 * s }]}>
+            <ShareText type="small" themeColor="textSecondary" style={[styles.middle, { fontSize: 13 * s, lineHeight: 18 * s }]}>
               {progress.deadlineText}
-            </ThemedText>
+            </ShareText>
           )}
         </View>
 
@@ -105,20 +104,20 @@ export const GroupShareCard = forwardRef<View, Props>(function GroupShareCard(
             {rows.map((m) => (
               <View key={m.user_id} style={[styles.row, { gap: 8 * s }]}>
                 <View style={{ width: 10 * s, height: 10 * s, borderRadius: 5 * s, backgroundColor: m.status === 'LUNAS' ? theme.primary : theme.backgroundSelected }} />
-                <ThemedText type="small" numberOfLines={1} style={[styles.flex, { fontSize: 14 * s, lineHeight: 20 * s }]}>
+                <ShareText type="small" numberOfLines={1} style={[styles.flex, { fontSize: 14 * s, lineHeight: 20 * s }]}>
                   {m.name}
-                </ThemedText>
+                </ShareText>
                 {showAmounts && (
-                  <ThemedText type="smallBold" style={{ fontSize: 13 * s, lineHeight: 18 * s }}>
+                  <ShareText type="smallBold" style={{ fontSize: 13 * s, lineHeight: 18 * s }}>
                     {money(m.verified)}
-                  </ThemedText>
+                  </ShareText>
                 )}
               </View>
             ))}
             {total > MAX_ROWS && (
-              <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 13 * s, lineHeight: 18 * s }}>
+              <ShareText type="small" themeColor="textSecondary" style={{ fontSize: 13 * s, lineHeight: 18 * s }}>
                 dan {total - MAX_ROWS} anggota lainnya
-              </ThemedText>
+              </ShareText>
             )}
           </View>
         ) : (
