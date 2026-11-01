@@ -22,6 +22,23 @@ export type Slice = {
   slot: number | null;
 };
 
+/** A slice smaller than this gets no icon on the ring: its neighbours' icons would run into it. */
+export const MIN_BADGE_SHARE = 0.08;
+
+/**
+ * Which slices carry an icon on the donut's ring, and where: the middle of the slice, in radians clockwise from the
+ * top. Slices follow each other in the given order, so hidden small ones still push the later ones along.
+ */
+export function sliceBadges<T extends Pick<Slice, 'share'>>(slices: T[]) {
+  const badges: { slice: T; angle: number }[] = [];
+  let before = 0;
+  for (const slice of slices) {
+    if (slice.share >= MIN_BADGE_SHARE) badges.push({ slice, angle: (before + slice.share / 2) * 2 * Math.PI });
+    before += slice.share;
+  }
+  return badges;
+}
+
 const keyOf = (t: ChartTransaction) => t.category_id ?? 'none';
 
 /**

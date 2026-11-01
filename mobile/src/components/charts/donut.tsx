@@ -1,10 +1,12 @@
-import { Platform, StyleSheet, View } from 'react-native';
+import { PixelRatio, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { useChartColors } from '@/constants/chart-colors';
+import { iconFor } from '@/constants/category-icons';
 import { useTheme } from '@/hooks/use-theme';
-import type { Slice } from '@/lib/charts';
+import { type Slice, sliceBadges } from '@/lib/charts';
 import { formatMoney } from '@/lib/money';
 
 type Props = {
@@ -20,17 +22,22 @@ type Props = {
   textScale?: number;
 };
 
-const GAP = 2; // px of card surface between segments
+// Android draws these icons as text, which would grow with the phone's text size and leave its circle.
+const iconFontScale = () => (Platform.OS === 'android' ? PixelRatio.getFontScale() : 1);
 
-// Part-to-whole for one month, at most six segments. The center shows the total, or the tapped segment.
+// Part-to-whole for one month, at most six segments, with each large enough segment's icon on the ring. The center
+// shows the total, or the tapped segment.
 export function Donut({ slices, total, label, selected = null, onSelect, size = 200, centerValue, textScale }: Props) {
   const theme = useTheme();
   const colors = useChartColors();
-  const thickness = Math.round(size * 0.13);
-  const r = (size - thickness - 6) / 2;
+  const thickness = Math.round(size * 0.085);
+  const badge = Math.round(size * 0.155);
+  const r = (size - badge) / 2 - 1;
   const circumference = 2 * Math.PI * r;
   const active = slices.find((s) => s.key === selected) ?? null;
-  const gap = slices.length > 1 ? GAP : 0;
+  const gap = slices.length > 1 ? Math.max(size * 0.012, 1.5) : 0; // card surface between segments
+  const inset = badge + Math.round(size * 0.02);
+  const toggle = (key: string) => onSelect?.(key === selected ? null : key);
 
   let offset = 0;
   const arcs = slices.map((s) => {
@@ -55,27 +62,29 @@ export function Donut({ slices, total, label, selected = null, onSelect, size = 
                 r={r}
                 fill="none"
                 stroke={colors.slot(slice.slot)}
-                strokeWidth={slice.key === selected ? thickness + 6 : thickness}
+                strokeWidth={slice.key === selected ? thickness + 4 : thickness}
                 strokeOpacity={active && slice.key !== selected ? 0.3 : 1}
                 strokeDasharray={`${length} ${circumference}`}
                 strokeDashoffset={-start}
-                // Browsers can't press an SVG shape here; the category rows below the chart select on every platform.
-                onPress={onSelect && Platform.OS !== 'web' ? () => onSelect(slice.key === selected ? null : slice.key) : undefined}
+                // Browsers can't press an SVG shape here; the icons and the category rows select on every platform.
+                onPress={onSelect && Platform.OS !== 'web' ? () => toggle(slice.key) : undefined}
               />
             ))
           )}
         </G>
       </Svg>
-      <View style={[styles.center, { paddingHorizontal: thickness + (textScale ? 4 : 12) }]} pointerEvents="none">
+      <View style={[styles.center, { paddingHorizontal: inset }]} pointerEvents="none">
         <ThemedText
           type="small"
           themeColor="textSecondary"
           numberOfLines={1}
+          allowFontScaling={!textScale}
           style={textScale ? { fontSize: 14 * textScale, lineHeight: 18 * textScale } : undefined}>
           {active ? active.name : label}
         </ThemedText>
         <ThemedText
           type="smallBold"
+          allowFontScaling={!textScale}
           style={[styles.total, textScale ? { fontSize: 22 * textScale, lineHeight: 28 * textScale } : undefined]}
           numberOfLines={1}
           adjustsFontSizeToFit>
@@ -87,6 +96,40 @@ export function Donut({ slices, total, label, selected = null, onSelect, size = 
           </ThemedText>
         )}
       </View>
+      {total > 0 &&
+        sliceBadges(slices).map(({ slice, angle }) => {
+          const def = iconFor(slice.icon);
+          const place = {
+            left: size / 2 + r * Math.sin(angle) - badge / 2,
+            top: size / 2 - r * Math.cos(angle) - badge / 2,
+            width: badge,
+            height: badge,
+            borderRadius: badge / 2,
+            borderWidth: Math.max(size * 0.006, 1),
+            backgroundColor: theme.backgroundElement,
+            borderColor: theme.backgroundSelected,
+            opacity: active && slice.key !== selected ? 0.45 : 1,
+          };
+          const icon = (
+            <AppSymbol material={def.material} sf={def.sf} size={(badge * 0.58) / iconFontScale()} color={colors.slot(slice.slot)} />
+          );
+          return onSelect ? (
+            <Pressable
+              key={slice.key}
+              onPress={() => toggle(slice.key)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityState={{ selected: slice.key === selected }}
+              accessibilityLabel={`${slice.name}, ${Math.round(slice.share * 100)} persen`}
+              style={[styles.badge, place]}>
+              {icon}
+            </Pressable>
+          ) : (
+            <View key={slice.key} style={[styles.badge, place]}>
+              {icon}
+            </View>
+          );
+        })}
     </View>
   );
 }
@@ -104,5 +147,10 @@ const styles = StyleSheet.create({
   total: {
     fontSize: 22,
     lineHeight: 28,
+  },
+  badge: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

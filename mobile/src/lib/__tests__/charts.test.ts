@@ -1,4 +1,29 @@
-import { assignSlots, type ChartTransaction, compactAmount, monthInsights, monthlyFlow, monthSlices, niceMax, savingsRate } from '@/lib/charts';
+import { assignSlots, type ChartTransaction, compactAmount, MIN_BADGE_SHARE, monthInsights, monthlyFlow, monthSlices, niceMax, savingsRate, sliceBadges } from '@/lib/charts';
+
+describe('sliceBadges', () => {
+  it('puts each icon in the middle of its slice, clockwise from the top', () => {
+    const badges = sliceBadges([{ share: 0.5 }, { share: 0.25 }, { share: 0.25 }]);
+    expect(badges.map((b) => b.angle / Math.PI)).toEqual([0.5, 1.25, 1.75]);
+  });
+
+  it('leaves out small slices without shifting the ones after them', () => {
+    const badges = sliceBadges([{ share: 0.5 }, { share: 0.02 }, { share: 0.48 }]);
+    expect(badges.map((b) => b.slice.share)).toEqual([0.5, 0.48]);
+    expect(badges[1].angle / (2 * Math.PI)).toBeCloseTo(0.76);
+  });
+
+  it('keeps a slice exactly at the limit, and has nothing to place without slices', () => {
+    expect(sliceBadges([{ share: MIN_BADGE_SHARE }])).toHaveLength(1);
+    expect(sliceBadges([])).toEqual([]);
+  });
+
+  it('never places two icons closer than the ring can hold', () => {
+    const badges = sliceBadges([0.08, 0.08, 0.08, 0.08, 0.08, 0.6].map((share) => ({ share })));
+    for (let i = 1; i < badges.length; i++) {
+      expect(badges[i].angle - badges[i - 1].angle).toBeGreaterThanOrEqual(MIN_BADGE_SHARE * 2 * Math.PI - 1e-9);
+    }
+  });
+});
 
 const tx = (type: 'INCOME' | 'EXPENSE', amount: number, day: number, cat: string | null, month = 9): ChartTransaction => ({
   type,
