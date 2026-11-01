@@ -16,12 +16,14 @@ type Props = {
   size?: number;
   /** What the center says instead of the total, e.g. on a shared picture that hides amounts. */
   centerValue?: string;
+  /** Scales the center text with the chart, on a picture drawn at its own size. */
+  textScale?: number;
 };
 
 const GAP = 2; // px of card surface between segments
 
 // Part-to-whole for one month, at most six segments. The center shows the total, or the tapped segment.
-export function Donut({ slices, total, label, selected = null, onSelect, size = 200, centerValue }: Props) {
+export function Donut({ slices, total, label, selected = null, onSelect, size = 200, centerValue, textScale }: Props) {
   const theme = useTheme();
   const colors = useChartColors();
   const thickness = Math.round(size * 0.13);
@@ -64,11 +66,19 @@ export function Donut({ slices, total, label, selected = null, onSelect, size = 
           )}
         </G>
       </Svg>
-      <View style={[styles.center, { paddingHorizontal: thickness + 12 }]} pointerEvents="none">
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+      <View style={[styles.center, { paddingHorizontal: thickness + (textScale ? 4 : 12) }]} pointerEvents="none">
+        <ThemedText
+          type="small"
+          themeColor="textSecondary"
+          numberOfLines={1}
+          style={textScale ? { fontSize: 14 * textScale, lineHeight: 18 * textScale } : undefined}>
           {active ? active.name : label}
         </ThemedText>
-        <ThemedText type="smallBold" style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
+        <ThemedText
+          type="smallBold"
+          style={[styles.total, textScale ? { fontSize: 22 * textScale, lineHeight: 28 * textScale } : undefined]}
+          numberOfLines={1}
+          adjustsFontSizeToFit>
           {centerValue ?? formatMoney(active ? active.total : total)}
         </ThemedText>
         {active && (

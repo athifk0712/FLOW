@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
@@ -545,6 +546,17 @@ function TargetCard({
           </View>
         ))}
 
+      {p.verified > 0 && (
+        <Pressable
+          onPress={() => router.push({ pathname: '/share-group', params: { group: detail.group.id, target: target.id } })}
+          style={({ pressed }) => [styles.ghost, styles.shareButton, { borderColor: theme.primary }, pressed && styles.pressed]}>
+          <AppSymbol material="ios_share" sf="square.and.arrow.up" size={16} color={theme.primary} />
+          <ThemedText type="smallBold" themeColor="primary">
+            Bagikan ke status
+          </ThemedText>
+        </Pressable>
+      )}
+
       {remind && (
         <ReminderPanel
           target={target}
@@ -899,6 +911,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
     borderWidth: 1,
+  },
+  shareButton: {
+    justifyContent: 'center',
   },
   smallButton: {
     minHeight: 36,

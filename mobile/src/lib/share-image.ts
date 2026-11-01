@@ -14,7 +14,7 @@ const STORY_HEIGHT = 1920;
 export async function shareViewAsImage(view: RefObject<View | null>, fileName: string): Promise<'shared' | 'saved'> {
   if (Platform.OS !== 'web') {
     const uri = await captureRef(view, { format: 'png', quality: 1, result: 'tmpfile', width: STORY_WIDTH, height: STORY_HEIGHT });
-    await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle: 'Bagikan rekap' });
+    await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle: 'Bagikan gambar' });
     return 'shared';
   }
   const dataUri = await captureRef(view, { format: 'png', quality: 1, result: 'data-uri' });

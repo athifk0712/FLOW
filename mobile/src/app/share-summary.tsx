@@ -1,18 +1,20 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ShareCard } from '@/components/charts/share-card';
 import { PrimaryButton } from '@/components/form-fields';
+import { ShareToggle } from '@/components/share-toggle';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCycleDay } from '@/hooks/use-cycle-day';
-import { useTheme } from '@/hooks/use-theme';
 import { useChartRows } from '@/lib/chart-data';
 import { assignSlots, monthSlices } from '@/lib/charts';
 import { cycleLabel, cycleRange } from '@/lib/cycle';
 import { shareViewAsImage } from '@/lib/share-image';
+import { STREAK_COLUMNS, streakFromProfile } from '@/lib/streak';
+import { supabase } from '@/lib/supabase';
 
 const MAX_CARD_WIDTH = 300;
 // Room left for the title and the controls, so the whole picture fits without scrolling on most phones.
@@ -20,7 +22,6 @@ const CONTROLS_HEIGHT = 240;
 
 // Previews the status picture before anything leaves the phone. Amounts stay hidden until the user turns them on.
 export default function ShareSummaryScreen() {
-  const theme = useTheme();
   const params = useLocalSearchParams<{ offset?: string }>();
   const offset = Math.min(0, Number(params.offset) || 0);
   const { day, loaded } = useCycleDay();
@@ -31,6 +32,22 @@ export default function ShareSummaryScreen() {
   const [showAmounts, setShowAmounts] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [streakDays, setStreakDays] = useState(0);
+
+  // Without it the card simply has no streak; never worth an error here.
+  useEffect(() => {
+    let alive = true;
+    supabase
+      .from('profiles')
+      .select(STREAK_COLUMNS)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive && data) setStreakDays(streakFromProfile(data).view.days);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const { expense, income } = useMemo(() => {
     const { start, end } = cycleRange(now, day, offset);
@@ -72,24 +89,16 @@ export default function ShareSummaryScreen() {
               expense={expense.total}
               slices={expense.slices}
               showAmounts={showAmounts}
+              streakDays={streakDays}
             />
           </View>
 
-          <Pressable
-            onPress={() => setShowAmounts((v) => !v)}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: showAmounts }}
-            style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.flex}>
-              <ThemedText type="smallBold">Tampilkan nominal</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {showAmounts ? 'Angka rupiahmu akan terlihat oleh yang melihat status.' : 'Hanya persentase yang terlihat.'}
-              </ThemedText>
-            </View>
-            <View style={[styles.track, { backgroundColor: showAmounts ? theme.primary : theme.backgroundSelected }]}>
-              <View style={[styles.thumb, { backgroundColor: theme.onPrimary }, showAmounts && styles.thumbOn]} />
-            </View>
-          </Pressable>
+          <ShareToggle
+            label="Tampilkan nominal"
+            detail={showAmounts ? 'Angka uangmu akan terlihat oleh yang melihat status.' : 'Hanya persentase yang terlihat.'}
+            value={showAmounts}
+            onChange={setShowAmounts}
+          />
 
           {message && (
             <ThemedText type="small" themeColor="textSecondary">
@@ -111,29 +120,5 @@ export default function ShareSummaryScreen() {
 const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
-  },
-  flex: {
-    flex: 1,
-  },
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  track: {
-    width: 44,
-    height: 26,
-    padding: 3,
-    borderRadius: 13,
-  },
-  thumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  thumbOn: {
-    alignSelf: 'flex-end',
   },
 });
