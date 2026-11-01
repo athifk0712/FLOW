@@ -1,12 +1,12 @@
-import { Fragment, type ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Fragment, type ReactNode, useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { searchCurrencies } from '@/lib/currencies';
-import { formatSample } from '@/lib/money';
+import { type Currency, searchCurrencies } from '@/lib/currencies';
+import { type ExchangeRates, loadExchangeRates, RATES_ATTRIBUTION_URL, rateLine } from '@/lib/exchange-rates';
 
 type Props = {
   selected: string;
@@ -15,18 +15,57 @@ type Props = {
   footer?: ReactNode;
 };
 
-// Searchable list of currencies; rupiah first, then the ones Indonesians meet most often.
+function rowDetail(c: Currency, rates: ExchangeRates | null) {
+  if (c.code === 'IDR') return 'Acuan kurs di daftar ini';
+  return rateLine(c.code, rates) ?? `Simbol ${c.symbol.trim()}`;
+}
+
+function formatDay(ms: number) {
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(ms);
+}
+
+// Searchable list of currencies; rupiah first, then the ones Indonesians meet most often. Each row shows today's rate
+// to the rupiah; without a connection and without saved rates it shows just the symbol.
 export function CurrencyList({ selected, onSelect, footer }: Props) {
   const theme = useTheme();
   const [query, setQuery] = useState('');
+  const [rates, setRates] = useState<ExchangeRates | null>(null);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
   const results = searchCurrencies(query);
+
+  useEffect(() => {
+    let alive = true;
+    loadExchangeRates().then((loaded) => {
+      if (!alive) return;
+      setRates(loaded);
+      setRatesLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <View style={styles.wrap}>
       <SearchField value={query} onChangeText={setQuery} placeholder="Cari: rupiah, dolar, USD, $…" />
-      <ThemedText type="small" themeColor="textSecondary">
-        Angka di bawah hanya contoh format penulisan, bukan kurs.
-      </ThemedText>
+      {rates ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {`Kurs perkiraan per ${formatDay(rates.updatedAt)}, bukan harga beli atau jual bank. `}
+          <ThemedText
+            type="small"
+            themeColor="primary"
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(RATES_ATTRIBUTION_URL).catch(() => {})}>
+            Rates By Exchange Rate API
+          </ThemedText>
+        </ThemedText>
+      ) : (
+        ratesLoaded && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Kurs belum bisa dimuat. Periksa koneksimu.
+          </ThemedText>
+        )
+      )}
       <View style={[styles.list, { backgroundColor: theme.backgroundElement }]}>
         {results.map((c, i) => {
           const isSelected = c.code === selected;
@@ -54,7 +93,7 @@ export function CurrencyList({ selected, onSelect, footer }: Props) {
                     {c.name}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {formatSample(c)}
+                    {rowDetail(c, rates)}
                   </ThemedText>
                 </View>
                 {isSelected && (

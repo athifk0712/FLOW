@@ -1,5 +1,5 @@
 import { CURRENCIES, findCurrency, searchCurrencies } from '@/lib/currencies';
-import { formatMoney, formatMoneyShort, formatSample } from '@/lib/money';
+import { formatMoney, formatMoneyShort } from '@/lib/money';
 
 const c = (code: string) => findCurrency(code);
 
@@ -50,13 +50,6 @@ describe('currency formats (amounts in minor units)', () => {
     expect(formatMoneyShort(1_250, c('SGD'))).toBe('S$12.50');
     expect(formatMoneyShort(250_000_000, c('EUR'))).toBe('€2,5 jt');
     expect(formatMoneyShort(2_500_000, c('IDR'))).toBe('Rp2,5 jt');
-  });
-
-  it('picker sample shows the format, not a conversion', () => {
-    expect(formatSample(c('IDR'))).toBe('Rp1.234.567');
-    expect(formatSample(c('USD'))).toBe('$1,234,567.89');
-    expect(formatSample(c('EUR'))).toBe('€1.234.567,89');
-    expect(formatSample(c('JPY'))).toBe('¥1,234,567');
   });
 
   it('finds currencies by name, code or symbol', () => {

@@ -93,12 +93,3 @@ export function formatMoneyShort(amount: number, currency: Currency = getCurrenc
   const local = text.replace(/\s/g, ' ').replace(',', SEPARATORS[currency.grouping].decimal);
   return `${amount < 0 ? '-' : ''}${currency.symbol}${local}`;
 }
-
-/**
- * The same digits written the way `currency` writes them, to show its format in a picker: "Rp1.234.567",
- * "$1,234,567.89", "¥1,234,567". Only an illustration: equal digits across currencies are not equal amounts.
- */
-export function formatSample(currency: Currency) {
-  const minor = 1_234_567 * 10 ** currency.decimals + (currency.decimals > 0 ? 89 : 0);
-  return formatMoney(minor, currency);
-}
