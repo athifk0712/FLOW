@@ -7,10 +7,16 @@ import { supabase } from '@/lib/supabase';
 export async function loadPockets(): Promise<Pocket[]> {
   const { data, error } = await supabase
     .from('v_pocket_balances')
-    .select('id, account_id, name, balance')
+    .select('id, account_id, name, balance, reserved')
     .order('created_at');
   if (error) throw new Error(error.message);
-  return (data ?? []).map((p) => ({ id: p.id!, account_id: p.account_id!, name: p.name!, balance: p.balance ?? 0 }));
+  return (data ?? []).map((p) => ({
+    id: p.id!,
+    account_id: p.account_id!,
+    name: p.name!,
+    balance: p.balance ?? 0,
+    reserved: p.reserved ?? false,
+  }));
 }
 
 /** The pockets for a form; it just shows none when they can't be loaded, since a pocket is optional. */
@@ -22,9 +28,14 @@ export function usePockets() {
   return pockets;
 }
 
-export async function createPocket(accountId: string, name: string) {
-  const { error } = await supabase.from('pockets').insert({ account_id: accountId, name: name.trim() });
+export async function createPocket(accountId: string, name: string, reserved: boolean) {
+  const { error } = await supabase.from('pockets').insert({ account_id: accountId, name: name.trim(), reserved });
   if (error) throw new Error(error.code === '23505' ? 'Nama ini sudah ada di akun ini.' : error.message);
+}
+
+export async function setPocketReserved(id: string, reserved: boolean) {
+  const { error } = await supabase.from('pockets').update({ reserved }).eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function renamePocket(id: string, name: string) {

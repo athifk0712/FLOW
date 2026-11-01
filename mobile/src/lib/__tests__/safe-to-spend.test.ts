@@ -1,4 +1,11 @@
-import { computeSafeToSpend, occurrences, type SafeInput, type SafeRule } from '@/lib/safe-to-spend';
+import {
+  computeSafeToSpend,
+  occurrences,
+  reservedInPockets,
+  type SafeInput,
+  type SafeRule,
+  spentFromAllowance,
+} from '@/lib/safe-to-spend';
 
 const now = new Date(2026, 9, 20, 10); // Tuesday 20 Oct 2026
 const cycleEnd = new Date(2026, 10, 1); // 1 Nov -> 12 days left including today
@@ -18,6 +25,7 @@ const input = (extra: Partial<SafeInput>): SafeInput => ({
   rules: [],
   debts: [],
   goalsSaved: 0,
+  pocketsReserved: 0,
   essential: null,
   spentToday: 0,
   cycleEnd,
@@ -93,5 +101,48 @@ describe('computeSafeToSpend', () => {
     const s = computeSafeToSpend(input({ cash: 500_000, rules: [rule({})], goalsSaved: 200_000 }), now);
     expect(s.safe).toBe(-700_000);
     expect(s.dailyLimit).toBe(0);
+  });
+
+  it('takes reserved pockets off the safe amount, alongside goals', () => {
+    const s = computeSafeToSpend(input({ pocketsReserved: 1_000_000, goalsSaved: 200_000 }), now);
+    expect(s.safe).toBe(1_800_000);
+    expect(s.pocketsReserved).toBe(1_000_000);
+  });
+
+  it('is not moved by spending out of a reserved pocket', () => {
+    const morning = computeSafeToSpend(input({ pocketsReserved: 1_000_000 }), now);
+    const spent = spentFromAllowance([{ amount: 500_000, pocket_id: 'tabungan' }], new Set(['tabungan']));
+    const after = computeSafeToSpend(input({ cash: 2_500_000, pocketsReserved: 500_000, spentToday: spent }), now);
+    expect(after.safe).toBe(morning.safe);
+    expect(after.dailyLimit).toBe(morning.dailyLimit);
+    expect(after.leftToday).toBe(morning.leftToday);
+  });
+});
+
+describe('reservedInPockets', () => {
+  const active = new Set<string | null>(['bca']);
+  const pocket = (extra: object) => ({ account_id: 'bca', balance: 100_000, reserved: true, ...extra });
+
+  it('counts only reserved pockets', () => {
+    expect(reservedInPockets([pocket({}), pocket({ reserved: false, balance: 999_000 })], active)).toBe(100_000);
+  });
+
+  it('ignores pockets of accounts that are not in the cash', () => {
+    expect(reservedInPockets([pocket({ account_id: 'arsip' })], active)).toBe(0);
+  });
+
+  it('does not let an overdrawn pocket cancel another', () => {
+    expect(reservedInPockets([pocket({ balance: -50_000 }), pocket({})], active)).toBe(100_000);
+  });
+});
+
+describe('spentFromAllowance', () => {
+  it('counts everything except reserved pockets', () => {
+    const rows = [
+      { amount: 10_000, pocket_id: null },
+      { amount: 20_000, pocket_id: 'jajan' },
+      { amount: 40_000, pocket_id: 'tabungan' },
+    ];
+    expect(spentFromAllowance(rows, new Set(['tabungan']))).toBe(30_000);
   });
 });

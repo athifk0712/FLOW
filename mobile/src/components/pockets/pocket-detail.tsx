@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { SwitchRow } from '@/components/switch-row';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/money';
-import { deletePocket, loadPocketActivity, renamePocket } from '@/lib/pocket-data';
+import { deletePocket, loadPocketActivity, renamePocket, setPocketReserved } from '@/lib/pocket-data';
 import { type Pocket, type PocketActivity, pocketActivity, pocketNameProblem } from '@/lib/pockets';
 
 const SHOWN = 10;
+export const RESERVED_LABEL = 'Lindungi dari Aman dibelanjakan';
 
 type Props = {
   pocket: Pocket;
@@ -51,6 +53,16 @@ export function PocketDetail({ pocket, siblings, onFill, onTake, onChanged }: Pr
     }
   }
 
+  async function toggleReserved(value: boolean) {
+    setError(null);
+    try {
+      await setPocketReserved(pocket.id, value);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal menyimpan.');
+    }
+  }
+
   async function remove() {
     if (!confirmDelete) return setConfirmDelete(true);
     try {
@@ -77,6 +89,14 @@ export function PocketDetail({ pocket, siblings, onFill, onTake, onChanged }: Pr
         {action('Isi', onFill)}
         {action('Ambil', onTake)}
       </View>
+
+      <SwitchRow
+        flat
+        label={RESERVED_LABEL}
+        detail={pocket.reserved ? 'Saldo kantong ini tidak dihitung aman dibelanjakan.' : 'Saldo kantong ini masih dihitung aman dibelanjakan.'}
+        value={pocket.reserved}
+        onChange={toggleReserved}
+      />
 
       {activity === null && !error && <ActivityIndicator />}
       {activity?.length === 0 && (

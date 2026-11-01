@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-
 
 import { ShareCard } from '@/components/charts/share-card';
 import { PrimaryButton } from '@/components/form-fields';
-import { ShareToggle } from '@/components/share-toggle';
+import { SwitchRow } from '@/components/switch-row';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -93,7 +93,7 @@ export default function ShareSummaryScreen() {
             />
           </View>
 
-          <ShareToggle
+          <SwitchRow
             label="Tampilkan nominal"
             detail={showAmounts ? 'Angka uangmu akan terlihat oleh yang melihat status.' : 'Hanya persentase yang terlihat.'}
             value={showAmounts}

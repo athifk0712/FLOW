@@ -102,6 +102,9 @@ export function SafeToSpendCard({ data, cash, until, hidden = false, onToggleHid
           {data.goalsSaved > 0 && (
             <Line label="Disisihkan untuk tabungan" amount={-data.goalsSaved} onPress={() => router.push('/goals')} />
           )}
+          {data.pocketsReserved > 0 && (
+            <Line label="Disisihkan di kantong" amount={-data.pocketsReserved} onPress={() => router.push('/pockets')} />
+          )}
           {data.hasEssentialBudget ? (
             <Line label="Cadangan kebutuhan pokok" amount={-data.essentials} />
           ) : (

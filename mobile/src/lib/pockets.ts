@@ -1,7 +1,14 @@
 // Kantong: one account's balance divided by purpose. The money stays in the account, so these numbers always add up
 // to the account's balance; Utama is whatever is not in a pocket.
 
-export type Pocket = { id: string; account_id: string; name: string; balance: number };
+export type Pocket = {
+  id: string;
+  account_id: string;
+  name: string;
+  balance: number;
+  /** Protected: its balance doesn't count as safe to spend. */
+  reserved: boolean;
+};
 
 export type PocketMove = {
   id: string;
@@ -22,6 +29,11 @@ export type PocketSpend = {
 export type PocketActivity = { id: string; title: string; amount: number; at: string };
 
 export const POCKET_SUGGESTIONS = ['Jajan', 'Cicilan', 'Tagihan', 'Tabungan', 'Darurat'];
+
+/** What the switch starts on for a new pocket: the same name the pocket_reserved migration protected once. */
+export function defaultReserved(name: string) {
+  return name.trim().toLowerCase() === 'tabungan';
+}
 
 /** Utama: the account's balance minus every pocket. Negative when more was spent from it than it held. */
 export function mainBalance(accountBalance: number, pockets: Pick<Pocket, 'balance'>[]) {

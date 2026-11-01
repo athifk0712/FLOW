@@ -50,8 +50,8 @@ export async function buildSnapshot(supabase: SupabaseClient, userId: string, mo
   const nextStart = addMonth(thisStart, 1);
   const since = new Date(Date.parse(`${prevStart}T00:00:00Z`) - 86_400_000).toISOString();
 
-  const [balances, safe, tx, categories, debts, goals, rules] = await Promise.all([
-    supabase.from('v_account_balances').select('name, current_balance').is('archived_at', null).order('name'),
+  const [balances, safe, tx, categories, debts, goals, rules, reservedPockets] = await Promise.all([
+    supabase.from('v_account_balances').select('account_id, name, current_balance').is('archived_at', null).order('name'),
     supabase.rpc('safe_to_spend', { p_user_id: userId }).maybeSingle(),
     supabase
       .from('transactions')
@@ -63,6 +63,7 @@ export async function buildSnapshot(supabase: SupabaseClient, userId: string, mo
     supabase.from('v_debts').select('direction, person, remaining, due_date').eq('settled', false),
     supabase.from('v_goal_progress').select('name, target_amount, saved, deadline'),
     supabase.from('recurring_transactions').select('name, amount, type, next_due, day_of_month').eq('active', true),
+    supabase.from('v_pocket_balances').select('account_id, balance').eq('reserved', true),
   ]);
 
   const gaps: string[] = [];
@@ -111,9 +112,15 @@ export async function buildSnapshot(supabase: SupabaseClient, userId: string, mo
   const goalRows = goals.data ?? [];
   const goalsSaved = Math.max(0, goalRows.reduce((s, g) => s + (g.saved ?? 0), 0));
 
+  // As in safe_to_spend(): only accounts counted in the cash, and an overdrawn pocket reserves nothing.
+  const activeAccounts = new Set(accountRows.map((a) => a.account_id));
+  const pocketsReserved = (reservedPockets.data ?? [])
+    .filter((p) => activeAccounts.has(p.account_id))
+    .reduce((s, p) => s + Math.max(0, p.balance ?? 0), 0);
+
   const safeRow = safe.data as { safe: number; daily_limit: number; days_left: number } | null;
   if (!safeRow) gaps.push('Safe to Spend belum bisa dihitung.');
-  const essentials = safeRow ? cash - billsTotal - debtsDue - goalsSaved - safeRow.safe : null;
+  const essentials = safeRow ? cash - billsTotal - debtsDue - goalsSaved - pocketsReserved - safeRow.safe : null;
   if (essentials === 0) gaps.push('Belum ada budget kebutuhan pokok mingguan, jadi tidak ada dana kebutuhan yang disisihkan.');
   if (startDay === 1) gaps.push('Siklus gajian memakai tanggal 1 (bawaan); bisa diubah di Pengaturan > Siklus.');
 
@@ -126,12 +133,13 @@ export async function buildSnapshot(supabase: SupabaseClient, userId: string, mo
       ? {
           safe_until_payday_text: money(safeRow.safe),
           daily_limit_text: money(safeRow.daily_limit),
-          formula: 'total saldo − tagihan rutin sebelum gajian − utang jatuh tempo sebelum gajian − dana target tabungan − cadangan kebutuhan pokok',
+          formula: 'total saldo − tagihan rutin sebelum gajian − utang jatuh tempo sebelum gajian − dana target tabungan − kantong yang dilindungi − cadangan kebutuhan pokok',
           breakdown: {
             total_balance_text: money(cash),
             upcoming_bills_text: money(billsTotal),
             debts_due_text: money(debtsDue),
             goals_set_aside_text: money(goalsSaved),
+            protected_pockets_text: money(pocketsReserved),
             essentials_reserve_text: money(Math.max(0, essentials ?? 0)),
           },
         }

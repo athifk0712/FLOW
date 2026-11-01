@@ -9,17 +9,20 @@ type Props = {
   detail: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  /** No surface of its own, for use inside a card. */
+  flat?: boolean;
 };
 
-// A privacy switch on the share screens.
-export function ShareToggle({ label, detail, value, onChange }: Props) {
+// A labelled on/off switch.
+export function SwitchRow({ label, detail, value, onChange, flat = false }: Props) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={() => onChange(!value)}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
+      aria-checked={value}
+      accessibilityLabel={label}
+      style={[styles.row, !flat && [styles.surface, { backgroundColor: theme.backgroundElement }]]}>
       <View style={styles.flex}>
         <ThemedText type="smallBold">{label}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
@@ -37,10 +40,12 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  toggle: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  surface: {
     padding: Spacing.three,
     borderRadius: Spacing.three,
   },

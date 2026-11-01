@@ -2,8 +2,9 @@ import type { Enums } from '@/lib/database.types';
 import { localDate } from '@/lib/debts';
 
 // "Safe to spend": cash that is not already promised to something until the end of the cycle.
-//   safe = cash − upcoming bills − debts falling due − money set aside for goals − essentials reserve
+//   safe = cash − upcoming bills − debts falling due − money set aside for goals − reserved pockets − essentials reserve
 // The daily limit is computed from this morning's position, so it stays put while you spend during the day.
+// Mirrored by safe_to_spend() in SQL: change both together.
 
 export type SafeRule = { name: string; amount: number; type: Enums<'transaction_type'>; active: boolean; next_due: string; day_of_month: number };
 export type SafeDebt = { direction: 'OWED_TO_ME' | 'I_OWE' | null; remaining: number | null; due_date: string | null; settled: boolean | null };
@@ -14,8 +15,9 @@ export type SafeInput = {
   rules: SafeRule[];
   debts: SafeDebt[];
   goalsSaved: number; // earmarked money still sitting in the accounts
+  pocketsReserved: number; // see reservedInPockets
   essential: EssentialBudget; // this week's ESSENTIAL budget, if the user set one
-  spentToday: number;
+  spentToday: number; // see spentFromAllowance
   cycleEnd: Date; // exclusive, local midnight
 };
 
@@ -27,6 +29,7 @@ export type SafeToSpend = {
   billsTotal: number;
   debtsDue: number;
   goalsSaved: number;
+  pocketsReserved: number;
   essentials: number;
   hasEssentialBudget: boolean;
   daysLeft: number; // including today
@@ -58,6 +61,27 @@ export function occurrences(rule: SafeRule, end: Date) {
   return dates;
 }
 
+/**
+ * What reserved pockets hold, in the accounts that count towards cash: an archived account's pockets aren't in the
+ * cash, so they must not come off it. An overdrawn pocket reserves nothing, and its minus can't cancel another pocket.
+ */
+export function reservedInPockets(
+  pockets: { account_id: string | null; balance: number | null; reserved: boolean | null }[],
+  activeAccountIds: Set<string | null>,
+) {
+  return pockets
+    .filter((p) => p.reserved && activeAccountIds.has(p.account_id))
+    .reduce((sum, p) => sum + Math.max(0, p.balance ?? 0), 0);
+}
+
+/**
+ * Today's spending that used the daily allowance. Spending out of a reserved pocket lowers cash and the reserve
+ * equally, so it leaves the safe amount as it was and must not look like the allowance was used.
+ */
+export function spentFromAllowance(rows: { amount: number; pocket_id: string | null }[], reservedPocketIds: Set<string | null>) {
+  return rows.filter((t) => !reservedPocketIds.has(t.pocket_id)).reduce((sum, t) => sum + t.amount, 0);
+}
+
 export function computeSafeToSpend(input: SafeInput, now = new Date()): SafeToSpend {
   const today = startOfDay(now);
   const daysLeft = Math.max(1, Math.round((input.cycleEnd.getTime() - today.getTime()) / DAY));
@@ -82,7 +106,8 @@ export function computeSafeToSpend(input: SafeInput, now = new Date()): SafeToSp
   }
 
   const goalsSaved = Math.max(0, input.goalsSaved);
-  const safe = input.cash - billsTotal - debtsDue - goalsSaved - essentials;
+  const pocketsReserved = Math.max(0, input.pocketsReserved);
+  const safe = input.cash - billsTotal - debtsDue - goalsSaved - pocketsReserved - essentials;
   // Today's spending already left the accounts; add it back to get this morning's position.
   // Rounded down to whole thousands: easy to remember at the till, and never more than is safe.
   const perDay = Math.max(0, (safe + input.spentToday) / daysLeft);
@@ -94,6 +119,7 @@ export function computeSafeToSpend(input: SafeInput, now = new Date()): SafeToSp
     billsTotal,
     debtsDue,
     goalsSaved,
+    pocketsReserved,
     essentials,
     hasEssentialBudget: !!input.essential,
     daysLeft,

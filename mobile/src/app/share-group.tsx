@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/form-fields';
-import { ShareToggle } from '@/components/share-toggle';
+import { SwitchRow } from '@/components/switch-row';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { GroupShareCard } from '@/components/together/group-share-card';
@@ -89,13 +89,13 @@ export default function ShareGroupScreen() {
             />
           </View>
 
-          <ShareToggle
+          <SwitchRow
             label="Tampilkan nominal"
             detail={showAmounts ? 'Jumlah uang grup akan terlihat oleh yang melihat status.' : 'Hanya persentase yang terlihat.'}
             value={showAmounts}
             onChange={setShowAmounts}
           />
-          <ShareToggle
+          <SwitchRow
             label="Tampilkan nama anggota"
             detail={showNames ? 'Pastikan teman-temanmu tidak keberatan namanya terlihat.' : 'Anggota hanya tampil sebagai titik.'}
             value={showNames}

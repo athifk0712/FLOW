@@ -1,4 +1,13 @@
-import { categoryForPocket, mainBalance, moveProblem, pocketActivity, pocketNameProblem } from '@/lib/pockets';
+import { categoryForPocket, defaultReserved, mainBalance, moveProblem, pocketActivity, pocketNameProblem } from '@/lib/pockets';
+
+describe('defaultReserved', () => {
+  it('starts on only for the exact name the migration protected', () => {
+    expect(defaultReserved(' tabungan ')).toBe(true);
+    expect(defaultReserved('TABUNGAN')).toBe(true);
+    expect(defaultReserved('Tabungan Haji')).toBe(false);
+    expect(defaultReserved('Jajan')).toBe(false);
+  });
+});
 
 describe('categoryForPocket', () => {
   const categories = [{ name: 'Kopi' }, { name: 'Makan Siang' }, { name: 'Lainnya' }];

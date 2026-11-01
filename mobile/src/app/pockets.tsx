@@ -4,7 +4,8 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MoveForm } from '@/components/pockets/move-form';
-import { PocketDetail } from '@/components/pockets/pocket-detail';
+import { PocketDetail, RESERVED_LABEL } from '@/components/pockets/pocket-detail';
+import { SwitchRow } from '@/components/switch-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ModalEdges } from '@/constants/safe-area';
@@ -13,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/money';
 import { closeModal } from '@/lib/navigation';
 import { createPocket, loadPockets } from '@/lib/pocket-data';
-import { mainBalance, type Pocket, POCKET_SUGGESTIONS, pocketNameProblem } from '@/lib/pockets';
+import { defaultReserved, mainBalance, type Pocket, POCKET_SUGGESTIONS, pocketNameProblem } from '@/lib/pockets';
 import { supabase } from '@/lib/supabase';
 
 type Account = { id: string; name: string; balance: number };
@@ -31,6 +32,8 @@ export default function PocketsScreen() {
   const [move, setMove] = useState<Move | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  // null until the user touches the switch; it then follows their choice instead of the name.
+  const [newReserved, setNewReserved] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Bumped after a change, so an open pocket's history reloads too.
@@ -64,6 +67,7 @@ export default function PocketsScreen() {
   const main = account ? mainBalance(account.balance, own) : 0;
   const nameIssue = newName ? pocketNameProblem(newName, own) : null;
   const canCreate = !!newName.trim() && !nameIssue && !saving;
+  const reservedChoice = newReserved ?? defaultReserved(newName);
   const suggestions = POCKET_SUGGESTIONS.filter((s) => !own.some((p) => p.name.toLowerCase() === s.toLowerCase()));
 
   function pickAccount(id: string) {
@@ -78,8 +82,9 @@ export default function PocketsScreen() {
     setSaving(true);
     setError(null);
     try {
-      await createPocket(account.id, newName);
+      await createPocket(account.id, newName, reservedChoice);
       setNewName('');
+      setNewReserved(null);
       setAdding(false);
       await load();
     } catch (e) {
@@ -181,9 +186,14 @@ export default function PocketsScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ expanded: open === pocket.id }}
                     style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-                    <ThemedText style={styles.flex} numberOfLines={1}>
-                      {pocket.name}
-                    </ThemedText>
+                    <View style={styles.flex}>
+                      <ThemedText numberOfLines={1}>{pocket.name}</ThemedText>
+                      {pocket.reserved && (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          Dilindungi
+                        </ThemedText>
+                      )}
+                    </View>
                     <ThemedText type="smallBold" themeColor={pocket.balance < 0 ? 'danger' : 'text'}>
                       {formatMoney(pocket.balance)}
                     </ThemedText>
@@ -252,6 +262,13 @@ export default function PocketsScreen() {
                       {nameIssue}
                     </ThemedText>
                   )}
+                  <SwitchRow
+                    flat
+                    label={RESERVED_LABEL}
+                    detail={reservedChoice ? 'Saldo kantong ini tidak dihitung aman dibelanjakan.' : 'Saldo kantong ini masih dihitung aman dibelanjakan.'}
+                    value={reservedChoice}
+                    onChange={setNewReserved}
+                  />
                   <View style={styles.actions}>
                     <Pressable onPress={() => setAdding(false)} hitSlop={8}>
                       <ThemedText type="smallBold" themeColor="textSecondary">

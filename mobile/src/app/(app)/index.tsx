@@ -31,7 +31,7 @@ import { takeSaved } from '@/lib/last-saved';
 import { formatMoney, formatMoneyShort } from '@/lib/money';
 import { isOnboarded } from '@/lib/onboarding';
 import { syncDueReminders } from '@/lib/reminders';
-import { computeSafeToSpend, type SafeRule } from '@/lib/safe-to-spend';
+import { computeSafeToSpend, reservedInPockets, type SafeRule, spentFromAllowance } from '@/lib/safe-to-spend';
 import { celebratedOn, markCelebrated, shouldCelebrate, STREAK_COLUMNS, streakFromProfile, type StreakView } from '@/lib/streak';
 import { netWorth } from '@/lib/assets';
 import { supabase } from '@/lib/supabase';
@@ -84,6 +84,7 @@ export default function HomeScreen() {
   const [openDebts, setOpenDebts] = useState<Debt[]>([]);
   const [rules, setRules] = useState<SafeRule[]>([]);
   const [spentToday, setSpentToday] = useState(0);
+  const [reservedPockets, setReservedPockets] = useState<{ account_id: string | null; balance: number | null; reserved: boolean | null }[]>([]);
   const [timeInsight, setTimeInsight] = useState<TimeInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Admin fees charged on this open and "it's saved" after Catat, shown one after another.
@@ -122,7 +123,7 @@ export default function HomeScreen() {
             .from('recurring_transactions')
             .select('name, amount, type, active, next_due, day_of_month')
             .eq('active', true),
-          supabase.from('transactions').select('amount').eq('type', 'EXPENSE').gte('occurred_at', todayStart),
+          supabase.from('transactions').select('amount, pocket_id').eq('type', 'EXPENSE').gte('occurred_at', todayStart),
           supabase
             .from('transactions')
             .select('occurred_at, amount, necessity')
@@ -131,6 +132,7 @@ export default function HomeScreen() {
             .gte('occurred_at', insightSince),
           supabase.from('profiles').select(STREAK_COLUMNS).maybeSingle(),
           supabase.from('v_assets').select('current_value').eq('status', 'ACTIVE'),
+          supabase.from('v_pocket_balances').select('id, account_id, balance, reserved').eq('reserved', true),
         ]);
       // Post due recurring transactions first so balances and budgets include them.
       // A failure there should not block the dashboard; the next focus retries.
@@ -142,7 +144,7 @@ export default function HomeScreen() {
           syncDueReminders(); // next_due may have moved on
           return load();
         })
-        .then(([bal, bud, due, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows]) => {
+        .then(([bal, bud, due, cats, goalRows, debtRows, ruleRows, todayRows, judgedRows, profileRow, assetRows, pocketRows]) => {
           const failed =
             bal.error ??
             bud.error ??
@@ -152,7 +154,9 @@ export default function HomeScreen() {
             debtRows.error ??
             ruleRows.error ??
             todayRows.error ??
-            judgedRows.error;
+            judgedRows.error ??
+            // Not optional like assets: without it the safe amount would quietly include protected money.
+            pocketRows.error;
           if (failed) return setError(failed.message);
           setError(null);
           setLoaded(true);
@@ -165,7 +169,8 @@ export default function HomeScreen() {
           setGoals(goalRows.data ?? []);
           setOpenDebts(debtRows.data ?? []);
           setRules(ruleRows.data ?? []);
-          setSpentToday((todayRows.data ?? []).reduce((sum, t) => sum + t.amount, 0));
+          setReservedPockets(pocketRows.data ?? []);
+          setSpentToday(spentFromAllowance(todayRows.data ?? [], new Set((pocketRows.data ?? []).map((p) => p.id))));
           setTimeInsight(computeTimeInsight(judgedRows.data ?? []));
           // Assets are optional: a failure only hides them from the net worth card.
           setAssetsValue(assetRows.error ? null : (assetRows.data ?? []).reduce((s, a) => s + (a.current_value ?? 0), 0));
@@ -203,6 +208,7 @@ export default function HomeScreen() {
     rules,
     debts: openDebts,
     goalsSaved: goals.reduce((sum, g) => sum + (g.saved ?? 0), 0),
+    pocketsReserved: reservedInPockets(reservedPockets, new Set(balances.map((b) => b.account_id))),
     essential: essential ? { limit_amount: essential.limit_amount ?? 0, remaining: essential.remaining ?? 0 } : null,
     spentToday,
     cycleEnd,
