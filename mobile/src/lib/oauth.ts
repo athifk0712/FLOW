@@ -71,9 +71,10 @@ export async function continueWithGoogle(mode: OAuthMode): Promise<GoogleResult>
   const isWeb = Platform.OS === 'web';
   // The trailing slash matters: Supabase's allow list has "https://flowku.expo.app/**", which the bare origin
   // doesn't match, and an unlisted redirect silently falls back to the Site URL. A web link comes back to
-  // Pengaturan, where the button was, so its result can be shown there.
+  // Profil, where the button is (components/settings/account-section.tsx), so its result is read there. Coming
+  // back anywhere else loses it: the "already has an account" error then never turns into signing in.
   const redirectTo = isWeb
-    ? `${window.location.origin}/${mode === 'link' ? 'settings' : ''}`
+    ? `${window.location.origin}/${mode === 'link' ? 'profile' : ''}`
     : Linking.createURL('auth-callback'); // flow://auth-callback, a route that steps aside (app/auth-callback.tsx)
   const options = { redirectTo, skipBrowserRedirect: !isWeb };
 
@@ -115,7 +116,11 @@ export async function takeWebLinkResult(): Promise<GoogleResult | null> {
 
   await supabase.auth.getSession();
   const params = readParams(window.location.href);
-  if (!params.error && !params.error_description) return { kind: 'ok' };
+  if (!params.error && !params.error_description) {
+    // Still a guest with no error in the address: the result was lost on the way back, so don't pretend it worked.
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.is_anonymous ? { kind: 'error', message: 'Google belum tersambung. Coba lagi.' } : { kind: 'ok' };
+  }
   window.history.replaceState(null, '', window.location.pathname);
   return describeError(params.error_code, params.error_description || params.error);
 }
