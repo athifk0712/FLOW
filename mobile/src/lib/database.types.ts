@@ -1298,6 +1298,7 @@ export type Database = {
         Args: { p_account_id: string; p_amount?: number; p_intent_id: string }
         Returns: string
       }
+      reset_my_data: { Args: never; Returns: string[] }
       set_debt_wallet: {
         Args: { p_account_id?: string; p_debt_id: string }
         Returns: undefined

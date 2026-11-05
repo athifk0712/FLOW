@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { DeleteAccountSection } from '@/components/settings/delete-account-section';
+import { ResetDataSection } from '@/components/settings/reset-data-section';
 import { SubScreen } from '@/components/sub-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -51,6 +52,7 @@ export default function BackupScreen() {
           </ThemedText>
         )}
       </ThemedView>
+      <ResetDataSection onExport={exportCsv} exporting={exporting} />
       <DeleteAccountSection onExport={exportCsv} exporting={exporting} />
     </SubScreen>
   );
