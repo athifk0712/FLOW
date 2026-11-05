@@ -32,8 +32,9 @@ export function ResetDataSection({ onExport, exporting }: { onExport: () => void
       await resetMyData();
       close();
       setResetting(false);
-      // Beranda sees no wallets and runs the first-run setup again.
-      router.replace('/');
+      // Back to the Beranda already in the stack (replace would stack a second copy of the tabs, each refetching on
+      // focus). With no wallets left, it runs the first-run setup again.
+      router.dismissTo('/');
       return;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Data belum bisa direset.');
