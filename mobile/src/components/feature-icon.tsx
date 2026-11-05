@@ -1,4 +1,11 @@
+import { memo } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+
+import { AppSymbol } from '@/components/app-symbol';
+import { NORMAL_SYMBOLS } from '@/constants/feature-icons';
+import { useTheme } from '@/hooks/use-theme';
+import { useIconStyle } from '@/lib/icon-style';
 
 // The hen's palette from the celengan ayam mark, plus the chick's yellow. The same in light and dark themes, like the
 // companion, so the icons stay recognisable.
@@ -265,7 +272,8 @@ function Glyph({ name, bg }: { name: FeatureIconName; bg: string }) {
 }
 
 /** A feature's round, colourful icon with the Flowku chick in it, like the service grid of a super app. */
-export function FeatureIcon({ name, size = 46 }: { name: FeatureIconName; size?: number }) {
+/** The celengan ayam illustration: a coloured circle with the feature's object and the chick. */
+function ChickIcon({ name, size }: { name: FeatureIconName; size: number }) {
   const bg = BACKGROUND[name];
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
@@ -274,3 +282,35 @@ export function FeatureIcon({ name, size = 46 }: { name: FeatureIconName; size?:
     </Svg>
   );
 }
+
+/** The plain look: the feature's line symbol in the brand colour on a soft circle, like most finance apps. */
+function NormalIcon({ name, size }: { name: FeatureIconName; size: number }) {
+  const theme = useTheme();
+  const symbol = NORMAL_SYMBOLS[name] ?? NORMAL_SYMBOLS.more;
+  return (
+    <View
+      style={[
+        styles.circle,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.backgroundSelected },
+      ]}>
+      <AppSymbol material={symbol.material} sf={symbol.sf} size={Math.round(size * 0.5)} color={theme.primary} />
+    </View>
+  );
+}
+
+/** A feature's round icon in the style chosen under Tampilan; Normal unless the user picked Celengan Ayam. */
+export const FeatureIcon = memo(function FeatureIcon({ name, size = 46 }: { name: FeatureIconName; size?: number }) {
+  return useIconStyle() === 'ayam' ? <ChickIcon name={name} size={size} /> : <NormalIcon name={name} size={size} />;
+});
+
+/** Both styles side by side for the picker, independent of the current choice. */
+export function FeatureIconPreview({ name, style, size = 40 }: { name: FeatureIconName; style: 'normal' | 'ayam'; size?: number }) {
+  return style === 'ayam' ? <ChickIcon name={name} size={size} /> : <NormalIcon name={name} size={size} />;
+}
+
+const styles = StyleSheet.create({
+  circle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
